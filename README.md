@@ -11,6 +11,19 @@ Manor Lords(Steam)용 UE4SS Lua 치트 모드와 외부 제어 패널.
 
 전제: 게임 폴더에 UE4SS v3.0.1(`dwmapi.dll` 프록시)이 설치돼 있어야 한다.
 
+## 기능
+
+| 기능 | 담당 | 패널 탭 |
+|---|---|---|
+| ① 자원 목표값 유지 (자원 55종 + 지역 재화·금고·영향력, 부족분만 보충, 내 지역마다) | Lua | 자원 |
+| ② 자재 불필요, 즉시 수리 | Lua | 건설 |
+| ② 배치 제한 무시, 즉시 완공 | 네이티브 (Plan 3, 미구현) | 건설 |
+| ③ 업그레이드 조건·비용·해금 무시 | Lua | 업그레이드 |
+| ④ 부대 수 상한 99, 모집비·용병 비용 0, 장비·훈련·집 레벨 요구 해제 | Lua | 군사 |
+| ④ 주민 수를 넘는 징집 | 네이티브 (Plan 3, 미구현) | 군사 |
+
+데이터 표(업그레이드·건물·유닛·용병) 변경은 메모리에만 적용되며 게임을 다시 켜면 원복된다. 기능을 꺼도 이미 적용된 값은 되돌리지 않는다.
+
 ## 설치
     pwsh tools/backup-saves.ps1
     pwsh tools/deploy.ps1 -Mod MLToybox
@@ -24,6 +37,10 @@ Manor Lords(Steam)용 UE4SS Lua 치트 모드와 외부 제어 패널.
 ## 테스트
     dotnet test panel/MLToybox.sln
     pwsh tools/tests/Tools.Tests.ps1
+
+## 개발 도구
+- 인게임 Lua 실행기: `pwsh tools/deploy.ps1 -Mod MLToyboxLab` 후 게임 재시작, 그다음 `pwsh tools/lab.ps1 -File probe.lua`. 게임 스레드에서 실행하고 `print` 출력을 돌려준다. 개발이 끝나면 `-Remove`로 제거한다.
+- Lua 파일은 백슬래시가 깨지지 않도록 셸 heredoc이 아닌 편집기로 작성한다.
 
 ## 게임 업데이트 후 복구 절차
 1. `pwsh tools/deploy.ps1 -Mod MLToyboxDump`, 게임 실행 후 세이브 로드
