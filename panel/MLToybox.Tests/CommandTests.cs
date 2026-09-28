@@ -44,6 +44,36 @@ public class CommandTests
     }
 
     [Fact]
+    public void ReformCommand_SerializesTypeWithoutUnit()
+    {
+        var dir = Path.Combine(Directory.CreateTempSubdirectory("mltb-cmd-").FullName, "bridge");
+        var c = new BridgeClient(dir, () => Now);
+        var doc = new ControlDocument();
+        doc.Commands.Add(ControlCommand.ReformSquads(Now));
+        c.SaveControl(doc);
+        using var json = JsonDocument.Parse(File.ReadAllText(c.ControlPath));
+        var cmd = json.RootElement.GetProperty("commands")[0];
+        Assert.Equal("reformSquads", cmd.GetProperty("type").GetString());
+        Assert.Equal(1_800_000_000, cmd.GetProperty("issuedAt").GetInt64());
+        Assert.False(string.IsNullOrWhiteSpace(cmd.GetProperty("id").GetString()));
+    }
+
+    [Fact]
+    public void ReadStatus_ParsesDisbandedSpawnedSquads()
+    {
+        var dir = Path.Combine(Directory.CreateTempSubdirectory("mltb-cmd-").FullName, "bridge");
+        Directory.CreateDirectory(dir);
+        var c = new BridgeClient(dir, () => Now);
+        File.WriteAllText(c.StatusPath,
+            """{"version":1,"heartbeat":1800000000,"inGame":true,"spawn":{"disbanded":3,"pending":1,"byUnit":{"retinue_tier1":2,"militia":1}},"commands":{"r":{"ok":true,"squads":[50,51],"reformed":2}}}""");
+        var s = c.ReadStatus()!;
+        Assert.Equal(3, s.Spawn!.Disbanded);
+        Assert.Equal(1, s.Spawn.Pending);
+        Assert.Equal(2, s.Spawn.ByUnit!["retinue_tier1"]);
+        Assert.Equal(2, s.Commands!["r"].Reformed);
+    }
+
+    [Fact]
     public void UnitCatalog_ListsPlayableUnitsOnly()
     {
         var ids = UnitCatalog.Units.Select(u => u.Id).ToList();

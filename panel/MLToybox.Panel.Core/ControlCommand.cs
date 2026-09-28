@@ -17,6 +17,14 @@ public sealed class ControlCommand
         Count = count,
         IssuedAt = now.ToUnixTimeSeconds(),
     };
+
+    // 해제된 생성 분대(0/N 빈 카드)를 같은 병종으로 다시 생성하고 빈 카드를 정리한다
+    public static ControlCommand ReformSquads(DateTimeOffset now) => new()
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Type = "reformSquads",
+        IssuedAt = now.ToUnixTimeSeconds(),
+    };
 }
 
 public sealed class CommandResult
@@ -24,6 +32,14 @@ public sealed class CommandResult
     public bool Ok { get; set; }
     public string? Error { get; set; }
     public List<int>? Squads { get; set; }
+    public int? Reformed { get; set; }
+}
+
+public sealed class SpawnStatus
+{
+    public int Disbanded { get; set; }
+    public int Pending { get; set; }
+    public Dictionary<string, int>? ByUnit { get; set; }
 }
 
 public sealed record UnitOption(string Id, string Label);
