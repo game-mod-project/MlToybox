@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('MLToybox', 'MLToyboxDump')][string]$Mod,
+    [Parameter(Mandatory)][ValidateSet('MLToybox', 'MLToyboxDump', 'MLToyboxLab')][string]$Mod,
     [string]$GameDir,
     [switch]$Remove,
     [switch]$Panel
@@ -58,6 +58,7 @@ robocopy $src $dstScripts /MIR /NJH /NJS /NP /NFL /NDL | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 $global:LASTEXITCODE = 0
 if ($Mod -eq 'MLToybox') { New-Item -ItemType Directory -Force (Join-Path $target 'bridge') | Out-Null }
+if ($Mod -eq 'MLToyboxLab') { New-Item -ItemType Directory -Force (Join-Path $target 'lab') | Out-Null }
 Update-ModsTxt $true
 Update-ModsJson $true
 Write-Host "Deployed $Mod -> $target"

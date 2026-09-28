@@ -24,16 +24,17 @@ public sealed class MainForm : Form
     };
 
     private readonly CheckBox _buildEnabled = new() { Text = "건설 기능 사용", AutoSize = true };
-    private readonly CheckBox _ignorePlacement = new() { Text = "배치 제한 무시", AutoSize = true };
-    private readonly CheckBox _instantBuild = new() { Text = "즉시 완공", AutoSize = true };
+    private readonly CheckBox _ignorePlacement = new() { Text = "배치 제한 무시 (네이티브, Plan 3)", AutoSize = true };
+    private readonly CheckBox _instantBuild = new() { Text = "즉시 완공 (네이티브, Plan 3)", AutoSize = true };
     private readonly CheckBox _instantRepair = new() { Text = "즉시 수리", AutoSize = true };
+    private readonly CheckBox _noMaterials = new() { Text = "자재 불필요 (건설 자재 없이 공사)", AutoSize = true };
 
     private readonly CheckBox _upgradeEnabled = new() { Text = "업그레이드 조건·비용·해금 무시", AutoSize = true };
 
     private readonly CheckBox _milEnabled = new() { Text = "군사 기능 사용", AutoSize = true };
     private readonly CheckBox _ignoreEquipment = new() { Text = "민병대 장비 요구 무시", AutoSize = true };
-    private readonly CheckBox _ignorePopulation = new() { Text = "징집 인구 제한 무시", AutoSize = true };
-    private readonly CheckBox _zeroUpkeep = new() { Text = "친위대·용병 유지비 0", AutoSize = true };
+    private readonly CheckBox _ignorePopulation = new() { Text = "징집 조건(집 레벨·훈련) 무시 — 주민 수 초과 징집은 네이티브, Plan 3", AutoSize = true };
+    private readonly CheckBox _zeroUpkeep = new() { Text = "용병 비용·모집비 0 (친위대 유지비는 미지원 — 자원 탭 금고 유지로 보정)", AutoSize = true };
     private readonly CheckBox _unlimitedSquads = new() { Text = "부대 수 상한 해제", AutoSize = true };
 
     private readonly TextBox _statusText = new()
@@ -55,7 +56,7 @@ public sealed class MainForm : Form
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(BuildResourcesTab());
-        tabs.TabPages.Add(Page("건설", _buildEnabled, _ignorePlacement, _instantBuild, _instantRepair));
+        tabs.TabPages.Add(Page("건설", _buildEnabled, _ignorePlacement, _instantBuild, _instantRepair, _noMaterials));
         tabs.TabPages.Add(Page("업그레이드", _upgradeEnabled));
         tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads));
         var statusPage = new TabPage("상태");
@@ -151,6 +152,7 @@ public sealed class MainForm : Form
         _ignorePlacement.Checked = f.Build.IgnorePlacement;
         _instantBuild.Checked = f.Build.InstantBuild;
         _instantRepair.Checked = f.Build.InstantRepair;
+        _noMaterials.Checked = f.Build.NoMaterials;
         _upgradeEnabled.Checked = f.Upgrade.Enabled;
         _milEnabled.Checked = f.Military.Enabled;
         _ignoreEquipment.Checked = f.Military.IgnoreEquipment;
@@ -183,6 +185,7 @@ public sealed class MainForm : Form
         f.Build.IgnorePlacement = _ignorePlacement.Checked;
         f.Build.InstantBuild = _instantBuild.Checked;
         f.Build.InstantRepair = _instantRepair.Checked;
+        f.Build.NoMaterials = _noMaterials.Checked;
         f.Upgrade.Enabled = _upgradeEnabled.Checked;
         f.Military.Enabled = _milEnabled.Checked;
         f.Military.IgnoreEquipment = _ignoreEquipment.Checked;
