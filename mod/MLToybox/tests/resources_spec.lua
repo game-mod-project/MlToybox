@@ -63,25 +63,47 @@ T.run({
     T.eq(r.regionalWealth, 100, "wealth"); T.eq(pawn.influence, 50, "influence")
     T.eq(st.resources.RegionalWealth, 100, "wealth reported"); T.eq(st.resources.Influence, 50, "influence reported")
   end,
-  treasury_topup_uses_delta = function()
+  treasury_topup_uses_delta_after_stable_reading = function()
     resources.clock = function() return 1000 end
     local cheat = world({ regions = {}, treasury = 300.0 })
     local st = {}
     resources.tick(st, { targets = { Treasury = 1000 } })
-    T.eq(cheat.changes[1], 700, "delta"); T.eq(st.resources.Treasury, 1000, "reported as topped")
+    T.eq(#cheat.changes, 0, "first reading only observed")
+    resources.tick(st, { targets = { Treasury = 1000 } })
+    T.eq(cheat.changes[1], 700, "delta once reading is stable"); T.eq(st.resources.Treasury, 1000, "reported as topped")
   end,
-  treasury_topup_has_cooldown = function()
+  treasury_stale_hud_never_double_adds = function()
     local now = 2000
+    resources.clock = function() return now end
+    local opts = { regions = {}, treasury = 300.0 }
+    local cheat = world(opts)
+    local st = {}
+    for _ = 1, 8 do resources.tick(st, { targets = { Treasury = 1000 } }); now = now + 2 end  -- HUD 가 16초 동안 300 그대로
+    T.eq(#cheat.changes, 1, "single top-up while HUD is stale")
+    opts.treasury = 1000.0                                                                    -- HUD 반영
+    for _ = 1, 2 do resources.tick(st, { targets = { Treasury = 1000 } }); now = now + 2 end
+    T.eq(#cheat.changes, 1, "no more once target reached")
+    opts.treasury = 400.0                                                                     -- 이후 소비
+    for _ = 1, 2 do resources.tick(st, { targets = { Treasury = 1000 } }); now = now + 2 end
+    T.eq(#cheat.changes, 2, "tops up again after HUD moved and settled")
+  end,
+  treasury_unsettled_hud_is_ignored = function()
+    resources.clock = function() return 3000 end
+    local opts = { regions = {}, treasury = 0.0 }
+    local cheat = world(opts)
+    local st = {}
+    for _, v in ipairs({ 0.0, 12000.0, 45000.0, 66000.0 }) do opts.treasury = v; resources.tick(st, { targets = { Treasury = 70000 } }) end
+    T.eq(#cheat.changes, 0, "no top-up while HUD value keeps changing (count-up after load)")
+  end,
+  treasury_pending_expires = function()
+    local now = 5000
     resources.clock = function() return now end
     local cheat = world({ regions = {}, treasury = 300.0 })
     local st = {}
+    resources.tick(st, { targets = { Treasury = 1000 } }); resources.tick(st, { targets = { Treasury = 1000 } })
+    now = now + resources.TREASURY_PENDING_TIMEOUT + 1
     resources.tick(st, { targets = { Treasury = 1000 } })
-    now = 2002
-    resources.tick(st, { targets = { Treasury = 1000 } })   -- HUD 가 아직 300 을 보여줘도 다시 더하지 않는다
-    T.eq(#cheat.changes, 1, "once within cooldown")
-    now = 2006
-    resources.tick(st, { targets = { Treasury = 1000 } })
-    T.eq(#cheat.changes, 2, "again after cooldown")
+    T.eq(#cheat.changes, 2, "retries after pending timeout if HUD never moved")
   end,
   tick_without_regions_is_noop = function()
     world({ regions = {} })

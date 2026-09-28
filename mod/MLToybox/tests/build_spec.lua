@@ -39,6 +39,23 @@ T.run({
     build.tick({}, { enabled = true, instantRepair = false })
     T.eq(cheat.maintained, 1, "not when off")
   end,
+  no_materials_clears_sites_on_tick_when_enable_ran_before_regions_existed = function()
+    local rows, unbuilt = setup()
+    local regions = game.playerRegions
+    game.playerRegions = function() return {} end          -- 로드 직후: 아직 지역 없음
+    build.enable({}, { enabled = true, noMaterials = true })
+    T.eq(#unbuilt.constructionGoods, 1, "not reachable at enable")
+    game.playerRegions = regions
+    build.tick({}, { enabled = true, noMaterials = true, instantRepair = false })
+    T.eq(#unbuilt.constructionGoods, 0, "cleared on tick")
+  end,
+  invalid_building_elements_are_skipped = function()
+    setup()
+    local region = F.object({})
+    region.GetBuildings = function() return { F.wrap(nil), F.wrap(F.invalid()) } end
+    game.playerRegions = function() return { region } end
+    build.tick({}, { enabled = true, noMaterials = true })
+  end,
   tick_without_cheat_is_noop = function()
     setup()
     game.cheat = function() return nil end

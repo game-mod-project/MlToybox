@@ -1,7 +1,7 @@
 local game = require("core.game")
 local catalog = require("features.resources_catalog")
 
-local M = { name = "resources", intervalSec = 2, TREASURY_COOLDOWN = 5 }
+local M = { name = "resources", intervalSec = 2, TREASURY_PENDING_TIMEOUT = 30 }
 M.clock = os.time
 
 local function shortfall(current, target)
@@ -13,7 +13,31 @@ end
 function M.enable(state)
   state.resourceIds = catalog.ids()
   state.resources = {}
-  state.treasuryCooldownUntil = nil
+  state.treasuryPending = nil
+  state.treasuryLastReading = nil
+end
+
+-- ChangeTreasury 는 증감이고 HUD 값은 늦게(수 초) 반영되거나 로드 직후 카운트업 애니메이션을 한다.
+-- 그래서 (1) 같은 값이 두 번 연속 읽힐 때만 보충하고, (2) 보충 후에는 HUD 값이 바뀌거나 시간이 초과될 때까지 다시 보충하지 않는다.
+local function keepTreasury(state, target, treasury, now)
+  local stable = state.treasuryLastReading == treasury
+  state.treasuryLastReading = treasury
+  local pending = state.treasuryPending
+  if pending then
+    if treasury ~= pending.before or now >= pending.deadline then
+      state.treasuryPending = nil
+    else
+      return treasury + pending.added
+    end
+  end
+  local need = shortfall(treasury, target)
+  if need <= 0 or not stable then return treasury end
+  local cheat = game.cheat()
+  if not cheat then return treasury end
+  local added = math.floor(need)
+  cheat:ChangeTreasury(added)
+  state.treasuryPending = { before = treasury, added = added, deadline = now + M.TREASURY_PENDING_TIMEOUT }
+  return treasury + added
 end
 
 function M.tick(state, settings)
@@ -48,22 +72,8 @@ function M.tick(state, settings)
     cur.Influence = pawn.influence
   end
 
-  -- ChangeTreasury 는 증감이고 HUD 반영이 늦으므로 보충 후 쿨다운 동안 다시 더하지 않는다
   local treasury = game.treasury()
-  if treasury then
-    local now = M.clock()
-    local need = shortfall(treasury, targets.Treasury)
-    local cooling = state.treasuryCooldownUntil and now < state.treasuryCooldownUntil
-    if need > 0 and not cooling then
-      local cheat = game.cheat()
-      if cheat then
-        cheat:ChangeTreasury(math.floor(need))
-        state.treasuryCooldownUntil = now + M.TREASURY_COOLDOWN
-        treasury = treasury + need
-      end
-    end
-    cur.Treasury = treasury
-  end
+  if treasury then cur.Treasury = keepTreasury(state, targets.Treasury, treasury, M.clock()) end
 
   state.resources = cur
 end
