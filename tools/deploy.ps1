@@ -34,6 +34,14 @@ function Update-ModsJson([bool]$register) {
     ConvertTo-Json -InputObject @($list) -Depth 5 | Set-Content -Path $modsJson -Encoding utf8NoBOM
 }
 
+if ($Panel) {
+    $out = Join-Path $repo 'dist\panel'
+    dotnet publish (Join-Path $repo 'panel\MLToybox.Panel\MLToybox.Panel.csproj') -c Release -o $out --nologo -v q
+    if ($LASTEXITCODE -ne 0) { throw 'panel publish failed' }
+    Write-Host "Panel published -> $out\MLToybox.Panel.exe"
+    return
+}
+
 if ($Remove) {
     Update-ModsTxt $false
     Update-ModsJson $false
