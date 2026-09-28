@@ -83,5 +83,21 @@ Test-Case 'deploy MLToyboxLab creates lab folder and registers' {
     Assert-Equal (@(Get-Content "$mods\mods.txt" | Where-Object { $_ -match '^\s*MLToyboxLab\s*:\s*1' }).Count) 1 'registered'
 }
 
+Test-Case 'deploy copies native dll when built and tolerates locked target' {
+    $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $built = Join-Path $repo 'native\build\mltoybox_native.dll'
+    $created = $false
+    if (-not (Test-Path $built)) { New-Item -ItemType Directory -Force (Split-Path $built) | Out-Null; Set-Content $built 'fake'; $created = $true }
+    try {
+        $g = New-FakeGame
+        $mods = Join-Path $g 'ManorLords\Binaries\Win64\ue4ss\Mods'
+        & "$PSScriptRoot\..\deploy.ps1" -Mod MLToybox -GameDir $g | Out-Null
+        $target = "$mods\MLToybox\native\mltoybox_native.dll"
+        Assert-True (Test-Path $target) 'dll copied'
+        $lock = [System.IO.File]::Open($target, 'Open', 'Read', 'None')
+        try { & "$PSScriptRoot\..\deploy.ps1" -Mod MLToybox -GameDir $g 3>$null | Out-Null } finally { $lock.Dispose() }
+    } finally { if ($created) { Remove-Item $built } }
+}
+
 if ($script:failed -gt 0) { throw "$script:failed test(s) failed" }
 Write-Host 'ALL PASS'

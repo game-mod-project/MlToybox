@@ -268,6 +268,17 @@ public sealed class MainForm : Form
         else
             foreach (var (name, fs) in status.Features.OrderBy(p => p.Key))
                 lines.Add($"{name,-10} active={fs.Active,-5} error={fs.LastError ?? "-"}");
+        lines.Add("");
+        lines.Add("[네이티브]");
+        var n = status.Native;
+        if (n is null) lines.Add("(정보 없음)");
+        else
+        {
+            lines.Add(!n.Loaded ? $"미로드: {n.Error ?? "-"}" : n.Stale ? "응답 없음 (heartbeat 끊김)" : "동작 중");
+            if (n.Features is not null)
+                foreach (var (name, f) in n.Features.OrderBy(p => p.Key))
+                    lines.Add($"{name,-16} installed={f.Installed,-5} active={f.Active,-5} error={f.LastError ?? "-"}");
+        }
         _statusText.Text = string.Join(Environment.NewLine, lines);
     }
 }

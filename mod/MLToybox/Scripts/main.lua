@@ -8,12 +8,15 @@ local safe = require("core.safe")
 local bridgeLib = require("core.bridge")
 local registryLib = require("core.registry")
 local gamemode = require("core.gamemode")
+local native = require("core.native")
 local config = require("config")
 
 safe.setThreshold(config.failureThreshold)
 
 local bridgeDir = paths.parentDir(scriptsDir) .. "\\bridge"
 local bridge = bridgeLib.new(bridgeDir)
+local nativeLoaded, nativeErr = native.load(paths.parentDir(scriptsDir) .. "\\native")
+log.info("native: %s", nativeLoaded and "loaded" or tostring(nativeErr))
 local registry = registryLib.new()
 local appliedSeq = nil
 
@@ -48,7 +51,9 @@ LoopAsync(config.pollIntervalMs, function()
         end
         local now = os.time()
         registry:tick(now)
-        local wrote, werr = bridge:writeStatus(registry:status(now, appliedSeq, bridge.lastError))
+        local status = registry:status(now, appliedSeq, bridge.lastError)
+        status.native = native.status(bridgeDir .. "\\native_status.json", now, nativeLoaded, nativeErr)
+        local wrote, werr = bridge:writeStatus(status)
         if not wrote then log.error("status write: %s", tostring(werr)) end
       end)
     end)
