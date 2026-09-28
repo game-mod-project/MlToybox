@@ -24,8 +24,8 @@ public sealed class MainForm : Form
     };
 
     private readonly CheckBox _buildEnabled = new() { Text = "건설 기능 사용", AutoSize = true };
-    private readonly CheckBox _ignorePlacement = new() { Text = "배치 제한 무시 (네이티브, Plan 3)", AutoSize = true };
-    private readonly CheckBox _instantBuild = new() { Text = "즉시 완공 (네이티브, Plan 3)", AutoSize = true };
+    private readonly CheckBox _ignorePlacement = new() { Text = "배치 제한 무시 (영지 경계 안, 네이티브 DLL)", AutoSize = true };
+    private readonly CheckBox _instantBuild = new() { Text = "즉시 완공 (네이티브 DLL)", AutoSize = true };
     private readonly CheckBox _instantRepair = new() { Text = "즉시 수리", AutoSize = true };
     private readonly CheckBox _noMaterials = new() { Text = "자재 불필요 (건설 자재 없이 공사)", AutoSize = true };
 
@@ -33,7 +33,7 @@ public sealed class MainForm : Form
 
     private readonly CheckBox _milEnabled = new() { Text = "군사 기능 사용", AutoSize = true };
     private readonly CheckBox _ignoreEquipment = new() { Text = "민병대 장비 요구 무시", AutoSize = true };
-    private readonly CheckBox _ignorePopulation = new() { Text = "징집 조건(집 레벨·훈련) 무시 — 주민 수 초과 징집은 네이티브, Plan 3", AutoSize = true };
+    private readonly CheckBox _ignorePopulation = new() { Text = "징집 조건(집 레벨·훈련) 무시 — 주민 수보다 많은 병력은 아래 '병력 생성' 사용", AutoSize = true };
     private readonly CheckBox _zeroUpkeep = new() { Text = "용병 비용·모집비 0 (친위대 유지비는 미지원 — 자원 탭 금고 유지로 보정)", AutoSize = true };
     private readonly CheckBox _unlimitedSquads = new() { Text = "부대 수 상한 해제", AutoSize = true };
 

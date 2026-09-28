@@ -40,7 +40,15 @@ bool wanted(const NativeControl& c) { return c.instantBuild; }
 }
 
 void registerHook(HookManager& manager) {
-    manager.add({ "instant_build", kPattern, reinterpret_cast<void*>(&Detour), reinterpret_cast<void**>(&g_original), &wanted });
+    HookSpec spec{ "instant_build", kPattern, reinterpret_cast<void*>(&Detour), reinterpret_cast<void**>(&g_original), &wanted };
+    spec.bodyChecks = {
+        "48 8D 96 C0 03 00 00",      // lea rdx,[rsi+3C0h]    constructionGoods
+        "48 8B 8E F8 02 00 00",      // mov rcx,[rsi+2F8h]    파츠 배열 Data
+        "F3 0F 58 80 14 03 00 00",   // addss xmm0,[rax+314h] 파츠 hp
+        "F3 0F 58 88 18 03 00 00",   // addss xmm1,[rax+318h] 파츠 maxHp
+    };
+    spec.bodyWindow = 0x160;
+    manager.add(spec);
 }
 
 }

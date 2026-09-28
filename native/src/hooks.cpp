@@ -1,5 +1,6 @@
 #include "hooks.h"
 #include "scanner.h"
+#include <algorithm>
 
 namespace mlt {
 
@@ -15,6 +16,13 @@ void HookManager::installAll(std::span<const uint8_t> text, uintptr_t textAddres
         if (r.result == ScanResult::NotFound) { e.state.error = "pattern not found"; continue; }
         if (r.result == ScanResult::Ambiguous) { e.state.error = "pattern ambiguous"; continue; }
         if (r.result == ScanResult::BadPattern) { e.state.error = "bad pattern"; continue; }
+        auto body = text.subspan(r.offset, std::min(e.spec.bodyWindow, text.size() - r.offset));
+        std::string missing;
+        for (const auto& check : e.spec.bodyChecks) {
+            auto p = parsePattern(check);
+            if (!p || findAll(body, *p, 1).empty()) { missing = check; break; }
+        }
+        if (!missing.empty()) { e.state.error = "layout check failed: " + missing; continue; }
         void* target = reinterpret_cast<void*>(textAddress + r.offset);
         std::string err;
         if (!backend.create(target, e.spec.detour, e.spec.original, err)) { e.state.error = err; continue; }

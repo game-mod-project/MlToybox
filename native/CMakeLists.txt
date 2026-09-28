@@ -29,6 +29,6 @@ target_link_libraries(mltoybox_native PRIVATE mlt_core)
 
 enable_testing()
 add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_tests.cpp
-    tests/json_tests.cpp tests/control_tests.cpp tests/status_tests.cpp tests/hooks_tests.cpp tests/instant_build_tests.cpp tests/probe_tests.cpp tests/placement_tests.cpp)
+    tests/json_tests.cpp tests/control_tests.cpp tests/status_tests.cpp tests/hooks_tests.cpp tests/instant_build_tests.cpp tests/probe_tests.cpp tests/placement_tests.cpp tests/pin_tests.cpp)
 target_link_libraries(native_tests PRIVATE mlt_core)
 add_test(NAME native_tests COMMAND native_tests)

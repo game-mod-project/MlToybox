@@ -13,6 +13,10 @@ struct HookSpec {
     void* detour;
     void** original;
     bool (*wanted)(const NativeControl&);
+    // 레이아웃 검사: 일치한 함수 시작부터 bodyWindow 바이트 안에 모두 있어야 하는 패턴들
+    // (detour 가 의존하는 필드 오프셋을 쓰는 명령). 게임 업데이트 뒤 같은 프롤로그의 다른 함수에 설치되는 것을 막는다.
+    std::vector<std::string> bodyChecks = {};
+    size_t bodyWindow = 0x200;
 };
 
 class HookBackend {

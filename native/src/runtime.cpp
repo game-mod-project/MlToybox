@@ -37,6 +37,13 @@ bool writeFileAtomic(const std::filesystem::path& path, std::string_view content
     return MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING) != 0;
 }
 
+bool pinModuleContaining(const void* address) {
+    if (!address) return false;
+    HMODULE pinned = nullptr;
+    return GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                              static_cast<LPCWSTR>(address), &pinned) != 0;
+}
+
 TextSection mainModuleText() {
     auto base = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
     auto dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);

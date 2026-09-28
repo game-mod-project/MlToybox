@@ -24,7 +24,14 @@ bool wanted(const NativeControl& c) { return c.ignorePlacement; }
 }
 
 void registerHook(HookManager& manager) {
-    manager.add({ "placement", kPattern, reinterpret_cast<void*>(&Detour), reinterpret_cast<void**>(&g_original), &wanted });
+    HookSpec spec{ "placement", kPattern, reinterpret_cast<void*>(&Detour), reinterpret_cast<void**>(&g_original), &wanted };
+    spec.bodyChecks = {
+        "44 38 B9 4D 03 00 00",      // cmp [rcx+34Dh],r15b   isAI
+        "8B 89 08 06 00 00",         // mov ecx,[rcx+608h]    placeBuilding
+        "44 88 A7 0C 06 00 00",      // mov [rdi+60Ch],r12b   배치 불가 플래그
+    };
+    spec.bodyWindow = 0x200;
+    manager.add(spec);
 }
 
 }

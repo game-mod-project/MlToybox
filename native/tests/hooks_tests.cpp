@@ -46,6 +46,41 @@ TEST(sync_toggles_only_on_change) {
     CHECK(m.states()[0].active == false);
 }
 
+TEST(body_check_rejects_same_prologue_with_wrong_layout) {
+    // 같은 프롤로그(AA BB CC)지만 본문에 기대한 오프셋 명령(DE AD)이 없는 함수
+    std::array<uint8_t, 12> text{ 0xAA, 0xBB, 0xCC, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0xDE };
+    HookManager m; FakeBackend be;
+    HookSpec s{ "b", "AA BB CC", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    s.bodyChecks = { "DE AD" };
+    s.bodyWindow = 12;
+    m.add(s);
+    m.installAll(text, 0, be);
+    CHECK(be.created == 0);
+    CHECK(!m.states()[0].installed && m.states()[0].error == "layout check failed: DE AD");
+}
+
+TEST(body_check_accepts_expected_layout_within_window) {
+    std::array<uint8_t, 12> text{ 0xAA, 0xBB, 0xCC, 0x90, 0x90, 0xDE, 0xAD, 0x90, 0x90, 0x90, 0x90, 0x90 };
+    HookManager m; FakeBackend be;
+    HookSpec s{ "b", "AA BB CC", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    s.bodyChecks = { "DE AD" };
+    s.bodyWindow = 8;
+    m.add(s);
+    m.installAll(text, 0, be);
+    CHECK(be.created == 1 && m.states()[0].installed);
+}
+
+TEST(body_check_outside_window_fails) {
+    std::array<uint8_t, 12> text{ 0xAA, 0xBB, 0xCC, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0xDE, 0xAD };
+    HookManager m; FakeBackend be;
+    HookSpec s{ "b", "AA BB CC", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    s.bodyChecks = { "DE AD" };
+    s.bodyWindow = 8;
+    m.add(s);
+    m.installAll(text, 0, be);
+    CHECK(!m.states()[0].installed);
+}
+
 TEST(create_failure_reported_and_never_enabled) {
     std::array<uint8_t, 4> text{ 0xAA, 0xBB, 0xCC, 0x90 };
     HookManager m; FakeBackend be; be.failCreate = true;
