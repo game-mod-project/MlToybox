@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MLToybox.Panel.Core", "MLToybox.Panel.Core\MLToybox.Panel.Core.csproj", "{B5B96EDD-3F9F-4ED0-9B0B-E3CA9DAC877B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MLToybox.Tests", "MLToybox.Tests\MLToybox.Tests.csproj", "{52D5D612-BA72-4F54-B2B1-99C2F00849D0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MLToybox.Panel", "MLToybox.Panel\MLToybox.Panel.csproj", "{45ADA264-1BCA-474A-A71E-179DD52BC022}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B5B96EDD-3F9F-4ED0-9B0B-E3CA9DAC877B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5B96EDD-3F9F-4ED0-9B0B-E3CA9DAC877B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5B96EDD-3F9F-4ED0-9B0B-E3CA9DAC877B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5B96EDD-3F9F-4ED0-9B0B-E3CA9DAC877B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52D5D612-BA72-4F54-B2B1-99C2F00849D0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52D5D612-BA72-4F54-B2B1-99C2F00849D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52D5D612-BA72-4F54-B2B1-99C2F00849D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52D5D612-BA72-4F54-B2B1-99C2F00849D0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45ADA264-1BCA-474A-A71E-179DD52BC022}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45ADA264-1BCA-474A-A71E-179DD52BC022}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45ADA264-1BCA-474A-A71E-179DD52BC022}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45ADA264-1BCA-474A-A71E-179DD52BC022}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
