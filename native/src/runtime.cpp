@@ -1,4 +1,8 @@
 #include "runtime.h"
+#include "control.h"
+#include "hooks.h"
+#include "status.h"
+#include <MinHook.h>
 #include <chrono>
 #include <cstring>
 #include <fstream>
@@ -52,11 +56,37 @@ static std::filesystem::path bridgeDirFor(void* selfModule) {
     return std::filesystem::path(buf).parent_path().parent_path() / L"bridge";
 }
 
+namespace {
+struct MinHookBackend : HookBackend {
+    bool create(void* target, void* detour, void** original, std::string& err) override {
+        MH_STATUS s = MH_CreateHook(target, detour, original);
+        if (s != MH_OK) { err = MH_StatusToString(s); return false; }
+        return true;
+    }
+    bool setEnabled(void* target, bool on, std::string& err) override {
+        MH_STATUS s = on ? MH_EnableHook(target) : MH_DisableHook(target);
+        if (s != MH_OK) { err = MH_StatusToString(s); return false; }
+        return true;
+    }
+};
+}
+
 void runWorker(void* selfModule) {
     const auto bridge = bridgeDirFor(selfModule);
+    HookManager hooks;
+    registerFeatures(hooks);
+    MinHookBackend backend;
+    if (MH_Initialize() == MH_OK) {
+        auto text = mainModuleText();
+        hooks.installAll(std::span<const uint8_t>(text.data, text.size), reinterpret_cast<uintptr_t>(text.data), backend);
+    }
+    NativeControl control;
     for (;;) {
-        std::string status = "{\"version\":1,\"heartbeat\":" + std::to_string(nowEpochSeconds()) + ",\"appliedSeq\":-1}";
-        writeFileAtomic(bridge / L"native_status.json", status);
+        if (auto s = readFileUtf8(bridge / L"control.json")) {
+            if (auto c = parseControl(*s)) control = *c;   // 깨진 파일이면 직전 값 유지
+        }
+        hooks.sync(control, backend);
+        writeFileAtomic(bridge / L"native_status.json", renderStatus(nowEpochSeconds(), control.seq, hooks.states()));
         Sleep(1000);
     }
 }
