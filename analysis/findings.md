@@ -1,15 +1,15 @@
 # MLToybox 분석 결과 (findings)
 
-- 덤프: `analysis/dumps/20260928-143053` (메인 메뉴 상태에서 수집. 네이티브 `/Script/ManorLords` 클래스 정의 전체와 주요 DataTable 인스턴스를 포함)
+- 덤프: `analysis/dumps/20260928-143053`(메인 메뉴: 네이티브 클래스 정의 전체와 주요 DataTable), `analysis/dumps/20260928-144831`(인게임, 맵 Winding_River: 인스턴스 확인)
 - UE4SS: v3.0.1 Beta #0 (Git SHA f6d5f942), 내장 Lua 5.4 / 게임 buildid: 24905706
 - 근거 표기: `H:줄` = `CXXHeaderDump/ManorLords.hpp`의 줄 번호, `OD` = `UE4SS_ObjectDump.txt`
 - 판정 기호: ✅ Lua 가능(UFunction 호출 또는 리플렉션 프로퍼티 쓰기) / 🧪 Lua 가능성 높음, Plan 2 첫 스파이크에서 실측 필요 / ❌ Lua 불가 추정(C++ 승격 후보)
 
 ## 공통 사항
 
-- `InitGameState` 훅의 context는 **GameMode**다. 메뉴는 `MenuGameMode_ML_C /Game/NotStronghold/Maps/MainMenu.MainMenu:...`(events.txt). 인게임 GameMode 이름은 세이브를 로드한 적이 없어 **미확인**이다.
-  - 조치: `config.lua`에 `menuGameModePattern = "MenuGameMode_ML_C"`를 두고, 메뉴 GameMode면 `inGame=false`로 판정한다. 양성 패턴 `gameStateClassPattern`은 인게임 이름을 확인한 뒤 필요할 때만 쓴다.
-- 게임 로직 중심 객체: `ARTSMultiEngineCPP`(건물·유닛·분대·용병 관리), `ARegion`(지역 재고·재화·승인도), `APawnCPP`(플레이어 영주). 인스턴스는 `FindFirstOf("RTSMultiEngineCPP")`, `FindAllOf("Region")`, `FindFirstOf("MyPawnCPP_BP3_C")`로 찾는다(인게임에서 확인 필요).
+- `InitGameState` 훅의 context는 **GameMode**다. 메뉴는 `MenuGameMode_ML_C /Game/NotStronghold/Maps/MainMenu.MainMenu:...`(events.txt). 인게임은 `RTSGame_C /Game/NotStronghold/Maps/NewMapSets/Winding_River.Winding_River:PersistentLevel.RTSGame_C_...`(2차 덤프 events.txt, 14:47:53).
+  - 조치: `config.lua`의 `menuGameModePattern = "MenuGameMode_ML_C"`로 메뉴를 제외한다. 다른 맵도 `RTSGame_C`일 것으로 보이지만 확인한 맵이 하나뿐이라 양성 패턴은 쓰지 않는다.
+- 게임 로직 중심 객체: `ARTSMultiEngineCPP`(건물·유닛·분대·용병 관리), `ARegion`(지역 재고·재화·승인도), `APawnCPP`(플레이어 영주). 인게임 인스턴스(2차 덤프로 확인): `MyRTSMultiEngineCPP_BP_C` 1개(`PersistentLevel.RTSGameManager`), `BP_Region_C` 7개, `MyPawnCPP_BP3_C` 1개, `MLCheatManager_C`(`MLPlayerController_C_....MLCheatManager_C_...`), 건물 `SMBuildingMaster` 167개, 건물 파츠 `SMBuilding` 6162개. 찾기: `FindFirstOf("MyRTSMultiEngineCPP_BP_C")`, `FindAllOf("BP_Region_C")`, `FindFirstOf("MyPawnCPP_BP3_C")`, `FindFirstOf("MLCheatManager_C")`. 로드 시점에는 공사 중 액터(`ConstructionBP_C`)가 0개였다.
 - **개발용 치트 매니저 `UMLCheatManager`가 있다(H:5977~6011).** UE4SS의 `CheatManagerEnablerMod`가 이미 활성화해 두었다(UE4SS.log "Enabled CheatManager"). 모든 메서드가 UFunction이라 Lua에서 호출할 수 있다.
   - `GiveItemByName(FString,int32)`, `GiveItemByID(int32,int32)`, `GiveRandomAmountOfAllItems()`, `GiveFoodVariety()`, `AddItemToBuilding(FString,FString,float)`
   - `ChangeTreasury(int32 InNewTreasury)`(절대값 설정), `MaintainAllBuildings()`, `UnlockPerk(FName,int32)`, `SetSettlementLevel(uint32)`, `AddExpertiseToSelection(int32)`
@@ -87,7 +87,7 @@
 
 ## Plan 2 선행 스파이크 (우선순위순)
 
-1. 세이브 로드 후 인게임 GameMode 이름 확인 + 2차 덤프(`tools/dump.ps1`)로 인스턴스 경로 확인
+1. (완료) 인게임 GameMode `RTSGame_C`, 인스턴스 경로 확인
 2. Lua에서 `DT_Upgrades` 행 1개 읽기·쓰기가 되는지, 그리고 `canUpgrade` 결과가 바뀌는지
 3. `grantResources`로 목재 +10이 되는지, `ChangeTreasury(9999)`가 되는지
 4. `AConstruction.constructionProgress=1` + `updateConstructionLevel()`로 완공되는지
