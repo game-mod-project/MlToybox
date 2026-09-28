@@ -1,0 +1,17 @@
+E:\MLToybox\tools\re\MLToybox.Re\bin\Debug\net8.0-windows\MLToybox.Re.exe
+E:\MLToybox\tools\re\MLToybox.Re\bin\Debug\net8.0-windows\MLToybox.Re.deps.json
+E:\MLToybox\tools\re\MLToybox.Re\bin\Debug\net8.0-windows\MLToybox.Re.runtimeconfig.json
+E:\MLToybox\tools\re\MLToybox.Re\bin\Debug\net8.0-windows\MLToybox.Re.dll
+E:\MLToybox\tools\re\MLToybox.Re\bin\Debug\net8.0-windows\MLToybox.Re.pdb
+E:\MLToybox\tools\re\MLToybox.Re\bin\Debug\net8.0-windows\Iced.dll
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.Re.csproj.AssemblyReference.cache
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.Re.GeneratedMSBuildEditorConfig.editorconfig
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.Re.AssemblyInfoInputs.cache
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.Re.AssemblyInfo.cs
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.Re.csproj.CoreCompileInputs.cache
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.2B1B8AEE.Up2Date
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.Re.dll
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\refint\MLToybox.Re.dll
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.Re.pdb
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\MLToybox.Re.genruntimeconfig.cache
+E:\MLToybox\tools\re\MLToybox.Re\obj\Debug\net8.0-windows\ref\MLToybox.Re.dll
