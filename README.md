@@ -42,6 +42,17 @@ Manor Lords(Steam)용 UE4SS Lua 치트 모드와 외부 제어 패널.
 - 인게임 Lua 실행기: `pwsh tools/deploy.ps1 -Mod MLToyboxLab` 후 게임 재시작, 그다음 `pwsh tools/lab.ps1 -File probe.lua`. 게임 스레드에서 실행하고 `print` 출력을 돌려준다. 개발이 끝나면 `-Remove`로 제거한다.
 - Lua 파일은 백슬래시가 깨지지 않도록 셸 heredoc이 아닌 편집기로 작성한다.
 
+## 네이티브 계층 (spec §11)
+- 빌드: `pwsh tools/build-native.ps1 -Test` → `native/build/mltoybox_native.dll`
+- 배포: `pwsh tools/deploy.ps1 -Mod MLToybox` (DLL이 있으면 `Mods/MLToybox/native/`에 복사. 게임 실행 중에는 DLL이 잠겨 경고만 남음)
+- 상태: 패널 [상태] 탭 "[네이티브]" (미로드/응답 없음/동작 중, 기능별 installed/active)
+- 분석 도구: `dotnet run --project tools/re/MLToybox.Re -- <exec|disasm|sig|count|strings> ...`
+  - `exec <UFunction>`은 후보를 둘 이상 낼 수 있다. `mov rax,[rdx+20h]`로 시작해 구현 함수를 `call`하는 쪽이 exec 썽크이고, `lea rdx,...; call` 형태는 UFunction 생성 함수다.
+- 게임 업데이트로 기능이 `pattern not found`/`pattern ambiguous`가 되면:
+  1. `analysis/findings.md`의 해당 기능 절에 적힌 UFunction 이름 또는 문자열로 `exec`/`strings`를 다시 실행해 대상 함수를 찾는다
+  2. `sig <VA>`로 새 패턴을 만들고 `count`로 1인지 확인한다
+  3. `native/src/features/<기능>.cpp`의 패턴 상수를 바꾸고 빌드·배포한다
+
 ## 게임 업데이트 후 복구 절차
 1. `pwsh tools/deploy.ps1 -Mod MLToyboxDump`, 게임 실행 후 세이브 로드
 2. `pwsh tools/dump.ps1` → `analysis/dumps/<시각>/` 생성
