@@ -42,7 +42,8 @@
 **UE4SS Lua 모드로 출발하고, 필요한 기능만 C++로 승격한다.**
 
 - 1차 구현은 UE4SS Lua로 한다. 프로퍼티는 주기적으로 기록하고, UFunction은 `RegisterHook`으로 후킹한다.
-- Lua로 도달할 수 없는 로직(예: 네이티브 배치 판정)은 분석 단계에서 증거와 함께 판정한다. 그런 기능은 UE4SS C++ 모드 승격 후보로 사용자에게 보고하고 결정을 받는다. 승격은 이 설계의 범위 밖이며 별도로 설계한다.
+- Lua로 도달할 수 없는 로직(예: 네이티브 배치 판정)은 분석 단계에서 증거와 함께 판정한다. 그런 기능은 UE4SS C++ 모드 승격 후보로 사용자에게 보고하고 결정을 받는다.
+- **(2026-09-28 결정)** 스파이크에서 Lua 불가로 판정된 3개 기능(배치 제한 무시, 즉시 완공, 주민 수를 넘는 징집)은 **독립 네이티브 DLL**로 구현한다. UE4SS 공식 C++ 모드는 `UEPseudo` 접근(Epic 계정 연동)이 필요해 쓰지 않는다. 설계는 §11.
 - Pak/DataTable 재패킹은 쓰지 않는다. DataTable 값 변경이 필요하면 런타임에 Lua로 덮어쓴다.
 
 검토했다가 기각한 방식:
@@ -137,7 +138,7 @@ return {
   "seq": 12,
   "features": {
     "resources": { "enabled": true, "intervalSec": 2, "targets": { "<ResourceId>": 500 } },
-    "build":     { "enabled": true, "ignorePlacement": true, "instantBuild": true, "instantRepair": true },
+    "build":     { "enabled": true, "ignorePlacement": true, "instantBuild": true, "instantRepair": true, "noMaterials": true },
     "upgrade":   { "enabled": true },
     "military":  { "enabled": true, "ignoreEquipment": true, "ignorePopulation": true, "zeroUpkeep": true, "unlimitedSquads": true }
   }
@@ -163,6 +164,8 @@ return {
 ## 6. 기능별 구현 전략
 
 정확한 식별자는 분석 단계(§7)에서 `findings.md`로 확정한다. 아래는 탐색 방향과 대체 수단이다.
+
+> 2026-09-28 스파이크 이후: 확정된 API와 판정은 `analysis/findings.md` "스파이크 결과"가 이 표보다 우선한다. Lua 불가로 판정된 배치 무시, 즉시 완공, 인구 초과 징집은 §11(네이티브 계층)을 따른다.
 
 ### 6.1 전략 표
 
@@ -222,4 +225,63 @@ return {
 
 - 로컬 git, `main` 보호, `develop` 통합 브랜치, 작업은 `feat/*`·`fix/*`·`chore/*`·`docs/*`에서 한다.
 - 원격 레포가 없으므로 PR 대신 로컬 `--no-ff` 머지로 같은 2단계 흐름(작업 브랜치 → develop → 릴리스 시 main)을 따른다.
-- `.gitignore`: `analysis/dumps/`, `panel/**/bin/`, `panel/**/obj/`, `dist/`, `backups/`
+- `.gitignore`: `analysis/dumps/`, `panel/**/bin/`, `panel/**/obj/`, `dist/`, `backups/`, `native/build/`
+
+## 11. 네이티브 계층 (2026-09-28 추가)
+
+### 11.1 범위와 근거
+- 스파이크 결과(`analysis/findings.md` "스파이크 결과")에 따라, Lua로 불가능한 다음 기능을 네이티브로 구현한다.
+  - ② 배치 제한 무시(지형·겹침): 판정 UFunction 없음
+  - ② 즉시 완공: 공사 진행도가 리플렉션되지 않은 필드에 있음
+  - ④ 주민 수를 넘는 징집: 가용 인원 계산이 네이티브 내부에 있음
+- Lua로 가능한 기능(①, ②의 자재 불필요·즉시 수리, ③, ④의 상한·유지비·장비·훈련 요구)은 Lua로 구현한다.
+
+### 11.2 로딩 방식
+- UE4SS SDK 없이 빌드한 독립 DLL `mltoybox_native.dll`(C++20, MSVC, x64, 정적 CRT)을 `mod/MLToybox`의 `core/native.lua`가 `package.loadlib(path, "*")`로 로드한다. 로드에 실패해도 Lua 기능은 계속 동작한다.
+- UE4SS가 Lua C API를 export하지 않으므로, DLL과 Lua는 함수 호출이 아니라 `bridge` 파일로 통신한다.
+  - DLL은 `control.json`을 직접 1초 간격으로 폴링한다.
+  - DLL은 `native_status.json`(heartbeat, 기능별 `installed`/`active`/`lastError`)을 기록한다.
+  - Lua는 이를 `status.json`의 `native` 항목으로 병합한다.
+
+### 11.3 구조
+```
+native/
+├─ CMakeLists.txt
+├─ third_party/minhook/     MinHook 소스 벤더링 (BSD-2)
+├─ src/dllmain.cpp          DllMain은 워커 스레드 생성만 한다 (로더 락 안에서 작업 금지)
+├─ src/scanner.*            게임 exe .text 패턴 스캔 ("48 8B ?? ..." 형식)
+├─ src/hooks.*              MinHook 래퍼: 설치/활성/비활성, 실패 시 해당 기능만 비활성
+├─ src/bridge.*             control.json 폴링, native_status.json 기록, 프로브 요청 처리
+├─ src/signatures.h         기능별 패턴·오프셋 (분석 결과는 여기에만 반영)
+├─ src/features/placement.cpp, instant_build.cpp, recruits.cpp
+└─ tests/                   CTest, assert 기반 (게임 무관)
+tools/re/MLToybox.Re/       .NET 8 + Iced: 문자열 참조 역추적, exec 썽크→구현 추적, 유일 패턴 생성·검증
+mod/MLToyboxLab/            인게임 Lua 실행기 (개발 도구, 기본 배포 안 함)
+tools/build-native.ps1      vcvars64 + cmake 빌드
+```
+
+### 11.4 동작 규칙
+- 패턴이 **정확히 1곳**에서 발견될 때만 후킹을 설치한다. 0곳이나 여러 곳이면 해당 기능을 "대상 없음"으로 비활성화한다.
+- 후킹은 설치해 두고 `control.json` 플래그로 활성/비활성(`MH_EnableHook`/`MH_DisableHook`)만 전환한다. 게임 오브젝트 쓰기는 후킹된 게임 스레드 함수 안에서만 한다.
+- 후킹 함수는 예외를 던지지 않고, 원본 호출 경로를 유지한다. DLL 언로드는 지원하지 않는다.
+- 해석하는 control 필드(프로토콜 version 1 유지, 필드 추가만):
+  - `build.ignorePlacement`, `build.instantBuild`, `military.ignorePopulation`: 네이티브
+  - `build.noMaterials`(신규), `build.instantRepair`: Lua
+  - `native.probe`(개발용): 네이티브
+
+### 11.5 역분석 절차
+- 기능 순서는 즉시 완공 → 인구 초과 징집 → 배치 무시(쉬운 순)다.
+- 공략 방법:
+  - 즉시 완공: 프로브 모드로 오브젝트 메모리에서 진행도 오프셋을 찾고, exec 썽크 디스어셈블리로 교차 검증한다.
+  - 징집·배치: UFunction exec 썽크 추적, 이유 문자열 참조 역추적으로 판정 함수를 특정한다.
+- 시간 제한: 즉시 완공 반나절, 징집 1일, 배치 1일. 제한 안에 "유일 패턴 + 인게임 동작 확인"에 도달하지 못하면 중단한다. 증거를 `findings.md`에 기록하고, 계속할지 포기할지 사용자 결정을 받는다.
+
+### 11.6 빌드·테스트·배포
+- `tools/build-native.ps1` → `native/build/.../mltoybox_native.dll`. `deploy.ps1 -Mod MLToybox`가 DLL이 있으면 `Mods/MLToybox/native/`로 복사한다.
+- 테스트는 C++ CTest(패턴 파서, 가짜 버퍼 스캔 0/1/2회 일치, control 파싱), .NET(`MLToybox.Re` 패턴 유일성), Lua(`native.lua` 병합, DLL 스텁)로 한다. 인게임 검증은 §6.3 체크리스트를 따른다.
+- 게임 업데이트 시 `MLToybox.Re`로 새 exe에서 패턴을 재생성한다. 절차는 README에 기록한다.
+- 외부 의존성 MinHook(GitHub `TsudaKageyu/minhook`)과 NuGet `Iced`는 Plan 3 착수 시 다운로드 승인을 받는다.
+
+### 11.7 계획 구성
+- Plan 2: Lua 기능 전체 + `MLToyboxLab` 정식화 + 패널·브리지 확장(`build.noMaterials`, 상태의 `native` 항목 표시)
+- Plan 3: 네이티브 계층(빌드 환경, DLL 골격, 스캐너·후킹, `MLToybox.Re`, 기능 3개). 기능 태스크는 "분석 → 결과 기록 → 구현" 단계로 구성한다.
