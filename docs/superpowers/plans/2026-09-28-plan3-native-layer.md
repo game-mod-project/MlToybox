@@ -1941,6 +1941,12 @@ void registerInstantBuild(HookManager& m) {
 - **판단: (b) 후킹으로는 불가.** 판정을 바꿔도 존재하지 않는 주민을 병사로 만들 수 없다. 주민 수를 넘는 병력은 유닛을 새로 생성해야 한다.
 - 대안(사용자 결정 대기): `ARTSMultiEngineCPP.spawnArmy(pos, unitTypes, ownerPawn, companyID, arrivesInDays)` / `spawnCompleteUnit(...)`(UFunction, Lua 호출 가능. 용병 생성 경로)로 플레이어 소유 분대를 생성한다.
 
-### A.3 배치 제한 무시
-- 사유 문자열 / 참조 코드 / 판정 함수 / 패턴:
-- detour 동작:
+### A.3 배치 제한 무시 (2026-09-28 분석)
+- 정적 분석: 사유 문자열 `too_steep`(UTF-16 `0x147EC6DE8`)은 `0x144B16AC0`에서 문자열 목록을 만들 때만 참조된다(판정 아님). `cant_build`, `not_enough_space`도 확인했다.
+- 동적 분석(메모리 프로브, 배치 모드 `placeBuilding=37`에서 초록 2장·빨강 2장): 안정적으로 다른 1바이트 플래그를 찾았다.
+  - **`APawnCPP+0x60C`**(리플렉션 없음, `placeBuilding`과 `bbox` 사이): 초록 0 / 빨강 1
+  - `isInsideBorders`(`+0xFE0`): 초록 1 / 빨강 0. 빨강 샘플이 영지 경계 밖이었다.
+- `+0x60C` 쓰기 7곳이 모인 함수 **`0x144AC61E0`** = 건물 배치 갱신. `this`=APawnCPP이고, 시작부에서 `isAI`(+0x34D), `isUsingUI`(+0x5A8), `placeBuilding`(+0x608)를 검사한다. 인자는 rcx뿐이다. 도로·밭 쪽 갱신은 `0x144B03460`(roadmode 검사)이며 이번 대상이 아니다.
+- 패턴: `4C 8B DC 55 57 41 54 41 57 49 8D AB 88 FC FF FF`(count = 1)
+- detour: 원본 호출 후 `isInsideBorders == 1`이면 `+0x60C = 0`. 경계 밖은 건드리지 않는다(소속 지역 없는 건물 방지).
+- 읽는 쪽(클릭 처리 후보): `0x144B7350B`, `0x144B7BB50`의 `cmp byte [rbx+60Ch],0`
