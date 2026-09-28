@@ -96,6 +96,29 @@ T.run({
     T.eq(s.resources, nil, "empty resources omitted")
     T.eq(s.resourceIds, nil, "empty ids omitted")
   end,
+  failed_enable_is_retried_on_next_tick = function()
+    local r = registry.new()
+    local attempts = 0
+    local a = { name = "late", enable = function() attempts = attempts + 1; if attempts == 1 then error("targets not ready") end end }
+    r:add(a); r:apply({ late = { enabled = true } }); r:setInGame(true)
+    T.eq(r.active.late, false, "first enable failed")
+    r:tick(1)
+    T.eq(attempts, 2, "retried on tick")
+    T.eq(r.active.late, true, "active after retry")
+    T.eq(r.errors.late, nil, "error cleared")
+  end,
+  leaving_game_clears_shared_state = function()
+    local r = registry.new(); local a = fake("a"); r:add(a)
+    r:apply({ a = { enabled = true } }); r:setInGame(true)
+    local stateRef = r.state
+    r.state.resourceIds = { "Timber" }; r.state.resources = { Timber = 5 }; r.state.cachedObj = {}
+    r:setInGame(false)
+    local s = r:status(1, nil, nil)
+    T.eq(s.resourceIds, nil, "ids cleared"); T.eq(s.resources, nil, "resources cleared")
+    T.eq(stateRef.cachedObj, nil, "feature cache cleared in the same table")
+    T.eq(r.state, stateRef, "table identity kept for features holding it")
+    T.eq(r.state.inGame, false, "inGame kept")
+  end,
   status_without_features_omits_map = function()
     local s = registry.new():status(1, nil, nil)
     T.eq(s.features, nil, "no features -> nil (avoids [] encoding)")

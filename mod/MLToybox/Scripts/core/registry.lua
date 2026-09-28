@@ -79,12 +79,16 @@ function M.new()
   function r:setInGame(inGame)
     if not inGame then
       for _, name in ipairs(self.order) do self:_deactivate(name) end
+      -- 이전 맵의 오브젝트 캐시·자원 표시가 남지 않도록 비운다. 기능이 참조를 쥐고 있을 수 있어 테이블은 유지한다.
+      for key in pairs(self.state) do self.state[key] = nil end
     end
     self.state.inGame = inGame
     self:_sync()
   end
 
   function r:tick(now)
+    -- enable 이 실패한 기능(예: 맵 로드 직후 대상 미생성)을 매 tick 재시도한다. 계속 실패하면 safe 임계치에서 trip 된다.
+    self:_sync()
     for _, name in ipairs(self.order) do
       local f = self.features[name]
       if self.active[name] and f.tick then
