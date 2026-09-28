@@ -1,0 +1,5 @@
+analysis/dumps/
+panel/**/bin/
+panel/**/obj/
+dist/
+backups/
