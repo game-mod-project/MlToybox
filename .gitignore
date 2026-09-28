@@ -3,3 +3,6 @@ panel/**/bin/
 panel/**/obj/
 dist/
 backups/
+.omc/
+**/.omc/
+*.csproj.user
