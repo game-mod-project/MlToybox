@@ -6,6 +6,10 @@ local function scriptsPath(rel)
 end
 
 T.run({
+  lab_main_compiles = function()
+    local fn, err = loadfile(SCRIPTS_DIR .. "/../../MLToyboxLab/Scripts/main.lua")
+    T.truthy(fn, "lab main.lua: " .. tostring(err))
+  end,
   main_compiles = function()
     local fn, err = loadfile(scriptsPath("main.lua"))
     T.truthy(fn, "main.lua: " .. tostring(err))

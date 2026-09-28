@@ -74,5 +74,14 @@ Test-Case 'deploy -Remove unregisters and deletes' {
     Assert-Equal (@($json).Count) 8 'other entries intact'
 }
 
+Test-Case 'deploy MLToyboxLab creates lab folder and registers' {
+    $g = New-FakeGame
+    $mods = Join-Path $g 'ManorLords\Binaries\Win64\ue4ss\Mods'
+    & "$PSScriptRoot\..\deploy.ps1" -Mod MLToyboxLab -GameDir $g | Out-Null
+    Assert-True (Test-Path "$mods\MLToyboxLab\Scripts\main.lua") 'lab scripts'
+    Assert-True (Test-Path "$mods\MLToyboxLab\lab") 'lab dir'
+    Assert-Equal (@(Get-Content "$mods\mods.txt" | Where-Object { $_ -match '^\s*MLToyboxLab\s*:\s*1' }).Count) 1 'registered'
+}
+
 if ($script:failed -gt 0) { throw "$script:failed test(s) failed" }
 Write-Host 'ALL PASS'
