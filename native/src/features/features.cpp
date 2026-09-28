@@ -1,6 +1,8 @@
 #include "features/features.h"
+#include "features/instant_build.h"
 
 namespace mlt {
-// Task 8~10 에서 기능별 HookSpec 을 추가한다
-void registerFeatures(HookManager&) {}
+void registerFeatures(HookManager& manager) {
+    instant_build::registerHook(manager);
+}
 }

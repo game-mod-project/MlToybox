@@ -56,6 +56,14 @@ T.run({
     game.playerRegions = function() return { region } end
     build.tick({}, { enabled = true, noMaterials = true })
   end,
+  instant_build_triggers_progress_read_on_unbuilt = function()
+    local _, unbuilt, built = setup()
+    local calls = 0
+    unbuilt.getConstructionProgress = function() calls = calls + 1; return 0.5 end
+    built.getConstructionProgress = function() error("must not be called on built") end
+    build.tick({}, { enabled = true, instantBuild = true })
+    T.eq(calls, 1, "triggered once")
+  end,
   tick_without_cheat_is_noop = function()
     setup()
     game.cheat = function() return nil end

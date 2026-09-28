@@ -1919,10 +1919,18 @@ void registerInstantBuild(HookManager& m) {
 
 ## 부록 A — 분석 결과 (실행 중 채움)
 
-### A.1 즉시 완공
-- exec 썽크 VA / 구현 VA / 패턴 / count:
-- 필드 오프셋·타입·의미:
-- 완공 조건과 detour 동작:
+### A.1 즉시 완공 (2026-09-28 분석, buildid 24905706)
+- exec 후보: `0x144A8E200`(UFunction 생성 함수), **`0x144A95C20`(exec 썽크)** → 구현 **`0x144CBC7B0`** `float ASMBuildingMaster::getConstructionProgress(this)`
+- 패턴: `48 8B C4 48 89 58 08 48 89 70 10 57 48 83 EC 50 48 8B F1` (count = 1)
+- 계산식: `progress = (Σ part.hp / Σ part.maxHp + materialRatio) × 0.5`
+  - `materialRatio` = (요구 합 − 부족 합) / 요구 합. 요구 합이 0이면 1.0(상수 `0x14703D4C8` = 1.0 double). 요구 = `this+0x3C0`(`constructionGoods`), 보유 = `this+0x438`(`Inventory`)
+  - 파츠 배열 = `this+0x2F8`: `TArray<ASMBuilding*>`(data 포인터 +0x2F8, Num int32 +0x300)
+  - 파츠 필드: `float hp` = part+0x314, `float maxHp` = part+0x318 (둘 다 리플렉션 없음)
+  - 상수 0.5 = `0x147052070`
+- detour 동작: 원본 호출 전에, 파츠 배열의 각 파츠(널 제외)에 대해 `hp < maxHp`이면 `hp = maxHp`로 설정한다. 자재 부분은 Plan 2의 "자재 불필요"(요구 목록 비움)가 1.0으로 만든다.
+- 트리거: Lua `build.tick`이 `instantBuild` 설정일 때 내 지역 미완공 건물마다 `getConstructionProgress()`를 호출한다(게임 스레드).
+- 완공 처리: `IsConstructed()` = `byte [this+0x3B1]`(구현 `0x144C97830`). 진행도 1.0만으로 즉시 플래그가 서지는 않고, 인부 작업·게임 틱이 마무리한다. 인게임에서 배치 후 24초 안에 완공됐다. 인부가 배정되지 않은 건물(`not_enough_workers`)은 마무리가 더 늦었지만 결국 완공됐다.
+- 인게임 결과(2026-09-28 17:33~17:52): 후킹 installed/active, 진행도 즉시 1.000, 완공 24초 이내, 크래시 없음.
 
 ### A.2 주민 수를 넘는 징집
 - 대상 함수 / 패턴 / 시그니처:
