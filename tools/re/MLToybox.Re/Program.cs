@@ -22,6 +22,9 @@ switch (argList[0])
     case "sig":
         Console.WriteLine(SigMaker.Make(pe, Hex(argList[1])) ?? "NOT UNIQUE within 64 bytes");
         break;
+    case "xrefs":
+        foreach (var x in Xrefs.Find(pe, Hex(argList[1]))) Console.WriteLine($"{x:X16}");
+        break;
     case "count":
         Console.WriteLine(Pattern.Parse(argList[1]).Count(pe.SectionBytes(pe.Text), 10));
         break;
