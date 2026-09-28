@@ -146,3 +146,7 @@
 - 진행도 식: `(Σhp/ΣmaxHp + 자재비율) × 0.5`. 스파이크에서 `buildingStats.maxHp`를 낮춰도 효과가 없던 이유는 진행도가 파츠 인스턴스의 hp로 계산되기 때문이다.
 - 완공 플래그 `this+0x3B1`은 인부 작업·게임 틱이 세운다. 인게임에서 배치 후 24초 안에 완공됐다.
 - 분석 도구 주의: `exec <UFunction>`은 UFunction 생성 함수와 exec 썽크를 함께 돌려준다.
+
+## Plan 3 네이티브 — 주민 수를 넘는 징집 (2026-09-28)
+- 가용 징집 인원(`getAllAvailableRecruits` 구현 `0x144BE7D50`)은 `ARegion.residents`(+0x368)를 순회해 만든다. 민병대 병사는 실제 주민 유닛이다.
+- 결론: 판정 후킹으로는 주민 수를 넘길 수 없다(없는 유닛을 만들 수 없음). 대안은 유닛 생성 UFunction(`spawnArmy`/`spawnCompleteUnit`)이며 사용자 결정 대기.

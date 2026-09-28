@@ -1932,9 +1932,14 @@ void registerInstantBuild(HookManager& m) {
 - 완공 처리: `IsConstructed()` = `byte [this+0x3B1]`(구현 `0x144C97830`). 진행도 1.0만으로 즉시 플래그가 서지는 않고, 인부 작업·게임 틱이 마무리한다. 인게임에서 배치 후 24초 안에 완공됐다. 인부가 배정되지 않은 건물(`not_enough_workers`)은 마무리가 더 늦었지만 결국 완공됐다.
 - 인게임 결과(2026-09-28 17:33~17:52): 후킹 installed/active, 진행도 즉시 1.000, 완공 24초 이내, 크래시 없음.
 
-### A.2 주민 수를 넘는 징집
-- 대상 함수 / 패턴 / 시그니처:
-- 판단(a/b)과 근거:
+### A.2 주민 수를 넘는 징집 (2026-09-28 분석)
+- exec 썽크 → 구현:
+  - `getAllAvailableRecruits` 썽크 `0x144A76790` → 구현 `0x144BE7D50`
+  - `canAddNewMilitiaSquad` 썽크 `0x144A5BFB0` → 구현 `0x144ACAAE0`
+  - `getAvailableRecruits` 썽크 `0x144A76950`, `addMilitiaSquad` 썽크 `0x144A5B670`
+- 구현 `0x144BE7D50`은 `ARegion.residents`(`this+0x368` 데이터, `+0x370` Num)를 순회하며 유닛 플래그(`unit+0xAC1`)로 거른다. 징집 대상은 실제 주민 유닛 오브젝트다.
+- **판단: (b) 후킹으로는 불가.** 판정을 바꿔도 존재하지 않는 주민을 병사로 만들 수 없다. 주민 수를 넘는 병력은 유닛을 새로 생성해야 한다.
+- 대안(사용자 결정 대기): `ARTSMultiEngineCPP.spawnArmy(pos, unitTypes, ownerPawn, companyID, arrivesInDays)` / `spawnCompleteUnit(...)`(UFunction, Lua 호출 가능. 용병 생성 경로)로 플레이어 소유 분대를 생성한다.
 
 ### A.3 배치 제한 무시
 - 사유 문자열 / 참조 코드 / 판정 함수 / 패턴:
