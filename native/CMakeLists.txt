@@ -11,13 +11,17 @@ add_subdirectory(third_party/minhook EXCLUDE_FROM_ALL)
 
 add_library(mlt_core STATIC
     src/runtime.cpp
-    src/scanner.cpp)
+    src/scanner.cpp
+    src/json.cpp
+    src/control.cpp
+    src/status.cpp)
 target_include_directories(mlt_core PUBLIC src)
 
 add_library(mltoybox_native SHARED src/dllmain.cpp)
 target_link_libraries(mltoybox_native PRIVATE mlt_core minhook)
 
 enable_testing()
-add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_tests.cpp)
+add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_tests.cpp
+    tests/json_tests.cpp tests/control_tests.cpp tests/status_tests.cpp)
 target_link_libraries(native_tests PRIVATE mlt_core)
 add_test(NAME native_tests COMMAND native_tests)
