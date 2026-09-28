@@ -10,13 +10,14 @@ add_compile_definitions(UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 add_subdirectory(third_party/minhook EXCLUDE_FROM_ALL)
 
 add_library(mlt_core STATIC
-    src/runtime.cpp)
+    src/runtime.cpp
+    src/scanner.cpp)
 target_include_directories(mlt_core PUBLIC src)
 
 add_library(mltoybox_native SHARED src/dllmain.cpp)
 target_link_libraries(mltoybox_native PRIVATE mlt_core minhook)
 
 enable_testing()
-add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp)
+add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_tests.cpp)
 target_link_libraries(native_tests PRIVATE mlt_core)
 add_test(NAME native_tests COMMAND native_tests)
