@@ -1,6 +1,7 @@
 #include "runtime.h"
 #include "control.h"
 #include "hooks.h"
+#include "probe.h"
 #include "status.h"
 #include <MinHook.h>
 #include <chrono>
@@ -81,7 +82,18 @@ void runWorker(void* selfModule) {
         hooks.installAll(std::span<const uint8_t>(text.data, text.size), reinterpret_cast<uintptr_t>(text.data), backend);
     }
     NativeControl control;
+    long long lastProbeSeq = -1;
     for (;;) {
+        // 개발용 메모리 프로브: 새 seq 요청만 한 번 처리한다
+        if (auto req = readFileUtf8(bridge / L"probe_request.txt")) {
+            if (auto p = parseProbeRequest(*req); p && p->seq != lastProbeSeq) {
+                lastProbeSeq = p->seq;
+                std::string bytes;
+                auto out = bridge / (L"probe_" + std::to_wstring(p->seq) + L".bin");
+                if (copyProcessMemory(p->address, p->size, bytes)) writeFileAtomic(out, bytes);
+                else writeFileAtomic(out.replace_extension(L".err"), "read failed");
+            }
+        }
         if (auto s = readFileUtf8(bridge / L"control.json")) {
             if (auto c = parseControl(*s)) control = *c;   // 깨진 파일이면 직전 값 유지
         }
