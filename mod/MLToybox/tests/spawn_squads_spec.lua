@@ -107,6 +107,12 @@ T.run({
     T.eq(g[1].id, 45, "highest id first"); T.eq(g[1].unit, "mercenary_infantry", "unit")
     T.eq(g[2].id, 40, "second"); T.eq(g[2].unit, "retinue_tier1", "unit 2")
   end,
+  ghosts_include_spawned_squads_marked_mercenary_without_company = function()
+    -- 진단 실험 중 squadType 을 용병(2)으로 바꾼 채 저장된 생성 분대. 순정 용병은 항상 company >= 0
+    local _, pawn = reformSetup(function(p) return { squad(41, p, { type = 2, company = -1, unit = "mercenary_infantry" }) } end)
+    local g = spawn.ghosts(pawn, game.engine())
+    T.eq(#g, 1, "included"); T.eq(g[1].id, 41, "id")
+  end,
   reform_respawns_ghost_unit_types_and_queues_removal = function()
     local calls, _, removed = reformSetup(function(p)
       return { squad(40, p, { unit = "retinue_tier1" }), squad(45, p, { unit = "mercenary_infantry" }) }

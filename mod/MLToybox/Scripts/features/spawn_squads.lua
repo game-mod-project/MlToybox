@@ -39,7 +39,9 @@ local function isPlayer(s, pawn)
 end
 
 local function isGhost(s, pawn)
-  return isPlayer(s, pawn) and s.squadType == 0 and s.companyID == M.MILITIA_COMPANY
+  -- 생성 분대는 type 0(None). 용병(2)이면서 용병단이 없는 경우도 생성 분대다(순정 용병은 company >= 0)
+  local t = s.squadType
+  return isPlayer(s, pawn) and (t == 0 or t == 2) and s.companyID == M.MILITIA_COMPANY
     and #s.unitArr == 0 and #s.assignedRecruits == 0
 end
 
