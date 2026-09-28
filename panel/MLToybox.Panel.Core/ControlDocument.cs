@@ -5,6 +5,7 @@ public sealed class ControlDocument
     public int Version { get; set; } = 1;
     public long Seq { get; set; }
     public FeaturesControl Features { get; set; } = new();
+    public List<ControlCommand> Commands { get; set; } = new();
 }
 
 public sealed class FeaturesControl
