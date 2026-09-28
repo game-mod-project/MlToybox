@@ -119,6 +119,12 @@ T.run({
     T.eq(r.state, stateRef, "table identity kept for features holding it")
     T.eq(r.state.inGame, false, "inGame kept")
   end,
+  status_includes_population_when_present = function()
+    local r = registry.new(); r:add(fake("a")); r:setInGame(true)
+    T.eq(r:status(1, nil, nil).population, nil, "absent")
+    r.state.population = { families = 3 }
+    T.eq(r:status(1, nil, nil).population.families, 3, "present")
+  end,
   status_without_features_omits_map = function()
     local s = registry.new():status(1, nil, nil)
     T.eq(s.features, nil, "no features -> nil (avoids [] encoding)")

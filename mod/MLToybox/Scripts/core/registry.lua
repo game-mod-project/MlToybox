@@ -118,6 +118,7 @@ function M.new()
       features = next(features) and features or nil,
       resourceIds = (type(st.resourceIds) == "table" and #st.resourceIds > 0) and st.resourceIds or nil,
       resources = (type(st.resources) == "table" and next(st.resources)) and st.resources or nil,
+      population = st.population,
     }
   end
 

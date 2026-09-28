@@ -155,3 +155,13 @@
 - 동적 분석(메모리 프로브)으로 숨은 배치 불가 플래그 `APawnCPP+0x60C`를 찾았다. 이 플래그를 쓰는 건물 배치 갱신 함수 `0x144AC61E0`을 후킹해, 원본 호출 뒤 `isInsideBorders`가 1이면 플래그를 0으로 만든다. 상세는 Plan 3 부록 A.3.
 - 인게임(18:49~): 후킹 installed/active. 경계 안의 막힌 위치에 건물 3개를 배치했고, 공사가 진행 중이며 즉시 완공과 함께 동작했다. 모드 오류 0건, 크래시 없음.
 - 한계: 영지 경계 밖은 의도적으로 허용하지 않는다. 도로·밭 배치 갱신(`0x144B03460`)은 대상이 아니다.
+
+## 인구 기능 (2026-09-28)
+- `ARegion.growPopulation()`은 이민이 아니라 주민 나이 증가 처리였다(구현 `0x144BED220`, 주민별 카운터 +0xD10이 30에 도달하면 처리). 호출해도 가족 수가 변하지 않는다.
+- `UPerkSettings.IncreaseImmigrationRate`(+0x1FC)를 읽는 코드가 게임 모듈에 없고, 해당 perk도 없다(`GetPerkForPerkEffect(32)` = None). perk 방식 배율은 불가하다.
+- 이민 경로 역추적: `AddNewFamily` 구현(`0x144BC2010`)의 호출자 `0x144CD1FA0`는 UFunction **`ASMBuildingMaster.spawnManorServantsInside(int32)`**의 구현이다. 건물 위치에 주민을 만들고 `AddNewFamily`로 등록하며, `occupantFamilyIDs`(+0xF98, Num +0xFA0)가 2 미만인 동안 반복한다.
+- 인게임: 빈 주거지에 1회 호출 → 거주 가족 0→1, 곧 구성원 3명(정상 규모). 저장·재로드 후에도 유지된다.
+- 구현: `features/population.lua`
+  - 배율: 자연 증가분 × (배율−1)만큼 추가한다. 모드가 들인 가족에는 배율을 다시 걸지 않는다.
+  - 목표 가족 수: 부족분만 채운다.
+  - 명령 `addFamilies`: 1~20가족, 빈 집부터 채운다.

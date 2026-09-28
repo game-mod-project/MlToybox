@@ -17,6 +17,14 @@ public sealed class ControlCommand
         Count = count,
         IssuedAt = now.ToUnixTimeSeconds(),
     };
+
+    public static ControlCommand AddFamilies(int count, DateTimeOffset now) => new()
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Type = "addFamilies",
+        Count = count,
+        IssuedAt = now.ToUnixTimeSeconds(),
+    };
 }
 
 public sealed class CommandResult
@@ -24,6 +32,16 @@ public sealed class CommandResult
     public bool Ok { get; set; }
     public string? Error { get; set; }
     public List<int>? Squads { get; set; }
+    public int? Requested { get; set; }
+    public int? Added { get; set; }
+}
+
+public sealed class PopulationStatus
+{
+    public int Families { get; set; }
+    public int Population { get; set; }
+    public int Homeless { get; set; }
+    public int FreeSlots { get; set; }
 }
 
 public sealed record UnitOption(string Id, string Label);
