@@ -18,6 +18,7 @@ public class LuaSpecTests
         using var lua = new Lua();
         lua.State.Encoding = System.Text.Encoding.UTF8;
         lua["TEST_TMP"] = tmp;
+        lua["SCRIPTS_DIR"] = RepoPaths.Scripts;
         lua.DoString($"package.path = [[{RepoPaths.Scripts}\\?.lua;{RepoPaths.LuaTests}\\?.lua;]] .. package.path");
         lua.DoString("require('core.log').sink = function() end", "silence");
         try

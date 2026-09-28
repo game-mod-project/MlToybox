@@ -7,6 +7,7 @@ local log = require("core.log")
 local safe = require("core.safe")
 local bridgeLib = require("core.bridge")
 local registryLib = require("core.registry")
+local gamemode = require("core.gamemode")
 local config = require("config")
 
 safe.setThreshold(config.failureThreshold)
@@ -22,11 +23,6 @@ for _, name in ipairs(config.featureModules) do
 end
 registry:apply(config.defaults)
 
-local function isGameplayState(fullName)
-  if config.gameStateClassPattern == nil then return true end
-  return fullName:find(config.gameStateClassPattern) ~= nil
-end
-
 RegisterLoadMapPreHook(function()
   safe.call("core", function() registry:setInGame(false) end)
 end)
@@ -35,7 +31,7 @@ RegisterInitGameStatePostHook(function(context)
   safe.call("core", function()
     local gameState = context:get()
     local fullName = gameState:GetFullName()
-    local inGame = isGameplayState(fullName)
+    local inGame = gamemode.isGameplay(fullName, config)
     log.info("GameState: %s inGame=%s", fullName, tostring(inGame))
     registry:setInGame(inGame)
   end)
