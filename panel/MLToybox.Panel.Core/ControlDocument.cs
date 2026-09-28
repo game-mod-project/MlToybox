@@ -28,6 +28,7 @@ public sealed class BuildControl
     public bool IgnorePlacement { get; set; } = true;
     public bool InstantBuild { get; set; } = true;
     public bool InstantRepair { get; set; } = true;
+    public bool NoMaterials { get; set; } = true;
 }
 
 public sealed class UpgradeControl

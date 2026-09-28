@@ -39,6 +39,7 @@ public class BridgeClientTests
         Assert.True(res.GetProperty("enabled").GetBoolean());
         Assert.Equal(2, res.GetProperty("intervalSec").GetInt32());
         Assert.Equal(500, res.GetProperty("targets").GetProperty("Timber").GetInt32());
+        Assert.True(root.GetProperty("features").GetProperty("build").GetProperty("noMaterials").GetBoolean());
         Assert.True(root.GetProperty("features").GetProperty("military").GetProperty("unlimitedSquads").GetBoolean());
     }
 

@@ -6,6 +6,14 @@ local function scriptsPath(rel)
 end
 
 T.run({
+  feature_modules_load_and_follow_contract = function()
+    local cfg = dofile(SCRIPTS_DIR .. "/config.lua")
+    T.eq(#cfg.featureModules, 4, "four features")
+    for _, name in ipairs(cfg.featureModules) do
+      local mod = require("features." .. name)
+      T.eq(mod.name, name, "name matches module " .. name)
+    end
+  end,
   lab_main_compiles = function()
     local fn, err = loadfile(SCRIPTS_DIR .. "/../../MLToyboxLab/Scripts/main.lua")
     T.truthy(fn, "lab main.lua: " .. tostring(err))
