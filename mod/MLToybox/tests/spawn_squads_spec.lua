@@ -170,6 +170,20 @@ T.run({
     spawn.tick(true)
     T.eq(removed[2], 40, "continues after shrink")
   end,
+  second_reform_after_first_completes_still_removes_ghost = function()
+    -- 첫 재구성의 마지막 제거 대기가 남아 있으면 새 생성으로 배열이 늘어 영영 대기하던 버그
+    local _, pawn, removed, engine = reformSetup(function(p) return { squad(40, p, { unit = "retinue_tier1" }) } end)
+    spawn.reform({}, IN_GAME)
+    engine.squads[#engine.squads + 1] = squad(41, pawn, { unit = "retinue_tier1", units = { 1 }, recruits = { 1 } })
+    spawn.tick(true)
+    T.eq(removed[1], 40, "first removed")
+    table.remove(engine.squads, 1)                                                  -- 게임이 정리, 새 분대는 40 으로
+    engine.squads[1] = squad(40, pawn, { unit = "retinue_tier1" })                   -- 사용자가 그 분대를 다시 해제(틱 없이 바로)
+    spawn.reform({}, IN_GAME)
+    engine.squads[#engine.squads + 1] = squad(41, pawn, { unit = "retinue_tier1", units = { 1 }, recruits = { 1 } })
+    spawn.tick(true)
+    T.eq(removed[2], 40, "second reform removes its ghost"); T.eq(spawn.pendingRemovals(), 0, "done")
+  end,
   tick_clears_pending_when_leaving_game = function()
     reformSetup(function(p) return { squad(40, p, { unit = "retinue_tier1" }) } end)
     spawn.reform({}, IN_GAME)

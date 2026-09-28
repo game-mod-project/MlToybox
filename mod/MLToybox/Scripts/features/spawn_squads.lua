@@ -79,17 +79,21 @@ function M.reform(_, ctx)
   if not first then return { ok = false, error = "spawnArmy returned no squads" } end
   for _, g in ipairs(ghosts) do reform.pending[#reform.pending + 1] = g.unit end
   reform.boundary = first
+  -- 새 분대만큼 배열이 늘어나므로 남아 있는 제거 대기 기준도 같이 올린다
+  if reform.awaitBelow then reform.awaitBelow = reform.awaitBelow + #squads end
   return { ok = true, squads = squads, reformed = #ghosts }
 end
 
 function M.tick(inGame)
   if not inGame then M.resetReform() return end
-  if #reform.pending == 0 then return end
+  if #reform.pending == 0 and not reform.awaitBelow then return end
   local pawn, engine = game.pawn(), game.engine()
   if not pawn or not engine then return end
-  -- removeSquad 는 요청만 등록한다. 게임이 배열을 줄이기 전에는 다음 유령을 지우지 않는다
+  -- removeSquad 는 요청만 등록한다. 게임이 배열을 줄이기 전에는 다음 유령을 지우지 않는다.
+  -- 대기는 대기열이 비어도 배열이 줄면 바로 푼다(남겨 두면 다음 재구성의 생성으로 배열이 늘어 영영 대기한다)
   if reform.awaitBelow and #engine.squads >= reform.awaitBelow then return end
   reform.awaitBelow = nil
+  if #reform.pending == 0 then return end
   for _, g in ipairs(M.ghosts(pawn, engine)) do
     if g.id < reform.boundary then
       for k, unit in ipairs(reform.pending) do
