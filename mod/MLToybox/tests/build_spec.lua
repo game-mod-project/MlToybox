@@ -1,0 +1,47 @@
+local T = require("t")
+local F = require("fakes")
+local datatable = require("core.datatable")
+local game = require("core.game")
+local build = require("features.build")
+
+local function setup()
+  local rows = { ["3"] = { constructionGoods = F.array({ { Type = 16, amt = 4 } }) }, ["72"] = { constructionGoods = F.array({ { Type = 17, amt = 2 } }) } }
+  datatable.find = function(p) if p == datatable.PATHS.buildingStats then return F.datatable(rows) end end
+  local unbuilt = F.object({ constructionGoods = F.array({ { Type = 16, amt = 1 } }) })
+  unbuilt.IsConstructed = function() return false end
+  local built = F.object({ constructionGoods = F.array({ { Type = 16, amt = 1 } }) })
+  built.IsConstructed = function() return true end
+  local region = F.object({})
+  region.GetBuildings = function() return { F.wrap(unbuilt), F.wrap(built) } end
+  local cheat = { maintained = 0 }
+  cheat.MaintainAllBuildings = function(self) self.maintained = self.maintained + 1 end
+  game.playerRegions = function() return { region } end
+  game.cheat = function() return cheat end
+  return rows, unbuilt, built, cheat
+end
+
+T.run({
+  no_materials_clears_stats_and_unbuilt_only = function()
+    local rows, unbuilt, built = setup()
+    build.enable({}, { enabled = true, noMaterials = true })
+    T.eq(#rows["3"].constructionGoods, 0, "stats row"); T.eq(#rows["72"].constructionGoods, 0, "stats row 2")
+    T.eq(#unbuilt.constructionGoods, 0, "unbuilt cleared"); T.eq(#built.constructionGoods, 1, "built untouched")
+  end,
+  no_materials_off_leaves_data = function()
+    local rows = setup()
+    build.enable({}, { enabled = true, noMaterials = false })
+    T.eq(#rows["3"].constructionGoods, 1, "untouched")
+  end,
+  instant_repair_maintains_on_tick = function()
+    local _, _, _, cheat = setup()
+    build.tick({}, { enabled = true, instantRepair = true })
+    T.eq(cheat.maintained, 1, "maintained")
+    build.tick({}, { enabled = true, instantRepair = false })
+    T.eq(cheat.maintained, 1, "not when off")
+  end,
+  tick_without_cheat_is_noop = function()
+    setup()
+    game.cheat = function() return nil end
+    build.tick({}, { enabled = true, instantRepair = true })
+  end,
+})
