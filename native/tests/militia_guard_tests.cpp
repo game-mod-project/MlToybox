@@ -98,3 +98,13 @@ TEST(militia_guard_safe_with_no_commanded_squads) {
     w.command({});
     CHECK(militia_guard::isSafe(w.pawn, region.bytes));
 }
+
+TEST(militia_guard_registers_both_evaluation_hooks) {
+    // 같은 null Home 읽기가 AI 틱의 두 형제 함수(0x144B910C0, 0x144B923D0)에 있다
+    HookManager m;
+    militia_guard::registerHook(m);
+    auto s = m.states();
+    CHECK(s.size() == 2);
+    CHECK(s[0].name == "militia_guard");
+    CHECK(s[1].name == "militia_guard_2");
+}

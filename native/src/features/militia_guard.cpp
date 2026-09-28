@@ -41,11 +41,17 @@ bool isSafe(const uint8_t* pawn, const uint8_t* region) {
 namespace {
 using EvaluateFn = void(__fastcall*)(void* pawn, void* region);
 EvaluateFn g_original = nullptr;
+EvaluateFn g_original2 = nullptr;
 
 // 게임 스레드에서 호출된다. 원본 반환값은 호출자가 쓰지 않는다(void).
 void __fastcall Detour(void* pawn, void* region) {
     if (!isSafe(static_cast<const uint8_t*>(pawn), static_cast<const uint8_t*>(region))) return;
     g_original(pawn, region);
+}
+
+void __fastcall Detour2(void* pawn, void* region) {
+    if (!isSafe(static_cast<const uint8_t*>(pawn), static_cast<const uint8_t*>(region))) return;
+    g_original2(pawn, region);
 }
 
 // 치트가 아닌 크래시 방어이므로 항상 켠다
@@ -66,6 +72,21 @@ void registerHook(HookManager& manager) {
     };
     spec.bodyWindow = 0x290;
     manager.add(spec);
+
+    HookSpec spec2{ "militia_guard_2", kPattern2, reinterpret_cast<void*>(&Detour2), reinterpret_cast<void**>(&g_original2), &wanted };
+    spec2.bodyChecks = {
+        "44 39 82 CC 07 00 00",   // cmp [rdx+7CCh],r8d     쿨다운
+        "4C 8B BE 10 0A 00 00",   // mov r15,[rsi+0A10h]    commandedSquads
+        "49 8B 8E 40 03 00 00",   // mov rcx,[r14+340h]     masterPtr
+        "48 69 F0 E8 03 00 00",   // imul rsi,rax,3E8h      sizeof(FSquad)
+        "48 03 B1 B0 05 00 00",   // add rsi,[rcx+5B0h]     squads
+        "80 7E 10 01",            // cmp byte [rsi+10h],1   squadType == Militia
+        "48 39 BE F8 01 00 00",   // cmp [rsi+1F8h],rdi     originRegion
+        "48 8B BE 48 03 00 00",   // mov rdi,[rsi+348h]     assignedRecruits
+        "48 8B 88 40 03 00 00",   // mov rcx,[rax+340h]     unit.Home
+    };
+    spec2.bodyWindow = 0x560;
+    manager.add(spec2);
 }
 
 }

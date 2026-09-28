@@ -161,5 +161,6 @@
 - 동작: `region+0x2E8`이 켜져 있고 쿨다운 `region+0x7C8 <= 0`이면 `+0x7C8 = 1`로 설정한다. 그다음 `pawn.commandedSquads`(0xA10)의 분대 가운데 `squadType == 1`이고 `originRegion == region`인 분대를 골라, `assignedRecruits`(0x348)의 각 유닛에 대해 `unit.Home(0x340)->lv(0xCA8)`를 null 검사 없이 읽는다.
 - 원인: AI 지역 민병대원의 가족이 집에서 몇 초간 빠졌다가 같은 집으로 돌아오는 일이 있다(Lab 기록: occupants 0 → 1, 약 4초). 그 사이에 이 함수가 호출되면 크래시한다. **MLToybox를 제거한 상태에서도 같은 세이브로 재현됐다**(게임 자체 버그). 생성 분대(type 0)는 이 경로를 타지 않는다.
 - 조사 결과: `squads` 배열 인덱스와 분대 ID는 일치한다(58개 모두).
-- 방어: 네이티브 `militia_guard`가 원본 호출 직전에 같은 조건의 분대원을 검사하고, Home이 null이면 그 호출만 건너뛴다. 쿨다운을 설정하기 전이므로 다음 AI 틱에 다시 실행된다. 항상 켜져 있다.
+- 같은 AI 틱 루프(`0x144BB41F0`~)에서 바로 다음에 호출되는 형제 함수 `0x144B923D0`(쿨다운 `region+0x7CC`)도 같은 읽기(`mov rcx,[rax+340h]; mov eax,[rcx+0CA8h]`)를 한다. 이 바이트열은 exe 전체에서 두 곳뿐이다. 첫 수정 뒤 이 함수에서 크래시가 났다(RIP `exe+0x4B9292A`).
+- 방어: 네이티브 `militia_guard`/`militia_guard_2`가 원본 호출 직전에 같은 조건의 분대원을 검사하고, Home이 null이면 그 호출만 건너뛴다. 쿨다운을 설정하기 전이므로 다음 AI 틱에 다시 실행된다. 항상 켜져 있다.
 - 인게임 검증: 수정 후 같은 세이브로 전투해도 크래시가 나지 않았고, 상태는 `installed=True active=True`였다.

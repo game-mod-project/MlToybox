@@ -3,11 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 
-// 게임 버그 방어: AI 지역 민병대 평가 함수(APawnCPP 멤버, 이름 없음)가 분대원 Home 을 null 검사 없이 읽는다.
-// 민병대원 가족이 집을 잠깐 비운 순간(Home == null) 호출되면 [null+0xCA8] 읽기로 크래시한다(모드 없이도 재현, buildid 24905706).
-// 위험한 순간에는 호출을 건너뛴다. 원본이 쿨다운(region+0x7C8)을 세우기 전이므로 다음 AI 틱에 다시 실행된다.
+// 게임 버그 방어: AI 지역 민병대 평가 함수 두 개(APawnCPP 멤버, 이름 없음, 같은 AI 틱 루프에서 연달아 호출)가
+// 분대원 Home 을 null 검사 없이 읽는다. 민병대원 가족이 집을 잠깐 비운 순간(Home == null) 호출되면
+// [null+0xCA8] 읽기로 크래시한다(모드 없이도 재현, buildid 24905706).
+// 위험한 순간에는 호출을 건너뛴다. 원본이 쿨다운(region+0x7C8 / +0x7CC)을 세우기 전이므로 다음 AI 틱에 다시 실행된다.
 namespace mlt::militia_guard {
-constexpr const char* kPattern = "48 8B C4 48 89 50 10 48 89 48 08 55 53 48 8D 68 A8 48 81 EC 48 01 00 00 80 BA E8 02 00 00 00";
+constexpr const char* kPattern = "48 8B C4 48 89 50 10 48 89 48 08 55 53 48 8D 68 A8 48 81 EC 48 01 00 00 80 BA E8 02 00 00 00";   // 0x144B910C0
+constexpr const char* kPattern2 = "48 8B C4 48 89 50 10 48 89 48 08 55 56 57 48 8D 68 A1 48 81 EC C0 00 00 00 45 33 C0 48 8B FA 48 8B F1";   // 0x144B923D0
 constexpr std::ptrdiff_t kPawnEngineOffset = 0x340;        // APawnCPP::masterPtr (ARTSMultiEngineCPP*)
 constexpr std::ptrdiff_t kPawnCommandedOffset = 0xA10;     // APawnCPP::commandedSquads (TArray<int32>) Data
 constexpr std::ptrdiff_t kPawnCommandedNumOffset = 0xA18;
