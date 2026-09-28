@@ -6,3 +6,6 @@ backups/
 .omc/
 **/.omc/
 *.csproj.user
+native/build/
+tools/re/**/bin/
+tools/re/**/obj/

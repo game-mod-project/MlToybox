@@ -59,6 +59,14 @@ if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 $global:LASTEXITCODE = 0
 if ($Mod -eq 'MLToybox') { New-Item -ItemType Directory -Force (Join-Path $target 'bridge') | Out-Null }
 if ($Mod -eq 'MLToyboxLab') { New-Item -ItemType Directory -Force (Join-Path $target 'lab') | Out-Null }
+if ($Mod -eq 'MLToybox') {
+    $dll = Join-Path $repo 'native\build\mltoybox_native.dll'
+    if (Test-Path $dll) {
+        $nativeDir = New-Item -ItemType Directory -Force (Join-Path $target 'native')
+        try { Copy-Item $dll $nativeDir -Force -ErrorAction Stop }
+        catch { Write-Warning "native dll not copied (game running?): $($_.Exception.Message)" }
+    }
+}
 Update-ModsTxt $true
 Update-ModsJson $true
 Write-Host "Deployed $Mod -> $target"

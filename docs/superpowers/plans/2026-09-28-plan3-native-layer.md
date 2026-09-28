@@ -1919,15 +1919,34 @@ void registerInstantBuild(HookManager& m) {
 
 ## 부록 A — 분석 결과 (실행 중 채움)
 
-### A.1 즉시 완공
-- exec 썽크 VA / 구현 VA / 패턴 / count:
-- 필드 오프셋·타입·의미:
-- 완공 조건과 detour 동작:
+### A.1 즉시 완공 (2026-09-28 분석, buildid 24905706)
+- exec 후보: `0x144A8E200`(UFunction 생성 함수), **`0x144A95C20`(exec 썽크)** → 구현 **`0x144CBC7B0`** `float ASMBuildingMaster::getConstructionProgress(this)`
+- 패턴: `48 8B C4 48 89 58 08 48 89 70 10 57 48 83 EC 50 48 8B F1` (count = 1)
+- 계산식: `progress = (Σ part.hp / Σ part.maxHp + materialRatio) × 0.5`
+  - `materialRatio` = (요구 합 − 부족 합) / 요구 합. 요구 합이 0이면 1.0(상수 `0x14703D4C8` = 1.0 double). 요구 = `this+0x3C0`(`constructionGoods`), 보유 = `this+0x438`(`Inventory`)
+  - 파츠 배열 = `this+0x2F8`: `TArray<ASMBuilding*>`(data 포인터 +0x2F8, Num int32 +0x300)
+  - 파츠 필드: `float hp` = part+0x314, `float maxHp` = part+0x318 (둘 다 리플렉션 없음)
+  - 상수 0.5 = `0x147052070`
+- detour 동작: 원본 호출 전에, 파츠 배열의 각 파츠(널 제외)에 대해 `hp < maxHp`이면 `hp = maxHp`로 설정한다. 자재 부분은 Plan 2의 "자재 불필요"(요구 목록 비움)가 1.0으로 만든다.
+- 트리거: Lua `build.tick`이 `instantBuild` 설정일 때 내 지역 미완공 건물마다 `getConstructionProgress()`를 호출한다(게임 스레드).
+- 완공 처리: `IsConstructed()` = `byte [this+0x3B1]`(구현 `0x144C97830`). 진행도 1.0만으로 즉시 플래그가 서지는 않고, 인부 작업·게임 틱이 마무리한다. 인게임에서 배치 후 24초 안에 완공됐다. 인부가 배정되지 않은 건물(`not_enough_workers`)은 마무리가 더 늦었지만 결국 완공됐다.
+- 인게임 결과(2026-09-28 17:33~17:52): 후킹 installed/active, 진행도 즉시 1.000, 완공 24초 이내, 크래시 없음.
 
-### A.2 주민 수를 넘는 징집
-- 대상 함수 / 패턴 / 시그니처:
-- 판단(a/b)과 근거:
+### A.2 주민 수를 넘는 징집 (2026-09-28 분석)
+- exec 썽크 → 구현:
+  - `getAllAvailableRecruits` 썽크 `0x144A76790` → 구현 `0x144BE7D50`
+  - `canAddNewMilitiaSquad` 썽크 `0x144A5BFB0` → 구현 `0x144ACAAE0`
+  - `getAvailableRecruits` 썽크 `0x144A76950`, `addMilitiaSquad` 썽크 `0x144A5B670`
+- 구현 `0x144BE7D50`은 `ARegion.residents`(`this+0x368` 데이터, `+0x370` Num)를 순회하며 유닛 플래그(`unit+0xAC1`)로 거른다. 징집 대상은 실제 주민 유닛 오브젝트다.
+- **판단: (b) 후킹으로는 불가.** 판정을 바꿔도 존재하지 않는 주민을 병사로 만들 수 없다. 주민 수를 넘는 병력은 유닛을 새로 생성해야 한다.
+- 대안(사용자 결정 대기): `ARTSMultiEngineCPP.spawnArmy(pos, unitTypes, ownerPawn, companyID, arrivesInDays)` / `spawnCompleteUnit(...)`(UFunction, Lua 호출 가능. 용병 생성 경로)로 플레이어 소유 분대를 생성한다.
 
-### A.3 배치 제한 무시
-- 사유 문자열 / 참조 코드 / 판정 함수 / 패턴:
-- detour 동작:
+### A.3 배치 제한 무시 (2026-09-28 분석)
+- 정적 분석: 사유 문자열 `too_steep`(UTF-16 `0x147EC6DE8`)은 `0x144B16AC0`에서 문자열 목록을 만들 때만 참조된다(판정 아님). `cant_build`, `not_enough_space`도 확인했다.
+- 동적 분석(메모리 프로브, 배치 모드 `placeBuilding=37`에서 초록 2장·빨강 2장): 안정적으로 다른 1바이트 플래그를 찾았다.
+  - **`APawnCPP+0x60C`**(리플렉션 없음, `placeBuilding`과 `bbox` 사이): 초록 0 / 빨강 1
+  - `isInsideBorders`(`+0xFE0`): 초록 1 / 빨강 0. 빨강 샘플이 영지 경계 밖이었다.
+- `+0x60C` 쓰기 7곳이 모인 함수 **`0x144AC61E0`** = 건물 배치 갱신. `this`=APawnCPP이고, 시작부에서 `isAI`(+0x34D), `isUsingUI`(+0x5A8), `placeBuilding`(+0x608)를 검사한다. 인자는 rcx뿐이다. 도로·밭 쪽 갱신은 `0x144B03460`(roadmode 검사)이며 이번 대상이 아니다.
+- 패턴: `4C 8B DC 55 57 41 54 41 57 49 8D AB 88 FC FF FF`(count = 1)
+- detour: 원본 호출 후 `isInsideBorders == 1`이면 `+0x60C = 0`. 경계 밖은 건드리지 않는다(소속 지역 없는 건물 방지).
+- 읽는 쪽(클릭 처리 후보): `0x144B7350B`, `0x144B7BB50`의 `cmp byte [rbx+60Ch],0`

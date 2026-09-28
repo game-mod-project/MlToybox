@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MLToybox.Tests", "MLToybox.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MLToybox.Panel", "MLToybox.Panel\MLToybox.Panel.csproj", "{45ADA264-1BCA-474A-A71E-179DD52BC022}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MLToybox.Re", "..\tools\re\MLToybox.Re\MLToybox.Re.csproj", "{D0DC4A48-AE43-4436-9834-D6A7D04AA4B1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{45ADA264-1BCA-474A-A71E-179DD52BC022}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{45ADA264-1BCA-474A-A71E-179DD52BC022}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{45ADA264-1BCA-474A-A71E-179DD52BC022}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D0DC4A48-AE43-4436-9834-D6A7D04AA4B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D0DC4A48-AE43-4436-9834-D6A7D04AA4B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D0DC4A48-AE43-4436-9834-D6A7D04AA4B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D0DC4A48-AE43-4436-9834-D6A7D04AA4B1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

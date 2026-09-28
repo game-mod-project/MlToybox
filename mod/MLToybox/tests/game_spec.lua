@@ -31,6 +31,22 @@ T.run({
     install({})
     T.eq(game.treasury(), nil, "no hud")
   end,
+  anchor_prefers_manor_then_first_constructed_building = function()
+    local function actor(x, constructed)
+      local a = F.object({ IsConstructed = function() return constructed end })
+      a.K2_GetActorLocation = function() return { X = x, Y = 0, Z = 0 } end
+      return a
+    end
+    local pawn = F.object()
+    local region = F.object({ ownerPawn = pawn, manor = actor(1, true) })
+    region.GetBuildings = function() return { F.wrap(actor(2, false)), F.wrap(actor(3, true)) } end
+    install({ MyPawnCPP_BP3_C = { pawn }, BP_Region_C = { region } })
+    T.eq(game.anchorLocation().X, 1, "manor")
+    region.manor = F.invalid()
+    T.eq(game.anchorLocation().X, 3, "first constructed")
+    region.GetBuildings = function() return {} end
+    T.eq(game.anchorLocation(), nil, "none")
+  end,
   unwrap_handles_wrapped_and_plain = function()
     T.eq(game.unwrap(F.wrap(5)), 5, "wrapped"); T.eq(game.unwrap(7), 7, "plain")
   end,

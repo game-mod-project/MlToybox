@@ -42,6 +42,20 @@ function M.treasury()
   return nil
 end
 
+M.fname = function(s) return FName(s) end
+
+-- 분대 생성 위치: 내 첫 지역의 영주 저택, 없으면 첫 완공 건물
+function M.anchorLocation()
+  for _, region in ipairs(M.playerRegions()) do
+    if safe.valid(region.manor) then return region.manor:K2_GetActorLocation() end
+    for _, w in ipairs(region:GetBuildings()) do
+      local b = M.unwrap(w)
+      if safe.valid(b) and b:IsConstructed() then return b:K2_GetActorLocation() end
+    end
+  end
+  return nil
+end
+
 function M.unwrap(x)
   local ok, v = pcall(function() return x:get() end)
   if ok then return v end

@@ -24,8 +24,8 @@ public sealed class MainForm : Form
     };
 
     private readonly CheckBox _buildEnabled = new() { Text = "건설 기능 사용", AutoSize = true };
-    private readonly CheckBox _ignorePlacement = new() { Text = "배치 제한 무시 (네이티브, Plan 3)", AutoSize = true };
-    private readonly CheckBox _instantBuild = new() { Text = "즉시 완공 (네이티브, Plan 3)", AutoSize = true };
+    private readonly CheckBox _ignorePlacement = new() { Text = "배치 제한 무시 (영지 경계 안, 네이티브 DLL)", AutoSize = true };
+    private readonly CheckBox _instantBuild = new() { Text = "즉시 완공 (네이티브 DLL)", AutoSize = true };
     private readonly CheckBox _instantRepair = new() { Text = "즉시 수리", AutoSize = true };
     private readonly CheckBox _noMaterials = new() { Text = "자재 불필요 (건설 자재 없이 공사)", AutoSize = true };
 
@@ -33,9 +33,12 @@ public sealed class MainForm : Form
 
     private readonly CheckBox _milEnabled = new() { Text = "군사 기능 사용", AutoSize = true };
     private readonly CheckBox _ignoreEquipment = new() { Text = "민병대 장비 요구 무시", AutoSize = true };
-    private readonly CheckBox _ignorePopulation = new() { Text = "징집 조건(집 레벨·훈련) 무시 — 주민 수 초과 징집은 네이티브, Plan 3", AutoSize = true };
+    private readonly CheckBox _ignorePopulation = new() { Text = "징집 조건(집 레벨·훈련) 무시 — 주민 수보다 많은 병력은 아래 '병력 생성' 사용", AutoSize = true };
     private readonly CheckBox _zeroUpkeep = new() { Text = "용병 비용·모집비 0 (친위대 유지비는 미지원 — 자원 탭 금고 유지로 보정)", AutoSize = true };
     private readonly CheckBox _unlimitedSquads = new() { Text = "부대 수 상한 해제", AutoSize = true };
+
+    private readonly ComboBox _spawnUnit = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 180, DisplayMember = nameof(UnitOption.Label) };
+    private readonly NumericUpDown _spawnCount = new() { Minimum = 1, Maximum = 5, Value = 1, Width = 50 };
 
     private readonly TextBox _statusText = new()
     {
@@ -58,7 +61,17 @@ public sealed class MainForm : Form
         tabs.TabPages.Add(BuildResourcesTab());
         tabs.TabPages.Add(Page("건설", _buildEnabled, _ignorePlacement, _instantBuild, _instantRepair, _noMaterials));
         tabs.TabPages.Add(Page("업그레이드", _upgradeEnabled));
-        tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads));
+        _spawnUnit.Items.AddRange(UnitCatalog.Units.Cast<object>().ToArray());
+        _spawnUnit.SelectedIndex = 1;
+        var spawnButton = new Button { Text = "분대 생성", AutoSize = true };
+        spawnButton.Click += (_, _) => SpawnSquads();
+        var spawnRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 16, 0, 0) };
+        spawnRow.Controls.AddRange(new Control[]
+        {
+            new Label { Text = "병력 생성 (주민과 무관):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) },
+            _spawnUnit, _spawnCount, new Label { Text = "개 분대", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, spawnButton,
+        });
+        tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads, spawnRow));
         var statusPage = new TabPage("상태");
         statusPage.Controls.Add(_statusText);
         tabs.TabPages.Add(statusPage);
@@ -203,6 +216,15 @@ public sealed class MainForm : Form
         RefreshStatus();
     }
 
+    // 현재 설정과 함께 일회성 생성 명령을 보낸다. 명령은 저장 직후 비워 다음 적용 때 다시 보내지 않는다.
+    private void SpawnSquads()
+    {
+        if (_spawnUnit.SelectedItem is not UnitOption unit) return;
+        _control.Commands = new List<ControlCommand> { ControlCommand.SpawnSquads(unit.Id, (int)_spawnCount.Value, DateTimeOffset.UtcNow) };
+        Apply();
+        _control.Commands = new List<ControlCommand>();
+    }
+
     private Dictionary<string, int> ReadTargets()
     {
         var targets = new Dictionary<string, int>();
@@ -268,6 +290,24 @@ public sealed class MainForm : Form
         else
             foreach (var (name, fs) in status.Features.OrderBy(p => p.Key))
                 lines.Add($"{name,-10} active={fs.Active,-5} error={fs.LastError ?? "-"}");
+        if (status.Commands is not null)
+        {
+            lines.Add("");
+            lines.Add("[명령 결과]");
+            foreach (var (id, r) in status.Commands)
+                lines.Add($"{id[..Math.Min(8, id.Length)]} {(r.Ok ? "성공" : "실패")} {(r.Squads is null ? "" : "분대 " + string.Join(",", r.Squads))} {r.Error ?? ""}");
+        }
+        lines.Add("");
+        lines.Add("[네이티브]");
+        var n = status.Native;
+        if (n is null) lines.Add("(정보 없음)");
+        else
+        {
+            lines.Add(!n.Loaded ? $"미로드: {n.Error ?? "-"}" : n.Stale ? "응답 없음 (heartbeat 끊김)" : "동작 중");
+            if (n.Features is not null)
+                foreach (var (name, f) in n.Features.OrderBy(p => p.Key))
+                    lines.Add($"{name,-16} installed={f.Installed,-5} active={f.Active,-5} error={f.LastError ?? "-"}");
+        }
         _statusText.Text = string.Join(Environment.NewLine, lines);
     }
 }

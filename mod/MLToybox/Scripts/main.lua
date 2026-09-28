@@ -8,13 +8,19 @@ local safe = require("core.safe")
 local bridgeLib = require("core.bridge")
 local registryLib = require("core.registry")
 local gamemode = require("core.gamemode")
+local native = require("core.native")
+local commandsLib = require("core.commands")
+local spawnSquads = require("features.spawn_squads")
 local config = require("config")
 
 safe.setThreshold(config.failureThreshold)
 
 local bridgeDir = paths.parentDir(scriptsDir) .. "\\bridge"
 local bridge = bridgeLib.new(bridgeDir)
+local nativeLoaded, nativeErr = native.load(paths.parentDir(scriptsDir) .. "\\native")
+log.info("native: %s", nativeLoaded and "loaded" or tostring(nativeErr))
 local registry = registryLib.new()
+local commands = commandsLib.new({ spawnSquads = spawnSquads.spawn })
 local appliedSeq = nil
 
 for _, name in ipairs(config.featureModules) do
@@ -42,13 +48,17 @@ LoopAsync(config.pollIntervalMs, function()
     local control = bridge:poll()
     ExecuteInGameThread(function()
       safe.call("core", function()
+        local now = os.time()
         if control then
           registry:apply(control.features)
+          commands:run(control.commands, { now = now, inGame = registry.state.inGame })
           appliedSeq = control.seq
         end
-        local now = os.time()
         registry:tick(now)
-        local wrote, werr = bridge:writeStatus(registry:status(now, appliedSeq, bridge.lastError))
+        local status = registry:status(now, appliedSeq, bridge.lastError)
+        status.native = native.status(bridgeDir .. "\\native_status.json", now, nativeLoaded, nativeErr)
+        status.commands = commands:status()
+        local wrote, werr = bridge:writeStatus(status)
         if not wrote then log.error("status write: %s", tostring(werr)) end
       end)
     end)

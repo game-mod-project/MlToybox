@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MLToybox.Panel.Core\MLToybox.Panel.Core.csproj" />
+    <ProjectReference Include="..\..\tools\re\MLToybox.Re\MLToybox.Re.csproj" />
   </ItemGroup>
 
 </Project>

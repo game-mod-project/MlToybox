@@ -80,6 +80,19 @@ public class BridgeClientTests
     }
 
     [Fact]
+    public void ReadStatus_ParsesNativeSection()
+    {
+        var c = NewClient(out var dir);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(c.StatusPath,
+            """{"version":1,"heartbeat":1800000000,"inGame":true,"native":{"loaded":true,"stale":false,"heartbeat":1800000000,"features":{"instant_build":{"installed":true,"active":true}}}}""");
+        var s = c.ReadStatus()!;
+        Assert.True(s.Native!.Loaded);
+        Assert.False(s.Native.Stale);
+        Assert.True(s.Native.Features!["instant_build"].Active);
+    }
+
+    [Fact]
     public void Evaluate_NullStatus_IsDisconnected() =>
         Assert.Equal(BridgeState.Disconnected, NewClient(out _).Evaluate(null, 0));
 
