@@ -18,9 +18,9 @@ public sealed class MainForm : Form
 
     // 영주 전체 값: 체크된 항목만 목표 이상으로 유지한다
     private readonly CheckBox _lordEnabled = new() { Text = "영주 자원 목표값 유지 (영지와 무관한 전체 값)", AutoSize = true };
-    private readonly LordRow _lordTreasury = new("국고");
-    private readonly LordRow _lordInfluence = new("영향력");
-    private readonly LordRow _lordFavour = new("왕의 총애");
+    private readonly LordRow _lordTreasury = new("국고", "treasury");
+    private readonly LordRow _lordInfluence = new("영향력", "influence");
+    private readonly LordRow _lordFavour = new("왕의 총애", "kingsFavour");
 
     private sealed class LordRow
     {
