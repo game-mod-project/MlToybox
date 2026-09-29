@@ -12,6 +12,7 @@ local native = require("core.native")
 local commandsLib = require("core.commands")
 local spawnSquads = require("features.spawn_squads")
 local population = require("features.population")
+local lord = require("features.lord")
 local config = require("config")
 
 safe.setThreshold(config.failureThreshold)
@@ -21,7 +22,7 @@ local bridge = bridgeLib.new(bridgeDir)
 local nativeLoaded, nativeErr = native.load(paths.parentDir(scriptsDir) .. "\\native")
 log.info("native: %s", nativeLoaded and "loaded" or tostring(nativeErr))
 local registry = registryLib.new()
-local commands = commandsLib.new({ spawnSquads = spawnSquads.spawn, reformSquads = spawnSquads.reform, addFamilies = population.command })
+local commands = commandsLib.new({ spawnSquads = spawnSquads.spawn, reformSquads = spawnSquads.reform, addFamilies = population.command, setLord = lord.set })
 local appliedSeq = nil
 
 for _, name in ipairs(config.featureModules) do

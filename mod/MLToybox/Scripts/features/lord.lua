@@ -59,4 +59,36 @@ function M.tick(state, settings)
   state.lord = cur
 end
 
+-- 일회성 명령 setLord { key, value }: 목표 유지와 달리 올리든 내리든 그 값으로 한 번 맞춘다
+local SETTERS = {
+  influence = function(value)
+    local pawn = game.pawn()
+    if not pawn then return "game objects not ready" end
+    pawn.influence = value
+  end,
+  kingsFavour = function(value)
+    local pawn = game.pawn()
+    if not pawn then return "game objects not ready" end
+    local delta = value - pawn.kingsFavour
+    if delta ~= 0 then pawn:changeKingsFavour(delta) end
+  end,
+  treasury = function(value)
+    local treasury, cheat = game.treasury(), game.cheat()
+    if not treasury or not cheat then return "treasury not readable" end
+    local delta = math.floor(value - treasury)
+    if delta ~= 0 then cheat:ChangeTreasury(delta) end
+  end,
+}
+
+function M.set(command, ctx)
+  if not ctx.inGame then return { ok = false, error = "not in game" } end
+  local setter = SETTERS[command.key]
+  if not setter then return { ok = false, error = "unknown key: " .. tostring(command.key) } end
+  local value = tonumber(command.value)
+  if not value or value < 0 or value ~= math.floor(value) then return { ok = false, error = "value must be a non-negative integer" } end
+  local err = setter(value)
+  if err then return { ok = false, error = err } end
+  return { ok = true }
+end
+
 return M

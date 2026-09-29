@@ -21,7 +21,28 @@ local function pawn(influence, favour)
   return p
 end
 
+local IN_GAME = { inGame = true }
+
 T.run({
+  set_command_lowers_or_raises_each_value_exactly = function()
+    local p = pawn(1600000, 1600000)
+    local cheat = world({ pawn = p, treasury = 5000.0 })
+    T.eq(lord.set({ key = "influence", value = 900000 }, IN_GAME).ok, true, "influence ok")
+    T.eq(p.influence, 900000, "lowered")
+    lord.set({ key = "kingsFavour", value = 800000 }, IN_GAME)
+    T.eq(p.favourChanges[1], -800000, "favour delta via game function")
+    lord.set({ key = "treasury", value = 2000 }, IN_GAME)
+    T.eq(cheat.changes[1], -3000, "treasury delta from HUD reading")
+  end,
+  set_command_rejects_bad_input = function()
+    world({ pawn = pawn(0, 0), treasury = 1.0 })
+    T.eq(lord.set({ key = "gold", value = 1 }, IN_GAME).ok, false, "unknown key")
+    T.eq(lord.set({ key = "influence", value = -1 }, IN_GAME).ok, false, "negative")
+    T.eq(lord.set({ key = "influence", value = "x" }, IN_GAME).ok, false, "nan")
+    T.eq(lord.set({ key = "influence", value = 5 }, { inGame = false }).ok, false, "not in game")
+    world({ pawn = nil, treasury = nil })
+    T.eq(lord.set({ key = "treasury", value = 5 }, IN_GAME).ok, false, "no hud")
+  end,
   influence_raised_to_target_and_reported = function()
     local p = pawn(3, 0)
     world({ pawn = p })

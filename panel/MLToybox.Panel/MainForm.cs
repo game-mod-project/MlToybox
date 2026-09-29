@@ -27,11 +27,13 @@ public sealed class MainForm : Form
         public readonly CheckBox Use;
         public readonly NumericUpDown Value = new() { Minimum = 0, Maximum = 10_000_000, Value = 0, Width = 110 };
         public readonly Label Current = new() { AutoSize = true, Text = "현재: -", Padding = new Padding(8, 6, 0, 0) };
-        public LordRow(string label) { Use = new CheckBox { Text = label, AutoSize = true, Width = 90 }; }
+        public readonly Button SetNow = new() { Text = "지금 설정", AutoSize = true };
+        public readonly string Key;
+        public LordRow(string label, string key) { Use = new CheckBox { Text = label, AutoSize = true, Width = 90 }; Key = key; }
         public Control Row()
         {
             var row = new FlowLayoutPanel { AutoSize = true };
-            row.Controls.AddRange(new Control[] { Use, new Label { Text = "목표", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, Value, Current });
+            row.Controls.AddRange(new Control[] { Use, new Label { Text = "목표", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, Value, SetNow, Current });
             return row;
         }
         public void Load(int? target) { Use.Checked = target is not null; Value.Value = Math.Clamp(target ?? 0, 0, 10_000_000); }
@@ -95,8 +97,14 @@ public sealed class MainForm : Form
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(BuildResourcesTab());
+        // '지금 설정'은 목표 유지와 별개로 그 값으로 한 번 맞춘다(올리기·내리기 모두)
+        foreach (var r in new[] { _lordTreasury, _lordInfluence, _lordFavour })
+        {
+            var row = r;
+            row.SetNow.Click += (_, _) => SendCommand(ControlCommand.SetLord(row.Key, (int)row.Value.Value, DateTimeOffset.UtcNow));
+        }
         tabs.TabPages.Add(Page("영주", _lordEnabled, _lordTreasury.Row(), _lordInfluence.Row(), _lordFavour.Row(),
-            new Label { Text = "체크한 항목만 목표값 아래로 내려가면 채웁니다. 체크 해제 = 관리 안 함.", AutoSize = true }));
+            new Label { Text = "체크한 항목은 목표값 아래로 내려가면 목표까지 채웁니다(더 많으면 그대로). 체크 해제 = 관리 안 함." + Environment.NewLine + "'지금 설정'은 체크와 상관없이 입력한 값으로 한 번 정확히 맞춥니다(내리기도 가능).", AutoSize = true }));
         tabs.TabPages.Add(Page("건설", _buildEnabled, _ignorePlacement, _instantBuild, _instantRepair, _noMaterials));
         tabs.TabPages.Add(Page("업그레이드", _upgradeEnabled));
         _spawnUnit.Items.AddRange(UnitCatalog.Units.Cast<object>().ToArray());

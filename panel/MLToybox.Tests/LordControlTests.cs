@@ -58,6 +58,20 @@ public class LordControlTests
     }
 
     [Fact]
+    public void SetLordCommand_SerializesKeyAndValue()
+    {
+        var c = NewClient();
+        var doc = new ControlDocument();
+        doc.Commands.Add(ControlCommand.SetLord("kingsFavour", 800000, DateTimeOffset.FromUnixTimeSeconds(1_800_000_000)));
+        c.SaveControl(doc);
+        using var json = JsonDocument.Parse(File.ReadAllText(c.ControlPath));
+        var cmd = json.RootElement.GetProperty("commands")[0];
+        Assert.Equal("setLord", cmd.GetProperty("type").GetString());
+        Assert.Equal("kingsFavour", cmd.GetProperty("key").GetString());
+        Assert.Equal(800000, cmd.GetProperty("value").GetInt32());
+    }
+
+    [Fact]
     public void ReadStatus_ParsesLordValues()
     {
         var c = NewClient();
