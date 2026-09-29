@@ -24,7 +24,8 @@ public sealed class PopulationControl
 {
     public bool Enabled { get; set; }
     public int Multiplier { get; set; } = 2;
-    public int TargetFamilies { get; set; }
+    public int TargetFamilies { get; set; }   // 영지마다 최소 가족 수(0 = 끔)
+    public Dictionary<string, int> RegionTargets { get; set; } = new();   // 영지별 값(0 = 그 영지 끔)
 }
 
 // 영주 전체 값. null = 관리 안 함(키를 쓰지 않음), 값이 있으면 그 이상으로 유지

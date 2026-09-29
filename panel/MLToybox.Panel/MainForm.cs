@@ -72,6 +72,14 @@ public sealed class MainForm : Form
     private readonly NumericUpDown _popTarget = new() { Minimum = 0, Maximum = 1000, Value = 0, Width = 70 };
     private readonly NumericUpDown _popAddCount = new() { Minimum = 1, Maximum = 20, Value = 3, Width = 50 };
     private readonly Label _popInfo = new() { AutoSize = true, Text = "현재: -" };
+    // 인구 범위: null = 공통(영지마다 최소 가족 수·모든 영지 합계), 아니면 영지 키
+    private readonly ComboBox _popRegion = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
+    private readonly CheckBox _popOverride = new() { Text = "이 영지만 따로 지정", AutoSize = true };
+    private readonly Label _popTargetLabel = new() { AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
+    private string? _popScope;
+    private string _popRegionsKey = "";
+    private bool _popUpdating;
+    private PopulationStatus? _lastPop;
 
     private readonly ComboBox _spawnUnit = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 180, DisplayMember = nameof(UnitOption.Label) };
     private readonly NumericUpDown _spawnCount = new() { Minimum = 1, Maximum = 5, Value = 1, Width = 50 };
@@ -123,13 +131,18 @@ public sealed class MainForm : Form
         reformRow.Controls.AddRange(new Control[] { _reformLabel, _reformButton });
         tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads, spawnRow, reformRow));
         var addFamilies = new Button { Text = "가족 추가", AutoSize = true };
-        addFamilies.Click += (_, _) => SendCommand(ControlCommand.AddFamilies((int)_popAddCount.Value, DateTimeOffset.UtcNow));
+        addFamilies.Click += (_, _) => SendCommand(ControlCommand.AddFamilies((int)_popAddCount.Value, DateTimeOffset.UtcNow, _popScope));
+        _popRegion.Items.Add(new ScopeOption(null, "공통 (모든 내 영지)"));
+        _popRegion.SelectedIndex = 0;
+        _popRegion.SelectedIndexChanged += (_, _) => SwitchPopScope();
+        _popOverride.CheckedChanged += (_, _) => _popTarget.Enabled = _popScope is null || _popOverride.Checked;
         tabs.TabPages.Add(Page("인구",
             _popEnabled,
+            Row(new Label { Text = "영지:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popRegion),
             Row(new Label { Text = "자연 이민 배율(배):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popMultiplier),
-            Row(new Label { Text = "목표 가족 수(0 = 끔, 부족분만 채움):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popTarget),
+            Row(_popTargetLabel, _popTarget, _popOverride),
             Row(new Label { Text = "지금 바로 들일 가족 수:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popAddCount, addFamilies),
-            new Label { Text = "빈 집(가족 0 → 1 → 2 순)에 정상 규모 가족이 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.", AutoSize = true },
+            new Label { Text = "배율은 영지마다 그 영지의 자연 이민만큼 그 영지에 추가합니다. 가족 추가는 선택한 영지에, 공통이면 빈 자리가 많은 영지부터 들입니다." + Environment.NewLine + "빈 집(가족 0 → 1 → 2 순)에 들어오며 미배치 가족으로 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.", AutoSize = true },
             _popInfo));
         var statusPage = new TabPage("상태");
         statusPage.Controls.Add(_statusText);
@@ -271,7 +284,10 @@ public sealed class MainForm : Form
         _unlimitedSquads.Checked = f.Military.UnlimitedSquads;
         _popEnabled.Checked = f.Population.Enabled;
         _popMultiplier.Value = Math.Clamp(f.Population.Multiplier, 1, 10);
-        _popTarget.Value = Math.Clamp(f.Population.TargetFamilies, 0, 1000);
+        _popScope = null;
+        _popRegionsKey = "";
+        if (_popRegion.Items.Count > 0) { _popUpdating = true; _popRegion.SelectedIndex = 0; _popUpdating = false; }
+        LoadPopTarget();
         _resourceIdsKey = "";
         _regionsKey = "";
         _resScope = null;
@@ -346,7 +362,7 @@ public sealed class MainForm : Form
         f.Military.UnlimitedSquads = _unlimitedSquads.Checked;
         f.Population.Enabled = _popEnabled.Checked;
         f.Population.Multiplier = (int)_popMultiplier.Value;
-        f.Population.TargetFamilies = (int)_popTarget.Value;
+        StorePopTarget();
         try
         {
             _lastSentSeq = _bridge.SaveControl(_control);
@@ -370,6 +386,75 @@ public sealed class MainForm : Form
         _control.Commands = new List<ControlCommand> { command };
         Apply();
         _control.Commands = new List<ControlCommand>();
+    }
+
+    // 공통: 영지마다 최소 가족 수. 영지: '따로 지정'을 켜면 그 영지 값, 끄면 공통 값을 따른다
+    private void StorePopTarget()
+    {
+        var pop = _control.Features.Population;
+        if (_popScope is null) pop.TargetFamilies = (int)_popTarget.Value;
+        else if (_popOverride.Checked) pop.RegionTargets[_popScope] = (int)_popTarget.Value;
+        else pop.RegionTargets.Remove(_popScope);
+    }
+
+    private void LoadPopTarget()
+    {
+        var pop = _control.Features.Population;
+        if (_popScope is null)
+        {
+            _popTargetLabel.Text = "영지마다 최소 가족 수(0 = 끔, 부족분만 채움):";
+            _popOverride.Visible = false;
+            _popTarget.Enabled = true;
+            _popTarget.Value = Math.Clamp(pop.TargetFamilies, 0, 1000);
+            return;
+        }
+        var own = pop.RegionTargets.TryGetValue(_popScope, out var v);
+        _popTargetLabel.Text = "이 영지 최소 가족 수(0 = 끔):";
+        _popOverride.Visible = true;
+        _popOverride.Checked = own;
+        _popTarget.Enabled = own;
+        _popTarget.Value = Math.Clamp(own ? v : pop.TargetFamilies, 0, 1000);
+    }
+
+    private void SwitchPopScope()
+    {
+        if (_popUpdating || _popRegion.SelectedItem is not ScopeOption option || option.Key == _popScope) return;
+        StorePopTarget();
+        _popScope = option.Key;
+        LoadPopTarget();
+        UpdatePopInfo();
+    }
+
+    private void RefreshPopRegions()
+    {
+        var regions = _lastPop?.Regions ?? new List<PopulationRegion>();
+        var key = string.Join("|", regions.Select(r => $"{r.Key}={r.Name}"));
+        if (key == _popRegionsKey) return;
+        _popRegionsKey = key;
+        var options = new List<ScopeOption> { new(null, "공통 (모든 내 영지)") };
+        options.AddRange(regions.Select(r => new ScopeOption(r.Key, $"{r.Name} ({r.Key})")));
+        _popUpdating = true;   // 목록을 비우는 동안 범위가 바뀌지 않게 한다
+        _popRegion.BeginUpdate();
+        _popRegion.Items.Clear();
+        _popRegion.Items.AddRange(options.Cast<object>().ToArray());
+        _popRegion.EndUpdate();
+        var index = options.FindIndex(o => o.Key == _popScope);
+        if (index < 0) { StorePopTarget(); _popScope = null; LoadPopTarget(); index = 0; }
+        _popRegion.SelectedIndex = index;
+        _popUpdating = false;
+    }
+
+    private void UpdatePopInfo()
+    {
+        var p = _lastPop;
+        if (p is null) { _popInfo.Text = "현재: - (인구 기능이 꺼져 있거나 게임 밖)"; return; }
+        var r = _popScope is null ? null : p.Regions?.FirstOrDefault(x => x.Key == _popScope);
+        var (families, people, homeless, free, unassigned) = r is null
+            ? (p.Families, p.Population, p.Homeless, p.FreeSlots, p.Unassigned)
+            : (r.Families, r.Population, r.Homeless, r.FreeSlots, r.Unassigned);
+        var scope = r is null ? "모든 내 영지 합계" : r.Name;
+        _popInfo.Text = $"현재({scope}): 가족 {families} · 인구 {people} · 집 없는 가족 {homeless} · 빈 자리 {free} · 미배치 가족 {unassigned}"
+            + $"{Environment.NewLine}이번 세션(전체): 자연 이민 {p.Natural}가족 → 배율로 추가 {p.Multiplied}가족";
     }
 
     private void UpdateReform(StatusDocument? status)
@@ -468,8 +553,9 @@ public sealed class MainForm : Form
         else
             foreach (var (name, fs) in status.Features.OrderBy(p => p.Key))
                 lines.Add($"{name,-10} active={fs.Active,-5} error={fs.LastError ?? "-"}");
-        var p = status.Population;
-        _popInfo.Text = p is null ? "현재: - (인구 기능이 꺼져 있거나 게임 밖)" : $"현재: 가족 {p.Families} · 인구 {p.Population} · 집 없는 가족 {p.Homeless} · 빈 자리 {p.FreeSlots}{Environment.NewLine}이번 세션: 자연 이민 {p.Natural}가족 → 배율로 추가 {p.Multiplied}가족";
+        _lastPop = status.Population;
+        RefreshPopRegions();
+        UpdatePopInfo();
         if (status.Commands is not null)
         {
             lines.Add("");

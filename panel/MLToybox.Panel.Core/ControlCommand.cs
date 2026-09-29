@@ -10,6 +10,7 @@ public sealed class ControlCommand
     public long IssuedAt { get; set; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Key { get; set; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public int? Value { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Region { get; set; }
 
     public static ControlCommand SpawnSquads(string unit, int count, DateTimeOffset now) => new()
     {
@@ -38,11 +39,13 @@ public sealed class ControlCommand
         IssuedAt = now.ToUnixTimeSeconds(),
     };
 
-    public static ControlCommand AddFamilies(int count, DateTimeOffset now) => new()
+    // region 이 없으면 빈 자리가 많은 영지부터 들인다
+    public static ControlCommand AddFamilies(int count, DateTimeOffset now, string? region = null) => new()
     {
         Id = Guid.NewGuid().ToString("N"),
         Type = "addFamilies",
         Count = count,
+        Region = region,
         IssuedAt = now.ToUnixTimeSeconds(),
     };
 }
@@ -72,6 +75,8 @@ public sealed class PopulationStatus
     public int FreeSlots { get; set; }
     public int Natural { get; set; }
     public int Multiplied { get; set; }
+    public int Unassigned { get; set; }
+    public List<PopulationRegion>? Regions { get; set; }
 }
 
 public sealed record UnitOption(string Id, string Label);
@@ -95,4 +100,15 @@ public static class UnitCatalog
         new("mercenary_heavy_archers", "용병 - 중궁수"),
         new("mercenary_crossbowmen", "용병 - 석궁병"),
     };
+}
+
+public sealed class PopulationRegion
+{
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public int Families { get; set; }
+    public int Population { get; set; }
+    public int Homeless { get; set; }
+    public int FreeSlots { get; set; }
+    public int Unassigned { get; set; }
 }
