@@ -12,6 +12,7 @@ public sealed class StatusDocument
     public Dictionary<string, double>? Resources { get; set; }
     public NativeStatus? Native { get; set; }
     public Dictionary<string, CommandResult>? Commands { get; set; }
+    public SpawnStatus? Spawn { get; set; }
 }
 
 public sealed class NativeStatus

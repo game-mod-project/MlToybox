@@ -39,6 +39,8 @@ public sealed class MainForm : Form
 
     private readonly ComboBox _spawnUnit = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 180, DisplayMember = nameof(UnitOption.Label) };
     private readonly NumericUpDown _spawnCount = new() { Minimum = 1, Maximum = 5, Value = 1, Width = 50 };
+    private readonly Label _reformLabel = new() { Text = "해제된 생성 분대: -", AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
+    private readonly Button _reformButton = new() { Text = "재구성", AutoSize = true, Enabled = false };
 
     private readonly TextBox _statusText = new()
     {
@@ -71,7 +73,11 @@ public sealed class MainForm : Form
             new Label { Text = "병력 생성 (주민과 무관):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) },
             _spawnUnit, _spawnCount, new Label { Text = "개 분대", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, spawnButton,
         });
-        tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads, spawnRow));
+        // 생성 분대는 집이 없어 게임의 해제→집결이 안 된다(해제하면 0/N 빈 카드). 모드가 같은 병종으로 다시 생성한다
+        _reformButton.Click += (_, _) => ReformSquads();
+        var reformRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
+        reformRow.Controls.AddRange(new Control[] { _reformLabel, _reformButton });
+        tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads, spawnRow, reformRow));
         var statusPage = new TabPage("상태");
         statusPage.Controls.Add(_statusText);
         tabs.TabPages.Add(statusPage);
@@ -225,6 +231,29 @@ public sealed class MainForm : Form
         _control.Commands = new List<ControlCommand>();
     }
 
+    private void UpdateReform(StatusDocument? status)
+    {
+        var spawn = status is { InGame: true } ? status.Spawn : null;
+        if (spawn is null)
+        {
+            _reformLabel.Text = "해제된 생성 분대: -";
+            _reformButton.Enabled = false;
+            return;
+        }
+        var labels = UnitCatalog.Units.ToDictionary(u => u.Id, u => u.Label);
+        var detail = spawn.ByUnit is null || spawn.ByUnit.Count == 0 ? ""
+            : " (" + string.Join(", ", spawn.ByUnit.Select(p => $"{labels.GetValueOrDefault(p.Key, p.Key)} {p.Value}")) + ")";
+        var pending = spawn.Pending > 0 ? $" — 빈 카드 정리 중 {spawn.Pending}" : "";
+        _reformLabel.Text = $"해제된 생성 분대: {spawn.Disbanded}개{detail}{pending}";
+        _reformButton.Enabled = spawn.Disbanded > 0 && spawn.Pending == 0;
+    }
+
+    private void ReformSquads()
+    {
+        _control.Commands = new List<ControlCommand> { ControlCommand.ReformSquads(DateTimeOffset.UtcNow) };
+        Apply();
+        _control.Commands = new List<ControlCommand>();
+    }
     private Dictionary<string, int> ReadTargets()
     {
         var targets = new Dictionary<string, int>();
@@ -255,6 +284,7 @@ public sealed class MainForm : Form
             BridgeState.MainMenu => Color.SteelBlue,
             _ => Color.Firebrick,
         };
+        UpdateReform(status);
         if (status is null)
         {
             _statusText.Text = "status.json 없음";
@@ -295,7 +325,7 @@ public sealed class MainForm : Form
             lines.Add("");
             lines.Add("[명령 결과]");
             foreach (var (id, r) in status.Commands)
-                lines.Add($"{id[..Math.Min(8, id.Length)]} {(r.Ok ? "성공" : "실패")} {(r.Squads is null ? "" : "분대 " + string.Join(",", r.Squads))} {r.Error ?? ""}");
+                lines.Add($"{id[..Math.Min(8, id.Length)]} {(r.Ok ? "성공" : "실패")} {(r.Squads is null ? "" : "분대 " + string.Join(",", r.Squads))} {(r.Reformed is null ? "" : $"재구성 {r.Reformed}개")} {r.Error ?? ""}");
         }
         lines.Add("");
         lines.Add("[네이티브]");

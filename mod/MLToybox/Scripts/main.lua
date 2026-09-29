@@ -20,7 +20,7 @@ local bridge = bridgeLib.new(bridgeDir)
 local nativeLoaded, nativeErr = native.load(paths.parentDir(scriptsDir) .. "\\native")
 log.info("native: %s", nativeLoaded and "loaded" or tostring(nativeErr))
 local registry = registryLib.new()
-local commands = commandsLib.new({ spawnSquads = spawnSquads.spawn })
+local commands = commandsLib.new({ spawnSquads = spawnSquads.spawn, reformSquads = spawnSquads.reform })
 local appliedSeq = nil
 
 for _, name in ipairs(config.featureModules) do
@@ -55,9 +55,12 @@ LoopAsync(config.pollIntervalMs, function()
           appliedSeq = control.seq
         end
         registry:tick(now)
+        safe.call("spawnSquads", function() spawnSquads.tick(registry.state.inGame) end)
         local status = registry:status(now, appliedSeq, bridge.lastError)
         status.native = native.status(bridgeDir .. "\\native_status.json", now, nativeLoaded, nativeErr)
         status.commands = commands:status()
+        local spawnOk, spawnStatus = safe.call("spawnSquads", spawnSquads.status, registry.state.inGame)
+        status.spawn = spawnOk and spawnStatus or nil
         local wrote, werr = bridge:writeStatus(status)
         if not wrote then log.error("status write: %s", tostring(werr)) end
       end)
