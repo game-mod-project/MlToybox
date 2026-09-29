@@ -29,7 +29,7 @@ public sealed class MainForm : Form
         public readonly Label Current = new() { AutoSize = true, Text = "현재: -", Padding = new Padding(8, 6, 0, 0) };
         public readonly Button SetNow = new() { Text = "지금 설정", AutoSize = true };
         public readonly string Key;
-        public LordRow(string label, string key) { Use = new CheckBox { Text = label, AutoSize = true, Width = 90 }; Key = key; }
+        public LordRow(string label, string key) { Use = new CheckBox { Text = label, AutoSize = false, Width = 100 }; Key = key; }
         public Control Row()
         {
             var row = new FlowLayoutPanel { AutoSize = true };
@@ -150,10 +150,33 @@ public sealed class MainForm : Form
         Controls.Add(tabs);
         Controls.Add(top);
         Controls.Add(bottom);
+        AttachNumberBoxes(this);
 
         InitGameDir();
         _timer.Tick += (_, _) => RefreshStatus();
         _timer.Start();
+    }
+
+    // 한글 입력 상태에서 숫자를 치면 전각 숫자(９００００)가 들어가 NumericUpDown 이 값을 버린다.
+    // IME 를 끄고, 그래도 들어온 전각 숫자·공백은 즉시 일반 숫자로 바꾼다.
+    private static void AttachNumberBoxes(Control root)
+    {
+        foreach (Control c in root.Controls)
+        {
+            if (c is NumericUpDown n)
+            {
+                n.ImeMode = ImeMode.Disable;
+                n.TextChanged += (_, _) =>
+                {
+                    var raw = n.Text;
+                    if (!raw.Any(ch => ch is >= '０' and <= '９' || char.IsWhiteSpace(ch))) return;
+                    if (NumberInput.Parse(raw) is not int v) return;
+                    n.Text = v.ToString();
+                    if (n.Controls.OfType<TextBox>().FirstOrDefault() is { } edit) edit.SelectionStart = edit.TextLength;
+                };
+            }
+            AttachNumberBoxes(c);
+        }
     }
 
     private TabPage BuildResourcesTab()
