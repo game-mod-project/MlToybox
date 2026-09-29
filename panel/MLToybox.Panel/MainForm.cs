@@ -37,6 +37,12 @@ public sealed class MainForm : Form
     private readonly CheckBox _zeroUpkeep = new() { Text = "용병 비용·모집비 0 (친위대 유지비는 미지원 — 자원 탭 금고 유지로 보정)", AutoSize = true };
     private readonly CheckBox _unlimitedSquads = new() { Text = "부대 수 상한 해제", AutoSize = true };
 
+    private readonly CheckBox _popEnabled = new() { Text = "인구 기능 사용", AutoSize = true };
+    private readonly NumericUpDown _popMultiplier = new() { Minimum = 1, Maximum = 10, Value = 2, Width = 50 };
+    private readonly NumericUpDown _popTarget = new() { Minimum = 0, Maximum = 1000, Value = 0, Width = 70 };
+    private readonly NumericUpDown _popAddCount = new() { Minimum = 1, Maximum = 20, Value = 3, Width = 50 };
+    private readonly Label _popInfo = new() { AutoSize = true, Text = "현재: -" };
+
     private readonly ComboBox _spawnUnit = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 180, DisplayMember = nameof(UnitOption.Label) };
     private readonly NumericUpDown _spawnCount = new() { Minimum = 1, Maximum = 5, Value = 1, Width = 50 };
     private readonly Label _reformLabel = new() { Text = "해제된 생성 분대: -", AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
@@ -78,6 +84,15 @@ public sealed class MainForm : Form
         var reformRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
         reformRow.Controls.AddRange(new Control[] { _reformLabel, _reformButton });
         tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads, spawnRow, reformRow));
+        var addFamilies = new Button { Text = "가족 추가", AutoSize = true };
+        addFamilies.Click += (_, _) => SendCommand(ControlCommand.AddFamilies((int)_popAddCount.Value, DateTimeOffset.UtcNow));
+        tabs.TabPages.Add(Page("인구",
+            _popEnabled,
+            Row(new Label { Text = "자연 이민 배율(배):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popMultiplier),
+            Row(new Label { Text = "목표 가족 수(0 = 끔, 부족분만 채움):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popTarget),
+            Row(new Label { Text = "지금 바로 들일 가족 수:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popAddCount, addFamilies),
+            new Label { Text = "빈 집(가족 0 → 1 → 2 순)에 정상 규모 가족이 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.", AutoSize = true },
+            _popInfo));
         var statusPage = new TabPage("상태");
         statusPage.Controls.Add(_statusText);
         tabs.TabPages.Add(statusPage);
@@ -120,6 +135,13 @@ public sealed class MainForm : Form
         page.Controls.Add(_resGrid);
         page.Controls.Add(header);
         return page;
+    }
+
+    private static FlowLayoutPanel Row(params Control[] controls)
+    {
+        var row = new FlowLayoutPanel { AutoSize = true };
+        row.Controls.AddRange(controls);
+        return row;
     }
 
     private static TabPage Page(string title, params Control[] controls)
@@ -178,6 +200,9 @@ public sealed class MainForm : Form
         _ignorePopulation.Checked = f.Military.IgnorePopulation;
         _zeroUpkeep.Checked = f.Military.ZeroUpkeep;
         _unlimitedSquads.Checked = f.Military.UnlimitedSquads;
+        _popEnabled.Checked = f.Population.Enabled;
+        _popMultiplier.Value = Math.Clamp(f.Population.Multiplier, 1, 10);
+        _popTarget.Value = Math.Clamp(f.Population.TargetFamilies, 0, 1000);
         _resourceIdsKey = "";
         RebuildResourceRows(null, null);
     }
@@ -211,6 +236,9 @@ public sealed class MainForm : Form
         f.Military.IgnorePopulation = _ignorePopulation.Checked;
         f.Military.ZeroUpkeep = _zeroUpkeep.Checked;
         f.Military.UnlimitedSquads = _unlimitedSquads.Checked;
+        f.Population.Enabled = _popEnabled.Checked;
+        f.Population.Multiplier = (int)_popMultiplier.Value;
+        f.Population.TargetFamilies = (int)_popTarget.Value;
         try
         {
             _lastSentSeq = _bridge.SaveControl(_control);
@@ -226,7 +254,12 @@ public sealed class MainForm : Form
     private void SpawnSquads()
     {
         if (_spawnUnit.SelectedItem is not UnitOption unit) return;
-        _control.Commands = new List<ControlCommand> { ControlCommand.SpawnSquads(unit.Id, (int)_spawnCount.Value, DateTimeOffset.UtcNow) };
+        SendCommand(ControlCommand.SpawnSquads(unit.Id, (int)_spawnCount.Value, DateTimeOffset.UtcNow));
+    }
+
+    private void SendCommand(ControlCommand command)
+    {
+        _control.Commands = new List<ControlCommand> { command };
         Apply();
         _control.Commands = new List<ControlCommand>();
     }
@@ -320,12 +353,14 @@ public sealed class MainForm : Form
         else
             foreach (var (name, fs) in status.Features.OrderBy(p => p.Key))
                 lines.Add($"{name,-10} active={fs.Active,-5} error={fs.LastError ?? "-"}");
+        var p = status.Population;
+        _popInfo.Text = p is null ? "현재: - (인구 기능이 꺼져 있거나 게임 밖)" : $"현재: 가족 {p.Families} · 인구 {p.Population} · 집 없는 가족 {p.Homeless} · 빈 자리 {p.FreeSlots}";
         if (status.Commands is not null)
         {
             lines.Add("");
             lines.Add("[명령 결과]");
             foreach (var (id, r) in status.Commands)
-                lines.Add($"{id[..Math.Min(8, id.Length)]} {(r.Ok ? "성공" : "실패")} {(r.Squads is null ? "" : "분대 " + string.Join(",", r.Squads))} {(r.Reformed is null ? "" : $"재구성 {r.Reformed}개")} {r.Error ?? ""}");
+                lines.Add($"{id[..Math.Min(8, id.Length)]} {(r.Ok ? "성공" : "실패")} {(r.Squads is null ? "" : "분대 " + string.Join(",", r.Squads))} {(r.Reformed is null ? "" : $"재구성 {r.Reformed}개")}{(r.Added is null ? "" : $"가족 {r.Added}/{r.Requested}")} {r.Error ?? ""}");
         }
         lines.Add("");
         lines.Add("[네이티브]");

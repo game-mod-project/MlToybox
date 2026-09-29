@@ -14,6 +14,14 @@ public sealed class FeaturesControl
     public BuildControl Build { get; set; } = new();
     public UpgradeControl Upgrade { get; set; } = new();
     public MilitaryControl Military { get; set; } = new();
+    public PopulationControl Population { get; set; } = new();
+}
+
+public sealed class PopulationControl
+{
+    public bool Enabled { get; set; }
+    public int Multiplier { get; set; } = 2;
+    public int TargetFamilies { get; set; }
 }
 
 public sealed class ResourcesControl

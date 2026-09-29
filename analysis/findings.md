@@ -156,6 +156,7 @@
 - 인게임(18:49~): 후킹 installed/active. 경계 안의 막힌 위치에 건물 3개를 배치했고, 공사가 진행 중이며 즉시 완공과 함께 동작했다. 모드 오류 0건, 크래시 없음.
 - 한계: 영지 경계 밖은 의도적으로 허용하지 않는다. 도로·밭 배치 갱신(`0x144B03460`)은 대상이 아니다.
 
+<<<<<<< HEAD
 ## 게임 버그 방어 — AI 민병대 평가 크래시 (2026-09-28)
 - 증상: 전투 뒤 `EXCEPTION_ACCESS_VIOLATION reading 0xCA8`, RIP `exe+0x4B9133A`. 함수 `0x144B910C0`(APawnCPP 멤버, UFunction 없음)은 `0x144BB3A40`의 지역별 AI 틱 루프에서 호출된다.
 - 동작: `region+0x2E8`이 켜져 있고 쿨다운 `region+0x7C8 <= 0`이면 `+0x7C8 = 1`로 설정한다. 그다음 `pawn.commandedSquads`(0xA10)의 분대 가운데 `squadType == 1`이고 `originRegion == region`인 분대를 골라, `assignedRecruits`(0x348)의 각 유닛에 대해 `unit.Home(0x340)->lv(0xCA8)`를 null 검사 없이 읽는다.
@@ -171,3 +172,14 @@
 - 해제·집결 버튼은 `PawnCPP:rallySquads`·`disbandSquad` 등 UFunction을 거치지 않는다(Lua 후킹으로 호출이 잡히지 않았다).
 - `APawnCPP::removeSquad(id)`(exec `0x144A65550`, 구현 `0x144AFC390`)는 엔진 `+0xFC0` 제거 대기열(TArray<int32>)에 id를 AddUnique로 넣는다. 게임이 곧(3초 이내) 해당 분대를 배열에서 지우고, 뒤쪽 분대를 한 칸씩 당겨 ID를 인덱스에 맞게 다시 매긴다. `commandedSquads`도 함께 갱신된다(실측: 43번 제거 후 id≠index인 분대 0개).
 - 재구성: 빈 카드(플레이어 소유, type 0, company -1, units 0, recruits 0)는 세이브에 `unitType`과 함께 남으므로 예비 기록으로 쓴다. 모드는 같은 병종을 `spawnArmy`로 다시 생성하고, 빈 카드는 높은 ID부터 한 틱에 하나씩 `removeSquad`로 지운다. 지우는 대상은 새 분대보다 앞 번호로 한정하고, 배열이 줄어든 것을 확인한 뒤 다음 것을 지운다.
+=======
+## 인구 기능 (2026-09-28)
+- `ARegion.growPopulation()`은 이민이 아니라 주민 나이 증가 처리였다(구현 `0x144BED220`, 주민별 카운터 +0xD10이 30에 도달하면 처리). 호출해도 가족 수가 변하지 않는다.
+- `UPerkSettings.IncreaseImmigrationRate`(+0x1FC)를 읽는 코드가 게임 모듈에 없고, 해당 perk도 없다(`GetPerkForPerkEffect(32)` = None). perk 방식 배율은 불가하다.
+- 이민 경로 역추적: `AddNewFamily` 구현(`0x144BC2010`)의 호출자 `0x144CD1FA0`는 UFunction **`ASMBuildingMaster.spawnManorServantsInside(int32)`**의 구현이다. 건물 위치에 주민을 만들고 `AddNewFamily`로 등록하며, `occupantFamilyIDs`(+0xF98, Num +0xFA0)가 2 미만인 동안 반복한다.
+- 인게임: 빈 주거지에 1회 호출 → 거주 가족 0→1, 곧 구성원 3명(정상 규모). 저장·재로드 후에도 유지된다.
+- 구현: `features/population.lua`
+  - 배율: 자연 증가분 × (배율−1)만큼 추가한다. 모드가 들인 가족에는 배율을 다시 걸지 않는다.
+  - 목표 가족 수: 부족분만 채운다.
+  - 명령 `addFamilies`: 1~20가족, 빈 집부터 채운다.
+>>>>>>> feat/population

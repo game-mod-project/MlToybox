@@ -25,6 +25,14 @@ public sealed class ControlCommand
         Type = "reformSquads",
         IssuedAt = now.ToUnixTimeSeconds(),
     };
+
+    public static ControlCommand AddFamilies(int count, DateTimeOffset now) => new()
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Type = "addFamilies",
+        Count = count,
+        IssuedAt = now.ToUnixTimeSeconds(),
+    };
 }
 
 public sealed class CommandResult
@@ -33,6 +41,8 @@ public sealed class CommandResult
     public string? Error { get; set; }
     public List<int>? Squads { get; set; }
     public int? Reformed { get; set; }
+    public int? Requested { get; set; }
+    public int? Added { get; set; }
 }
 
 public sealed class SpawnStatus
@@ -40,6 +50,14 @@ public sealed class SpawnStatus
     public int Disbanded { get; set; }
     public int Pending { get; set; }
     public Dictionary<string, int>? ByUnit { get; set; }
+}
+
+public sealed class PopulationStatus
+{
+    public int Families { get; set; }
+    public int Population { get; set; }
+    public int Homeless { get; set; }
+    public int FreeSlots { get; set; }
 }
 
 public sealed record UnitOption(string Id, string Label);

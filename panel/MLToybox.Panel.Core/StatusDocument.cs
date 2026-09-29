@@ -13,6 +13,7 @@ public sealed class StatusDocument
     public NativeStatus? Native { get; set; }
     public Dictionary<string, CommandResult>? Commands { get; set; }
     public SpawnStatus? Spawn { get; set; }
+    public PopulationStatus? Population { get; set; }
 }
 
 public sealed class NativeStatus
