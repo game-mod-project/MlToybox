@@ -24,7 +24,14 @@ public sealed class BridgeClient
         try
         {
             if (File.Exists(ControlPath))
-                return JsonSerializer.Deserialize<ControlDocument>(File.ReadAllText(ControlPath), BridgeJson.Options) ?? new();
+            {
+                var text = File.ReadAllText(ControlPath);
+                var doc = JsonSerializer.Deserialize<ControlDocument>(text, BridgeJson.Options) ?? new();
+                using var raw = JsonDocument.Parse(text);
+                var hadLord = raw.RootElement.TryGetProperty("features", out var fs) && fs.ValueKind == JsonValueKind.Object && fs.TryGetProperty("lord", out _);
+                LordControl.MigrateFrom(doc.Features, hadLord);
+                return doc;
+            }
         }
         catch (JsonException) { }
         catch (IOException) { }

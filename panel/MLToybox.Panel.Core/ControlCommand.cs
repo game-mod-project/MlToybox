@@ -8,6 +8,8 @@ public sealed class ControlCommand
     public string? Unit { get; set; }
     public int Count { get; set; }
     public long IssuedAt { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Key { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public int? Value { get; set; }
 
     public static ControlCommand SpawnSquads(string unit, int count, DateTimeOffset now) => new()
     {
@@ -23,6 +25,16 @@ public sealed class ControlCommand
     {
         Id = Guid.NewGuid().ToString("N"),
         Type = "reformSquads",
+        IssuedAt = now.ToUnixTimeSeconds(),
+    };
+
+    // 영주 값(treasury/influence/kingsFavour)을 올리든 내리든 그 값으로 한 번 맞춘다
+    public static ControlCommand SetLord(string key, int value, DateTimeOffset now) => new()
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Type = "setLord",
+        Key = key,
+        Value = value,
         IssuedAt = now.ToUnixTimeSeconds(),
     };
 

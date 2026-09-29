@@ -1,8 +1,8 @@
 local game = require("core.game")
 local catalog = require("features.resources_catalog")
 
-local M = { name = "resources", intervalSec = 2, TREASURY_PENDING_TIMEOUT = 30 }
-M.clock = os.time
+-- 국고·영향력·왕의 총애는 영주 전체 값이라 features/lord.lua 가 관리한다
+local M = { name = "resources", intervalSec = 2 }
 
 local function shortfall(current, target)
   if type(target) ~= "number" then return 0 end
@@ -13,31 +13,6 @@ end
 function M.enable(state)
   state.resourceIds = catalog.ids()
   state.resources = {}
-  state.treasuryPending = nil
-  state.treasuryLastReading = nil
-end
-
--- ChangeTreasury 는 증감이고 HUD 값은 늦게(수 초) 반영되거나 로드 직후 카운트업 애니메이션을 한다.
--- 그래서 (1) 같은 값이 두 번 연속 읽힐 때만 보충하고, (2) 보충 후에는 HUD 값이 바뀌거나 시간이 초과될 때까지 다시 보충하지 않는다.
-local function keepTreasury(state, target, treasury, now)
-  local stable = state.treasuryLastReading == treasury
-  state.treasuryLastReading = treasury
-  local pending = state.treasuryPending
-  if pending then
-    if treasury ~= pending.before or now >= pending.deadline then
-      state.treasuryPending = nil
-    else
-      return treasury + pending.added
-    end
-  end
-  local need = shortfall(treasury, target)
-  if need <= 0 or not stable then return treasury end
-  local cheat = game.cheat()
-  if not cheat then return treasury end
-  local added = math.floor(need)
-  cheat:ChangeTreasury(added)
-  state.treasuryPending = { before = treasury, added = added, deadline = now + M.TREASURY_PENDING_TIMEOUT }
-  return treasury + added
 end
 
 -- 영지 식별자: regionUniqueTag(세이브 간 고정, 예 "hof"), 표시 이름: regionName(플레이어가 바꿀 수 있음)
@@ -96,15 +71,6 @@ function M.tick(state, settings)
   for i, p in ipairs(perRegion) do
     if p.key then state.regions[#state.regions + 1] = { key = p.key, name = p.name or p.key, values = p.values } end
   end
-
-  local pawn = game.pawn()
-  if pawn then
-    if shortfall(pawn.influence, targets.Influence) > 0 then pawn.influence = targets.Influence end
-    cur.Influence = pawn.influence
-  end
-
-  local treasury = game.treasury()
-  if treasury then cur.Treasury = keepTreasury(state, targets.Treasury, treasury, M.clock()) end
 
   state.resources = cur
 end

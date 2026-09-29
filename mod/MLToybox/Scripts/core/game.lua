@@ -42,6 +42,13 @@ function M.treasury()
   return nil
 end
 
+-- 영향력·왕의 총애는 필드를 바꿔도 영주 HUD 숫자가 갱신되지 않는다(국고 ChangeTreasury 는 갱신됨). 위젯 갱신 함수를 부른다
+function M.refreshLordHud()
+  for _, w in ipairs(M.find.all("W_HUD_LordPanel_V2_C")) do
+    if safe.valid(w) then w:updatePlayerStats() end
+  end
+end
+
 M.fname = function(s) return FName(s) end
 
 -- 분대 생성 위치: 내 첫 지역의 영주 저택, 없으면 첫 완공 건물

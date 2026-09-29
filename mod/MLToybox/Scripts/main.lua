@@ -12,6 +12,7 @@ local native = require("core.native")
 local commandsLib = require("core.commands")
 local spawnSquads = require("features.spawn_squads")
 local population = require("features.population")
+local lord = require("features.lord")
 local config = require("config")
 
 safe.setThreshold(config.failureThreshold)
@@ -21,7 +22,7 @@ local bridge = bridgeLib.new(bridgeDir)
 local nativeLoaded, nativeErr = native.load(paths.parentDir(scriptsDir) .. "\\native")
 log.info("native: %s", nativeLoaded and "loaded" or tostring(nativeErr))
 local registry = registryLib.new()
-local commands = commandsLib.new({ spawnSquads = spawnSquads.spawn, reformSquads = spawnSquads.reform, addFamilies = population.command })
+local commands = commandsLib.new({ spawnSquads = spawnSquads.spawn, reformSquads = spawnSquads.reform, addFamilies = population.command, setLord = lord.set })
 local appliedSeq = nil
 
 for _, name in ipairs(config.featureModules) do
@@ -62,6 +63,10 @@ LoopAsync(config.pollIntervalMs, function()
         status.commands = commands:status()
         local spawnOk, spawnStatus = safe.call("spawnSquads", spawnSquads.status, registry.state.inGame)
         status.spawn = spawnOk and spawnStatus or nil
+        if registry.state.inGame then   -- 영주 기능이 꺼져 있어도 현재값은 보고한다
+          local lordOk, lordValues = safe.call("lord", lord.read)
+          if lordOk then status.lord = lordValues end
+        end
         local wrote, werr = bridge:writeStatus(status)
         if not wrote then log.error("status write: %s", tostring(werr)) end
       end)

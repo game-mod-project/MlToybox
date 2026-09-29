@@ -125,6 +125,12 @@ T.run({
     r.state.population = { families = 3 }
     T.eq(r:status(1, nil, nil).population.families, 3, "present")
   end,
+  status_includes_lord_values_when_present = function()
+    local r = registry.new(); r:add(fake("a")); r:setInGame(true)
+    T.eq(r:status(1, nil, nil).lord, nil, "absent")
+    r.state.lord = { treasury = 5, kingsFavour = 2 }
+    T.eq(r:status(1, nil, nil).lord.kingsFavour, 2, "present")
+  end,
   status_includes_per_region_resources_when_present = function()
     local r = registry.new(); r:add(fake("a")); r:setInGame(true)
     T.eq(r:status(1, nil, nil).regions, nil, "absent")
