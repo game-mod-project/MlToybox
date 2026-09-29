@@ -5,7 +5,9 @@ local population = require("features.population")
 
 -- 가짜 지역: 집마다 거주 가족 수를 들고, spawnManorServantsInside(1) 이 호출되면 +1 (최대 2)
 local function world(houseOccupants, extra)
-  local region = F.object({ spawned = 0 })
+  local region = F.object({ spawned = 0, unassigned = {} })
+  local nextId = 100
+  region.unassignFamily = function(self, id) self.unassigned[#self.unassigned + 1] = id end
   local houses = {}
   for i, occ in ipairs(houseOccupants) do
     local h = F.object({ occupantFamilyIDs = F.array({}), calls = 0 })
@@ -15,7 +17,7 @@ local function world(houseOccupants, extra)
     h.spawnManorServantsInside = function(self, n)
       self.calls = self.calls + 1
       for _ = 1, n do
-        if #self.occupantFamilyIDs < 2 then self.occupantFamilyIDs[#self.occupantFamilyIDs + 1] = 99; region.spawned = region.spawned + 1 end
+        if #self.occupantFamilyIDs < 2 then nextId = nextId + 1; self.occupantFamilyIDs[#self.occupantFamilyIDs + 1] = nextId; region.spawned = region.spawned + 1 end
       end
     end
     houses[i] = h
@@ -31,6 +33,24 @@ local function world(houseOccupants, extra)
 end
 
 T.run({
+  added_families_are_unassigned_not_working_at_their_house = function()
+    -- spawnManorServantsInside 는 새 가족을 그 집의 일꾼으로 배치한다. 자연 이민처럼 미배치로 바꾼다
+    local region, houses = world({ 1, 0 })
+    T.eq(population.addFamilies(2), 2, "added")
+    T.eq(#region.unassigned, 2, "both unassigned")
+    T.eq(region.unassigned[1], houses[2].occupantFamilyIDs[1], "new family id")
+    for _, id in ipairs(region.unassigned) do T.truthy(id > 100, "never the existing family") end
+  end,
+  status_counts_families_added_by_multiplier = function()
+    local region = world({ 0, 0, 0, 0 })
+    local st = {}
+    population.enable(st, {})
+    population.tick(st, { enabled = true, multiplier = 3 })
+    region.setNatural(1)
+    population.tick(st, { enabled = true, multiplier = 3 })
+    T.eq(st.population.multiplied, 2, "bonus families counted")
+    T.eq(st.population.natural, 1, "natural growth counted")
+  end,
   add_families_fills_empty_houses_first = function()
     local _, houses = world({ 1, 0, 0 })
     local added = population.addFamilies(2)

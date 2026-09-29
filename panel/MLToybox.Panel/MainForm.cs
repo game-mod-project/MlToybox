@@ -402,7 +402,7 @@ public sealed class MainForm : Form
             foreach (var (name, fs) in status.Features.OrderBy(p => p.Key))
                 lines.Add($"{name,-10} active={fs.Active,-5} error={fs.LastError ?? "-"}");
         var p = status.Population;
-        _popInfo.Text = p is null ? "현재: - (인구 기능이 꺼져 있거나 게임 밖)" : $"현재: 가족 {p.Families} · 인구 {p.Population} · 집 없는 가족 {p.Homeless} · 빈 자리 {p.FreeSlots}";
+        _popInfo.Text = p is null ? "현재: - (인구 기능이 꺼져 있거나 게임 밖)" : $"현재: 가족 {p.Families} · 인구 {p.Population} · 집 없는 가족 {p.Homeless} · 빈 자리 {p.FreeSlots}{Environment.NewLine}이번 세션: 자연 이민 {p.Natural}가족 → 배율로 추가 {p.Multiplied}가족";
         if (status.Commands is not null)
         {
             lines.Add("");
