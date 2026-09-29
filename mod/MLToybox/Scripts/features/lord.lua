@@ -46,10 +46,12 @@ function M.tick(state, settings)
 
   local pawn = game.pawn()
   if pawn then
-    if shortfall(pawn.influence, settings.influence) > 0 then pawn.influence = settings.influence end
+    local changed = false
+    if shortfall(pawn.influence, settings.influence) > 0 then pawn.influence = settings.influence; changed = true end
     cur.influence = pawn.influence
     local need = shortfall(pawn.kingsFavour, settings.kingsFavour)
-    if need > 0 then pawn:changeKingsFavour(math.floor(need)) end   -- UI 갱신까지 하는 게임 함수로 증감
+    if need > 0 then pawn:changeKingsFavour(math.floor(need)); changed = true end
+    if changed then game.refreshLordHud() end
     cur.kingsFavour = pawn.kingsFavour
   end
 
@@ -77,12 +79,14 @@ local SETTERS = {
     local pawn = game.pawn()
     if not pawn then return "game objects not ready" end
     pawn.influence = value
+    game.refreshLordHud()
   end,
   kingsFavour = function(value)
     local pawn = game.pawn()
     if not pawn then return "game objects not ready" end
     local delta = value - pawn.kingsFavour
     if delta ~= 0 then pawn:changeKingsFavour(delta) end
+    game.refreshLordHud()
   end,
   treasury = function(value)
     local treasury, cheat = game.treasury(), game.cheat()

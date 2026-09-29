@@ -189,3 +189,7 @@
 - `ARegion::unassignFamily(familyID)`를 호출하면 미배치가 된다(실측: `getNumUnassignedFamilies` 4 → 5). familyID는 `region.workerFamilies`의 인덱스이고, 집의 `occupantFamilyIDs`에 들어 있다.
 - 수정: 가족을 추가한 직후 집의 `occupantFamilyIDs`에서 새로 생긴 id를 찾아 `unassignFamily`를 호출한다.
 - 이미 들어온 가족은 건드리지 않는다. 조사 시점에 일터가 자기 집인 가족이 hof 80, sel 17이었는데, 순정 장인(버게이지 작업장) 가족과 구분할 방법을 찾지 못했다.
+
+## 영주 값 HUD 갱신 (2026-09-29)
+- `pawn.influence`에 직접 쓰거나 `changeKingsFavour`를 호출해도 영주 HUD(`W_HUD_LordPanel_V2_C`의 `InfluenceNumeric`/`FavorNumeric`)는 갱신되지 않는다(실측: 내부 값 33333, HUD는 13초 뒤에도 20410). `ChangeTreasury`는 HUD를 갱신하므로 국고를 바꾸면 다른 값도 함께 갱신돼 보였다.
+- 위젯의 `updatePlayerStats()`를 호출하면 즉시 갱신된다(영향력 20410→33333, 총애 50000→44444 실측).

@@ -9,6 +9,7 @@ local function world(opts)
   game.pawn = function() return opts.pawn end
   game.cheat = function() return cheat end
   game.treasury = function() return opts.treasury end
+  game.refreshLordHud = function() end
   return cheat
 end
 
@@ -33,6 +34,22 @@ T.run({
     T.eq(p.favourChanges[1], -800000, "favour delta via game function")
     lord.set({ key = "treasury", value = 2000 }, IN_GAME)
     T.eq(cheat.changes[1], -3000, "treasury delta from HUD reading")
+  end,
+  set_influence_or_favour_refreshes_lord_hud = function()
+    -- 영향력·총애는 값만 바꾸면 화면(W_HUD_LordPanel_V2)이 갱신되지 않는다(실측). 설정 후 updatePlayerStats 를 부른다
+    local p = pawn(20410, 50000)
+    world({ pawn = p, treasury = 1.0 })
+    local refreshed = 0
+    game.refreshLordHud = function() refreshed = refreshed + 1 end
+    lord.set({ key = "influence", value = 33333 }, IN_GAME)
+    T.eq(refreshed, 1, "after influence")
+    lord.set({ key = "kingsFavour", value = 10 }, IN_GAME)
+    T.eq(refreshed, 2, "after favour")
+    local st = {}
+    lord.tick(st, { influence = 50000 })
+    T.eq(refreshed, 3, "after tick raised influence")
+    lord.tick(st, { influence = 50000 })
+    T.eq(refreshed, 3, "no refresh when nothing changed")
   end,
   read_reports_current_values_without_managing = function()
     -- 기능이 꺼져 있어도 패널 '현재' 값은 갱신돼야 한다(main 이 매 루프 read 로 보고)
