@@ -58,6 +58,8 @@ public sealed class PopulationStatus
     public int Population { get; set; }
     public int Homeless { get; set; }
     public int FreeSlots { get; set; }
+    public int Natural { get; set; }
+    public int Multiplied { get; set; }
 }
 
 public sealed record UnitOption(string Id, string Label);

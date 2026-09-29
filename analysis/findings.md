@@ -183,3 +183,9 @@
   - 목표 가족 수: 부족분만 채운다.
   - 명령 `addFamilies`: 1~20가족, 빈 집부터 채운다.
 >>>>>>> feat/population
+
+## 인구 — 추가 가족의 배치 상태 (2026-09-29)
+- `spawnManorServantsInside(1)`로 들인 가족은 그 집에 일꾼으로 배치된다(`workerFamilies[id].assignedTo == familyHome`). 그래서 자연 이민 가족처럼 미배치 인력으로 잡히지 않는다.
+- `ARegion::unassignFamily(familyID)`를 호출하면 미배치가 된다(실측: `getNumUnassignedFamilies` 4 → 5). familyID는 `region.workerFamilies`의 인덱스이고, 집의 `occupantFamilyIDs`에 들어 있다.
+- 수정: 가족을 추가한 직후 집의 `occupantFamilyIDs`에서 새로 생긴 id를 찾아 `unassignFamily`를 호출한다.
+- 이미 들어온 가족은 건드리지 않는다. 조사 시점에 일터가 자기 집인 가족이 hof 80, sel 17이었는데, 순정 장인(버게이지 작업장) 가족과 구분할 방법을 찾지 못했다.
