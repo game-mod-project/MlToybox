@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MLToybox.Panel.Core;
 
 public sealed class ControlDocument
@@ -11,6 +13,7 @@ public sealed class ControlDocument
 public sealed class FeaturesControl
 {
     public ResourcesControl Resources { get; set; } = new();
+    public LordControl Lord { get; set; } = new();
     public BuildControl Build { get; set; } = new();
     public UpgradeControl Upgrade { get; set; } = new();
     public MilitaryControl Military { get; set; } = new();
@@ -22,6 +25,30 @@ public sealed class PopulationControl
     public bool Enabled { get; set; }
     public int Multiplier { get; set; } = 2;
     public int TargetFamilies { get; set; }
+}
+
+// 영주 전체 값. null = 관리 안 함(키를 쓰지 않음), 값이 있으면 그 이상으로 유지
+public sealed class LordControl
+{
+    public bool Enabled { get; set; }
+    public int IntervalSec { get; set; } = 2;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Treasury { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Influence { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? KingsFavour { get; set; }
+
+    // 예전 버전은 국고·영향력을 자원 목표(targets.Treasury/Influence)에 넣었다. 영주 설정이 비어 있을 때만 옮긴다
+    public static void MigrateFrom(FeaturesControl features, bool hadLordSection)
+    {
+        var targets = features.Resources.Targets;
+        if (!hadLordSection)
+        {
+            if (targets.TryGetValue("Treasury", out var t)) features.Lord.Treasury = t;
+            if (targets.TryGetValue("Influence", out var i)) features.Lord.Influence = i;
+            if (features.Lord.Treasury is not null || features.Lord.Influence is not null) features.Lord.Enabled = features.Resources.Enabled;
+        }
+        targets.Remove("Treasury");
+        targets.Remove("Influence");
+    }
 }
 
 public sealed class ResourcesControl

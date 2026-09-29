@@ -16,6 +16,29 @@ public sealed class MainForm : Form
     private StatusDocument? _lastStatus;
     private readonly ComboBox _resRegion = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
 
+    // 영주 전체 값: 체크된 항목만 목표 이상으로 유지한다
+    private readonly CheckBox _lordEnabled = new() { Text = "영주 자원 목표값 유지 (영지와 무관한 전체 값)", AutoSize = true };
+    private readonly LordRow _lordTreasury = new("국고");
+    private readonly LordRow _lordInfluence = new("영향력");
+    private readonly LordRow _lordFavour = new("왕의 총애");
+
+    private sealed class LordRow
+    {
+        public readonly CheckBox Use;
+        public readonly NumericUpDown Value = new() { Minimum = 0, Maximum = 10_000_000, Value = 0, Width = 110 };
+        public readonly Label Current = new() { AutoSize = true, Text = "현재: -", Padding = new Padding(8, 6, 0, 0) };
+        public LordRow(string label) { Use = new CheckBox { Text = label, AutoSize = true, Width = 90 }; }
+        public Control Row()
+        {
+            var row = new FlowLayoutPanel { AutoSize = true };
+            row.Controls.AddRange(new Control[] { Use, new Label { Text = "목표", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, Value, Current });
+            return row;
+        }
+        public void Load(int? target) { Use.Checked = target is not null; Value.Value = Math.Clamp(target ?? 0, 0, 10_000_000); }
+        public int? Read() => Use.Checked ? (int)Value.Value : null;
+        public void Show(double? current) => Current.Text = current is null ? "현재: -" : $"현재: {current:0}";
+    }
+
     private readonly Label _gameDirLabel = new() { AutoSize = true };
     private readonly Label _stateLabel = new() { AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) };
 
@@ -72,6 +95,8 @@ public sealed class MainForm : Form
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(BuildResourcesTab());
+        tabs.TabPages.Add(Page("영주", _lordEnabled, _lordTreasury.Row(), _lordInfluence.Row(), _lordFavour.Row(),
+            new Label { Text = "체크한 항목만 목표값 아래로 내려가면 채웁니다. 체크 해제 = 관리 안 함.", AutoSize = true }));
         tabs.TabPages.Add(Page("건설", _buildEnabled, _ignorePlacement, _instantBuild, _instantRepair, _noMaterials));
         tabs.TabPages.Add(Page("업그레이드", _upgradeEnabled));
         _spawnUnit.Items.AddRange(UnitCatalog.Units.Cast<object>().ToArray());
@@ -198,6 +223,10 @@ public sealed class MainForm : Form
         var f = _control.Features;
         _resEnabled.Checked = f.Resources.Enabled;
         _resInterval.Value = Math.Clamp(f.Resources.IntervalSec, 1, 60);
+        _lordEnabled.Checked = f.Lord.Enabled;
+        _lordTreasury.Load(f.Lord.Treasury);
+        _lordInfluence.Load(f.Lord.Influence);
+        _lordFavour.Load(f.Lord.KingsFavour);
         _buildEnabled.Checked = f.Build.Enabled;
         _ignorePlacement.Checked = f.Build.IgnorePlacement;
         _instantBuild.Checked = f.Build.InstantBuild;
@@ -269,6 +298,10 @@ public sealed class MainForm : Form
         f.Resources.Enabled = _resEnabled.Checked;
         f.Resources.IntervalSec = (int)_resInterval.Value;
         ResourceScope.Store(f.Resources, _resScope, ReadTargets());
+        f.Lord.Enabled = _lordEnabled.Checked;
+        f.Lord.Treasury = _lordTreasury.Read();
+        f.Lord.Influence = _lordInfluence.Read();
+        f.Lord.KingsFavour = _lordFavour.Read();
         f.Build.Enabled = _buildEnabled.Checked;
         f.Build.IgnorePlacement = _ignorePlacement.Checked;
         f.Build.InstantBuild = _instantBuild.Checked;
@@ -369,6 +402,9 @@ public sealed class MainForm : Form
         }
 
         _lastStatus = status;
+        _lordTreasury.Show(status.Lord?.Treasury);
+        _lordInfluence.Show(status.Lord?.Influence);
+        _lordFavour.Show(status.Lord?.KingsFavour);
         if (!_resGrid.IsCurrentCellInEditMode) RefreshRegionOptions(status);
         var ids = ResourceScope.Ids(status, _resScope);
         var current = ResourceScope.Current(status, _resScope);

@@ -15,6 +15,7 @@ public sealed class StatusDocument
     public SpawnStatus? Spawn { get; set; }
     public PopulationStatus? Population { get; set; }
     public List<RegionResources>? Regions { get; set; }
+    public LordStatus? Lord { get; set; }
 }
 
 public sealed class NativeStatus
@@ -44,4 +45,11 @@ public sealed class RegionResources
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
     public Dictionary<string, double>? Values { get; set; }
+}
+
+public sealed class LordStatus
+{
+    public double? Treasury { get; set; }
+    public int? Influence { get; set; }
+    public int? KingsFavour { get; set; }
 }

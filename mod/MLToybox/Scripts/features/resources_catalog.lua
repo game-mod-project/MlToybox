@@ -1,7 +1,7 @@
 -- 자원 ID(EItemType 이름) ↔ 값. 출처: CXXHeaderDump/ManorLords_enums.hpp enum class EItemType
 local M = {}
 
-M.special = { "RegionalWealth", "Treasury", "Influence" }
+M.special = { "RegionalWealth" }   -- 국고·영향력은 features/lord.lua
 
 M.items = {
   { id = "Timber", type = 16 }, { id = "planks", type = 17 }, { id = "Firewood", type = 216 }, { id = "Charcoal", type = 13 },

@@ -119,6 +119,7 @@ function M.new()
       resourceIds = (type(st.resourceIds) == "table" and #st.resourceIds > 0) and st.resourceIds or nil,
       resources = (type(st.resources) == "table" and next(st.resources)) and st.resources or nil,
       population = st.population,
+      lord = st.lord,
       regions = (type(st.regions) == "table" and #st.regions > 0) and st.regions or nil,
     }
   end
