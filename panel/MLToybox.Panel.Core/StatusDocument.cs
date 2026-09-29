@@ -14,6 +14,7 @@ public sealed class StatusDocument
     public Dictionary<string, CommandResult>? Commands { get; set; }
     public SpawnStatus? Spawn { get; set; }
     public PopulationStatus? Population { get; set; }
+    public List<RegionResources>? Regions { get; set; }
 }
 
 public sealed class NativeStatus
@@ -36,4 +37,11 @@ public sealed class FeatureStatus
 {
     public bool Active { get; set; }
     public string? LastError { get; set; }
+}
+
+public sealed class RegionResources
+{
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public Dictionary<string, double>? Values { get; set; }
 }

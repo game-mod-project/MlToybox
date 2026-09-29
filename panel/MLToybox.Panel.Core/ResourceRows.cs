@@ -7,12 +7,14 @@ public static class ResourceRows
     public static List<ResourceRow> Build(
         IEnumerable<string>? ids,
         IReadOnlyDictionary<string, double>? current,
-        IReadOnlyDictionary<string, int> targets)
+        IReadOnlyDictionary<string, int> targets,
+        IReadOnlySet<string>? exclude = null)
     {
         var all = new SortedSet<string>(StringComparer.Ordinal);
         if (ids is not null) all.UnionWith(ids);
         if (current is not null) all.UnionWith(current.Keys);
         all.UnionWith(targets.Keys);
+        if (exclude is not null) all.ExceptWith(exclude);
         return all.Select(id => new ResourceRow(
             id,
             current is not null && current.TryGetValue(id, out var c) ? c : null,
