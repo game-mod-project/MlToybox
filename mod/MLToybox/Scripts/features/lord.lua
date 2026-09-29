@@ -59,6 +59,18 @@ function M.tick(state, settings)
   state.lord = cur
 end
 
+-- 기능 켜짐과 무관하게 현재값만 읽는다(main 이 매 루프 상태로 보고)
+function M.read()
+  local out = {}
+  local pawn = game.pawn()
+  if pawn then
+    out.influence = pawn.influence
+    out.kingsFavour = pawn.kingsFavour
+  end
+  out.treasury = game.treasury()
+  return out
+end
+
 -- 일회성 명령 setLord { key, value }: 목표 유지와 달리 올리든 내리든 그 값으로 한 번 맞춘다
 local SETTERS = {
   influence = function(value)

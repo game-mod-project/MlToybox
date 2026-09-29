@@ -34,6 +34,16 @@ T.run({
     lord.set({ key = "treasury", value = 2000 }, IN_GAME)
     T.eq(cheat.changes[1], -3000, "treasury delta from HUD reading")
   end,
+  read_reports_current_values_without_managing = function()
+    -- 기능이 꺼져 있어도 패널 '현재' 값은 갱신돼야 한다(main 이 매 루프 read 로 보고)
+    local p = pawn(5129, 5000)
+    local cheat = world({ pawn = p, treasury = 4955.0 })
+    local v = lord.read()
+    T.eq(v.influence, 5129, "influence"); T.eq(v.kingsFavour, 5000, "favour"); T.eq(v.treasury, 4955, "treasury")
+    T.eq(#cheat.changes, 0, "no side effects"); T.eq(#p.favourChanges, 0, "no side effects 2")
+    world({})
+    T.eq(next(lord.read()), nil, "nothing readable -> empty")
+  end,
   set_command_rejects_bad_input = function()
     world({ pawn = pawn(0, 0), treasury = 1.0 })
     T.eq(lord.set({ key = "gold", value = 1 }, IN_GAME).ok, false, "unknown key")

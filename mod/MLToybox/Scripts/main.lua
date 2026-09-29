@@ -63,6 +63,10 @@ LoopAsync(config.pollIntervalMs, function()
         status.commands = commands:status()
         local spawnOk, spawnStatus = safe.call("spawnSquads", spawnSquads.status, registry.state.inGame)
         status.spawn = spawnOk and spawnStatus or nil
+        if registry.state.inGame then   -- 영주 기능이 꺼져 있어도 현재값은 보고한다
+          local lordOk, lordValues = safe.call("lord", lord.read)
+          if lordOk then status.lord = lordValues end
+        end
         local wrote, werr = bridge:writeStatus(status)
         if not wrote then log.error("status write: %s", tostring(werr)) end
       end)
