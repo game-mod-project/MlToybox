@@ -125,6 +125,14 @@ T.run({
     r.state.population = { families = 3 }
     T.eq(r:status(1, nil, nil).population.families, 3, "present")
   end,
+  status_includes_per_region_resources_when_present = function()
+    local r = registry.new(); r:add(fake("a")); r:setInGame(true)
+    T.eq(r:status(1, nil, nil).regions, nil, "absent")
+    r.state.regions = {}
+    T.eq(r:status(1, nil, nil).regions, nil, "empty omitted")
+    r.state.regions = { { key = "hof", name = "Klainau", values = { Timber = 5 } } }
+    T.eq(r:status(1, nil, nil).regions[1].key, "hof", "present")
+  end,
   status_without_features_omits_map = function()
     local s = registry.new():status(1, nil, nil)
     T.eq(s.features, nil, "no features -> nil (avoids [] encoding)")

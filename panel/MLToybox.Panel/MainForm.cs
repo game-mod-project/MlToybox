@@ -10,6 +10,11 @@ public sealed class MainForm : Form
     private ControlDocument _control = new();
     private long _lastSentSeq;
     private string _resourceIdsKey = "";
+    private string _regionsKey = "";
+    private string? _resScope;   // null = 공통, 아니면 영지 키(regionUniqueTag)
+    private bool _updatingRegions;
+    private StatusDocument? _lastStatus;
+    private readonly ComboBox _resRegion = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
 
     private readonly Label _gameDirLabel = new() { AutoSize = true };
     private readonly Label _stateLabel = new() { AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) };
@@ -130,7 +135,11 @@ public sealed class MainForm : Form
         {
             _resEnabled, new Label { Text = "주기(초)", AutoSize = true, Padding = new Padding(8, 6, 0, 0) }, _resInterval,
             _fillValue, fill,
+            new Label { Text = "영지", AutoSize = true, Padding = new Padding(8, 6, 0, 0) }, _resRegion,
         });
+        _resRegion.Items.AddRange(ResourceScope.Options(null).Cast<object>().ToArray());
+        _resRegion.SelectedIndex = 0;
+        _resRegion.SelectedIndexChanged += (_, _) => SwitchScope();
         var page = new TabPage("자원");
         page.Controls.Add(_resGrid);
         page.Controls.Add(header);
@@ -204,14 +213,49 @@ public sealed class MainForm : Form
         _popMultiplier.Value = Math.Clamp(f.Population.Multiplier, 1, 10);
         _popTarget.Value = Math.Clamp(f.Population.TargetFamilies, 0, 1000);
         _resourceIdsKey = "";
+        _regionsKey = "";
+        _resScope = null;
+        if (_resRegion.Items.Count > 0) _resRegion.SelectedIndex = 0;
         RebuildResourceRows(null, null);
     }
 
     private void RebuildResourceRows(List<string>? ids, Dictionary<string, double>? current)
     {
         _resGrid.Rows.Clear();
-        foreach (var row in ResourceRows.Build(ids, current, _control.Features.Resources.Targets))
+        _resGrid.Columns["Target"]!.HeaderText = _resScope is null ? "목표 (빈칸=관리 안 함)" : "영지 목표 (빈칸=공통 목표 따름)";
+        var targets = ResourceScope.Targets(_control.Features.Resources, _resScope);
+        var exclude = _resScope is null ? null : ResourceScope.LordWide;
+        foreach (var row in ResourceRows.Build(ids, current, targets, exclude))
             _resGrid.Rows.Add(row.Id, row.Current?.ToString("0"), row.Target);
+    }
+
+    // 범위를 바꾸기 전에 지금 표의 목표를 이전 범위에 저장한다
+    private void SwitchScope()
+    {
+        if (_updatingRegions || _resRegion.SelectedItem is not ScopeOption option) return;
+        var next = option.Key;
+        if (next == _resScope) return;
+        if (_resGrid.IsCurrentCellInEditMode) _resGrid.EndEdit();
+        ResourceScope.Store(_control.Features.Resources, _resScope, ReadTargets());
+        _resScope = next;
+        RebuildResourceRows(ResourceScope.Ids(_lastStatus, _resScope), ResourceScope.Current(_lastStatus, _resScope));
+    }
+
+    private void RefreshRegionOptions(StatusDocument status)
+    {
+        var key = string.Join("|", (status.Regions ?? new List<RegionResources>()).Select(r => $"{r.Key}={r.Name}"));
+        if (key == _regionsKey) return;
+        _regionsKey = key;
+        var options = ResourceScope.Options(status);
+        _updatingRegions = true;   // 목록을 비우는 동안 SelectedIndexChanged 가 범위를 바꾸지 않게 한다
+        _resRegion.BeginUpdate();
+        _resRegion.Items.Clear();
+        _resRegion.Items.AddRange(options.Cast<object>().ToArray());
+        var index = options.FindIndex(o => o.Key == _resScope);
+        _resRegion.EndUpdate();
+        if (index < 0) { ResourceScope.Store(_control.Features.Resources, _resScope, ReadTargets()); _resScope = null; index = 0; _resourceIdsKey = ""; }
+        _resRegion.SelectedIndex = index;
+        _updatingRegions = false;
     }
 
     private void Apply()
@@ -224,7 +268,7 @@ public sealed class MainForm : Form
         var f = _control.Features;
         f.Resources.Enabled = _resEnabled.Checked;
         f.Resources.IntervalSec = (int)_resInterval.Value;
-        f.Resources.Targets = ReadTargets();
+        ResourceScope.Store(f.Resources, _resScope, ReadTargets());
         f.Build.Enabled = _buildEnabled.Checked;
         f.Build.IgnorePlacement = _ignorePlacement.Checked;
         f.Build.InstantBuild = _instantBuild.Checked;
@@ -324,18 +368,22 @@ public sealed class MainForm : Form
             return;
         }
 
-        var key = string.Join("|", status.ResourceIds ?? new List<string>());
+        _lastStatus = status;
+        if (!_resGrid.IsCurrentCellInEditMode) RefreshRegionOptions(status);
+        var ids = ResourceScope.Ids(status, _resScope);
+        var current = ResourceScope.Current(status, _resScope);
+        var key = (_resScope ?? "") + ":" + string.Join("|", ids ?? new List<string>());
         if (key != _resourceIdsKey && !_resGrid.IsCurrentCellInEditMode)
         {
             _resourceIdsKey = key;
             var edited = ReadTargets();   // 재구성 전에 사용자가 입력 중이던 목표값을 보존
-            if (edited.Count > 0) _control.Features.Resources.Targets = edited;
-            RebuildResourceRows(status.ResourceIds, status.Resources);
+            if (edited.Count > 0) ResourceScope.Store(_control.Features.Resources, _resScope, edited);
+            RebuildResourceRows(ids, current);
         }
-        else if (status.Resources is not null)
+        else if (current is not null)
         {
             foreach (DataGridViewRow row in _resGrid.Rows)
-                if (row.Cells["Id"].Value is string id && status.Resources.TryGetValue(id, out var cur))
+                if (row.Cells["Id"].Value is string id && current.TryGetValue(id, out var cur))
                     row.Cells["Current"].Value = cur.ToString("0");
         }
 

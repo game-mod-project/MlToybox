@@ -29,6 +29,8 @@ public sealed class ResourcesControl
     public bool Enabled { get; set; }
     public int IntervalSec { get; set; } = 2;
     public Dictionary<string, int> Targets { get; set; } = new();
+    // 영지별 목표(키 = regionUniqueTag). 없는 자원은 공통 목표를 따른다
+    public Dictionary<string, Dictionary<string, int>> RegionTargets { get; set; } = new();
 }
 
 public sealed class BuildControl

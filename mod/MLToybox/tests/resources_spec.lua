@@ -26,7 +26,52 @@ local function world(opts)
   return cheat
 end
 
+local function named(r, tag, name)
+  r.regionUniqueTag = { ToString = function() return tag end }
+  r.regionName = { ToString = function() return name end }
+  return r
+end
+
 T.run({
+  region_target_overrides_common_target = function()
+    local hof = named(region({ [16] = 100 }), "hof", "Klainau")
+    local sel = named(region({ [16] = 100 }), "sel", "Furdau")
+    world({ regions = { hof, sel } })
+    resources.tick({}, { targets = { Timber = 500 }, regionTargets = { hof = { Timber = 2000 } } })
+    T.eq(hof.stock[16], 2000, "override"); T.eq(sel.stock[16], 500, "common for other region")
+  end,
+  region_target_zero_stops_topping_up_that_region = function()
+    local hof = named(region({ [16] = 100 }), "hof", "Klainau")
+    world({ regions = { hof } })
+    resources.tick({}, { targets = { Timber = 500 }, regionTargets = { hof = { Timber = 0 } } })
+    T.eq(#hof.grants, 0, "zero override means no top-up")
+  end,
+  region_only_target_without_common = function()
+    local hof = named(region({ [16] = 100 }), "hof", "Klainau")
+    local sel = named(region({ [16] = 100 }), "sel", "Furdau")
+    world({ regions = { hof, sel } })
+    resources.tick({}, { targets = {}, regionTargets = { sel = { Timber = 300 } } })
+    T.eq(hof.stock[16], 100, "unmanaged"); T.eq(sel.stock[16], 300, "region only")
+  end,
+  region_wealth_uses_region_target = function()
+    local hof = named(region({}, 10), "hof", "Klainau")
+    local sel = named(region({}, 10), "sel", "Furdau")
+    world({ regions = { hof, sel } })
+    resources.tick({}, { targets = { RegionalWealth = 100 }, regionTargets = { sel = { RegionalWealth = 900 } } })
+    T.eq(hof.regionalWealth, 100, "common"); T.eq(sel.regionalWealth, 900, "override")
+  end,
+  reports_per_region_stock_with_names = function()
+    local hof = named(region({ [16] = 700 }, 5), "hof", "Klainau")
+    local sel = named(region({ [16] = 40 }, 6), "sel", "Furdau")
+    world({ regions = { hof, sel } })
+    local st = {}
+    resources.tick(st, { targets = {} })
+    T.eq(#st.regions, 2, "two regions")
+    T.eq(st.regions[1].key, "hof", "key"); T.eq(st.regions[1].name, "Klainau", "name")
+    T.eq(st.regions[1].values.Timber, 700, "hof timber"); T.eq(st.regions[2].values.Timber, 40, "sel timber")
+    T.eq(st.regions[2].values.RegionalWealth, 6, "wealth per region")
+    T.eq(st.resources.Timber, 740, "total still reported")
+  end,
   enable_publishes_ids_special_first = function()
     local st = {}
     resources.enable(st, {})
