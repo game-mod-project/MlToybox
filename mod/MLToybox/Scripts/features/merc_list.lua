@@ -135,8 +135,16 @@ end
 
 function M.applyInPlace(engine, slots)
   local avail = engine.availableMercs
+  -- 유지하는 순정 칸이 다른 자리로 옮겨 갈 수 있다(커스텀이 앞 칸을 차지할 때). 도착 정보를 쓰기 전에 기억해 둔다
+  local before, saved = {}, {}
   for i = 1, #avail do
-    if slots[i] then writeSlot(avail[i], slots[i], nil) end
+    local c = avail[i]
+    before[i] = str(c.Name)
+    saved[before[i]] = { arrivalRegion = c.arrivalRegion, arrivesIn = c.arrivesIn }
+  end
+  for i = 1, #avail do
+    local d = slots[i]
+    if d then writeSlot(avail[i], d, d.keep and before[i] ~= d.name and saved[d.name] or nil) end
   end
 end
 

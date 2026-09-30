@@ -161,6 +161,22 @@ T.run({
     list.applyInPlace(engine, { vanilla("a", 10, true) })
     T.eq(engine.availableMercs[1].cost, 10, "table cost restored")
   end,
+  apply_in_place_moves_a_kept_vanilla_with_its_arrival = function()
+    local engine, rows, regions = setup({ list = {
+      entry("b", { cost = 20, arrivesIn = 33, units = F.array({ "inf", "bow" }), traits = F.array({ "Looters" }) }),
+      entry("c", { cost = 30, arrivesIn = 12, units = F.array({ "spear" }) }),
+      entry("gone", { arrivesIn = 7 }),
+    } })
+    engine.availableMercs[1].arrivalRegion = regions.nus
+    engine.availableMercs[2].arrivalRegion = regions.gold
+    list.applyInPlace(engine, { custom("토이박스"), vanilla("b", 20, true), vanilla("c", 30, true) })
+    T.eq(listNames(engine), "토이박스,b,c", "customs take the front slots")
+    local b, c = engine.availableMercs[2], engine.availableMercs[3]
+    T.eq(b.arrivesIn, 33, "b keeps its arrival days"); T.eq(b.arrivalRegion, regions.nus, "b keeps its region")
+    T.eq(table.concat(b.units, ","), "inf,bow", "b units"); T.eq(table.concat(b.traits, ","), "Looters", "b traits"); T.eq(b.banner, rows.b.banner, "b banner")
+    T.eq(c.arrivesIn, 12, "c keeps its arrival days"); T.eq(c.arrivalRegion, regions.gold, "c keeps its region")
+    T.eq(engine.rerolls, 0, "no reroll")
+  end,
   screen_state_reads_the_hire_screen_and_confirmation = function()
     setup()
     game.mercScreen = function() return nil end

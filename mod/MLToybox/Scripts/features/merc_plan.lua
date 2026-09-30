@@ -106,36 +106,17 @@ function M.build(input)
   local result = { desired = desired, action = "rebuild", renames = math.max(0, #desired - #candidates) }
   if #input.current ~= #desired then return result end
 
-  -- 칸 수가 같다. 이름이 같은 칸은 그 자리에 두고, 남은 칸에 남은 항목을 순서대로 넣는다
-  local slots, taken = {}, {}
-  for i, e in ipairs(input.current) do
-    for j, d in ipairs(desired) do
-      if not taken[j] and d.name == e.name then
-        slots[i] = d
-        taken[j] = true
-        break
-      end
-    end
-  end
-  local j = 1
-  for i = 1, #input.current do
-    if not slots[i] then
-      while taken[j] do j = j + 1 end
-      slots[i] = desired[j]
-      taken[j] = true
-    end
-  end
-
+  -- 칸 수가 같다. i번 칸에 desired[i] 가 오게 한다(커스텀이 앞 칸을 차지한다, spec §2.1)
   local dirty = false
   for i, e in ipairs(input.current) do
-    local d = slots[i]
+    local d = desired[i]
     if not same(e, d) then
       dirty = true
       -- 다른 순정 용병단으로 바꾸려면 표 행 내용을 칸에 복사해야 한다. 그게 안 되는 환경이면 다시 뽑는다
       if d.kind == "vanilla" and e.name ~= d.name and not input.canCopyRows then return result end
     end
   end
-  result.slots = slots
+  result.slots = desired
   result.action = dirty and "inplace" or "none"
   return result
 end
