@@ -117,6 +117,7 @@ T.run({
     T.eq(p.regions[1].key, "hof", "key"); T.eq(p.regions[1].name, "HOF", "name")
     T.eq(p.regions[1].freeSlots, 3, "hof free"); T.eq(p.regions[2].freeSlots, 0, "sel full")
     T.eq(p.regions[2].families, 4, "sel families"); T.eq(p.regions[1].unassigned, 0, "unassigned")
+    T.eq(p.unassigned, 0, "total unassigned reported")
   end,
   command_validates_and_targets_region = function()
     local hof, sel = table.unpack(world(region("hof", { 1 }), region("sel", { 1, 1 })))

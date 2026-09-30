@@ -84,7 +84,7 @@ function M.tick(state, settings)
   local overrides = settings.regionTargets or {}
   state.populationLast = state.populationLast or {}
 
-  local totals = { families = 0, population = 0, homeless = 0, freeSlots = 0 }
+  local totals = { families = 0, population = 0, homeless = 0, freeSlots = 0, unassigned = 0 }
   local perRegion = {}
   for _, r in ipairs(game.playerRegions()) do
     local key = regionKey(r)
