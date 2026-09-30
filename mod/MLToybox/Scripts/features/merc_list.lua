@@ -148,6 +148,20 @@ function M.applyInPlace(engine, slots)
   end
 end
 
+-- 재구성을 기다리는 동안: 이미 떠 있는 커스텀 칸의 고용비(AI 잠금)만 맞춘다
+function M.applyCustomCosts(engine, desired)
+  local costs = {}
+  for _, d in ipairs(desired) do
+    if d.kind == "custom" then costs[d.name] = d.cost end
+  end
+  local avail = engine.availableMercs
+  for i = 1, #avail do
+    local c = avail[i]
+    local cost = costs[str(c.Name)]
+    if cost and c.cost ~= cost then c.cost = cost end
+  end
+end
+
 -- 칸 수를 #desired 로 맞추고 내용을 덮어쓴다. 실제로 생긴 칸 수를 돌려준다 (spec §4.3)
 function M.rebuild(engine, desired, renames)
   local saved = {}
@@ -157,19 +171,22 @@ function M.rebuild(engine, desired, renames)
     saved[str(c.Name)] = { arrivalRegion = c.arrivalRegion, arrivesIn = c.arrivesIn }
   end
 
-  -- 후보가 모자라면 고용 중 이름과 겹치는 표 행의 이름을 잠깐 바꿔 후보로 만든다
+  -- 후보가 모자라면 고용 중 이름과 겹치는 표 행의 이름을 잠깐 바꿔 후보로 만든다.
+  -- 이름 바꾸기나 다시 뽑기가 도중에 실패해도, 그때까지 바꾼 행의 이름은 반드시 되돌린다
   local renamed = {}
-  if renames > 0 then
-    local hired = M.hiredNames(engine)
-    datatable.forEachRow("mercenaries", function(_, row)
-      local name = str(row.Name)
-      if #renamed < renames and hired[name] and not isQuest(row) then
-        renamed[#renamed + 1] = { row = row, name = name }
-        row.Name = name .. M.TEMP_SUFFIX
-      end
-    end)
-  end
-  local ok, err = pcall(function() engine:rerollMercenaries() end)
+  local ok, err = pcall(function()
+    if renames > 0 then
+      local hired = M.hiredNames(engine)
+      datatable.forEachRow("mercenaries", function(_, row)
+        local name = str(row.Name)
+        if #renamed < renames and hired[name] and not isQuest(row) then
+          renamed[#renamed + 1] = { row = row, name = name }
+          row.Name = name .. M.TEMP_SUFFIX
+        end
+      end)
+    end
+    engine:rerollMercenaries()
+  end)
   for _, r in ipairs(renamed) do pcall(function() r.row.Name = r.name end) end
   if not ok then error(err, 0) end
 

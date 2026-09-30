@@ -21,7 +21,7 @@ local ON = { enabled = true, refund = true, lockFromAi = true, companies = {} }
 local function setup(opts)
   opts = opts or {}
   local pawn, other = F.object({}), F.object({})
-  local calls = { inplace = {}, rebuild = {}, refresh = 0, treasury = {} }
+  local calls = { inplace = {}, rebuild = {}, costs = {}, refresh = 0, treasury = {} }
   local hired = opts.hired and opts.hired(pawn, other) or { entries = {}, squads = {} }
   local engine = F.object({ hiredMercs = F.map(hired.entries), squads = hired.squads })
   local cheat = F.object({})
@@ -38,6 +38,7 @@ local function setup(opts)
   list.read = function() return opts.current or {} end
   list.screenState = function() return opts.screen or { open = false, confirming = false } end
   list.applyInPlace = function(_, slots) calls.inplace[#calls.inplace + 1] = slots end
+  list.applyCustomCosts = function(_, desired) calls.costs[#calls.costs + 1] = desired end
   list.rebuild = function(_, desired, renames)
     calls.rebuild[#calls.rebuild + 1] = { desired = desired, renames = renames }
     return opts.rebuildReturns or #desired
@@ -130,6 +131,17 @@ T.run({
     T.eq(#s.calls.rebuild, 1, "too soon")
     s.advance(merc.REBUILD_MIN_INTERVAL); merc.tick(s.state, ON)
     T.eq(#s.calls.rebuild, 2, "after the interval")
+  end,
+  custom_costs_are_synced_while_a_rebuild_waits = function()
+    local custom = { name = "토이박스", units = { "inf" }, cost = 3000, region = "gold", enabled = true }
+    local settings = { enabled = true, refund = true, lockFromAi = true, companies = { custom } }
+    -- 고용 직후: 칸이 하나 줄었고, 커스텀 칸에는 창이 열려 있을 때의 가격이 남아 있다
+    local s = setup({ current = { { name = "토이박스", cost = 3000, units = { "inf" }, region = "gold" }, { name = "a", cost = 10 } } })
+    merc.tick(s.state, settings)
+    T.eq(#s.calls.rebuild, 1, "first rebuild"); T.eq(#s.calls.costs, 0, "a rebuild writes the costs itself")
+    s.advance(1); merc.tick(s.state, settings)
+    T.eq(#s.calls.rebuild, 1, "the next rebuild waits")
+    T.eq(#s.calls.costs, 1, "the lock is still applied"); T.eq(s.calls.costs[1][1].cost, plan.LOCK_COST, "locked price")
   end,
   a_short_rebuild_is_reported_and_retried_later = function()
     local s = setup({ current = {}, rebuildReturns = 1 })

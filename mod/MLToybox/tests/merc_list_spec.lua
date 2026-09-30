@@ -124,6 +124,21 @@ T.run({
     local ok = pcall(list.rebuild, engine, { custom("토이박스") }, 1)
     T.eq(ok, false, "the error surfaces"); T.eq(rows.a.Name, "a", "row restored")
   end,
+  rebuild_restores_row_names_when_a_rename_fails = function()
+    local engine, rows = setup({ hired = { "a", "b" } })
+    -- 두 번째 행의 임시 이름 쓰기가 실패한다(원래 이름으로 되돌리는 쓰기는 된다)
+    local real = rows.b
+    rows.b = setmetatable({}, {
+      __index = real,
+      __newindex = function(_, k, v)
+        if k == "Name" and v ~= "b" then error("write failed") end
+        real[k] = v
+      end,
+    })
+    local ok = pcall(list.rebuild, engine, { custom("토이박스"), custom("궁수대") }, 2)
+    T.eq(ok, false, "the error surfaces"); T.eq(rows.a.Name, "a", "the row renamed before the failure is restored")
+    T.eq(engine.rerolls, 0, "no reroll on a half-renamed table")
+  end,
   rebuild_restores_the_arrival_of_kept_vanilla = function()
     local engine, _, regions = setup({ list = { entry("b", { cost = 20, arrivesIn = 33 }) } })
     engine.availableMercs[1].arrivalRegion = regions.nus
@@ -176,6 +191,61 @@ T.run({
     T.eq(table.concat(b.units, ","), "inf,bow", "b units"); T.eq(table.concat(b.traits, ","), "Looters", "b traits"); T.eq(b.banner, rows.b.banner, "b banner")
     T.eq(c.arrivesIn, 12, "c keeps its arrival days"); T.eq(c.arrivalRegion, regions.gold, "c keeps its region")
     T.eq(engine.rerolls, 0, "no reroll")
+  end,
+  apply_custom_costs_writes_only_the_cost_of_listed_customs = function()
+    local engine = setup({ list = {
+      entry("토이박스", { cost = 3000, units = F.array({ "inf", "bow" }) }),
+      entry("c", { cost = 1 }),
+    } })
+    local units = engine.availableMercs[1].units
+    list.applyCustomCosts(engine, { custom("토이박스"), custom("궁수대"), vanilla("c", 30, true) })
+    T.eq(engine.availableMercs[1].cost, plan.LOCK_COST, "custom cost synced"); T.eq(engine.availableMercs[1].units, units, "nothing else written")
+    T.eq(engine.availableMercs[2].cost, 1, "vanilla slots wait for the rebuild"); T.eq(engine.rerolls, 0, "no reroll")
+  end,
+  -- 실제 merc_list 와 mercenaries.tick 을 함께 돌린다: 고용 직후 재구성을 기다리는 동안에도 AI 잠금이 돌아와야 한다
+  the_lock_returns_at_once_after_a_hire_while_the_rebuild_waits = function()
+    local merc = require("features.mercenaries")
+    local engine = setup()
+    engine.squads = F.array({})
+    local find = datatable.find
+    datatable.find = function(p)
+      if p == datatable.PATHS.unitTemplates then return F.datatable({ inf = {}, bow = {} }) end
+      return find(p)
+    end
+    local pawn = F.object({})
+    game.pawn = function() return pawn end
+    game.engine = function() return engine end
+    game.cheat = function() return nil end
+    game.regionList = function() return { { key = "nus", name = "Haderwand" } } end
+    local open = true
+    local screen = F.object({
+      IsVisible = function() return open end, updateCompanies = function() end,
+      HireConfirmation = F.object({ IsVisible = function() return false end }),
+    })
+    game.mercScreen = function() return screen end
+    local now = 100
+    merc.clock = function() return now end
+    merc.pick = function(candidates, count)
+      local out = {}
+      for i = 1, count do out[i] = candidates[i] end
+      return out
+    end
+    local settings = { enabled = true, refund = false, lockFromAi = true,
+      companies = { { name = "토이박스", units = { "inf", "bow" }, cost = 3000, region = "nus", enabled = true } } }
+    local state = {}
+    merc.enable(state, settings)
+    merc.tick(state, settings)
+    T.eq(listNames(engine), "토이박스,a,b", "rebuilt with the screen open"); T.eq(engine.availableMercs[1].cost, 3000, "unlocked while open")
+    -- 순정 카드를 하나 고용해 칸이 줄고, 1초 뒤 창을 닫는다. 다음 재구성은 아직 기다려야 한다
+    table.remove(engine.availableMercs, 2)
+    now = now + 1
+    open = false
+    merc.tick(state, settings)
+    T.eq(engine.rerolls, 1, "the rebuild waits"); T.eq(engine.availableMercs[1].cost, plan.LOCK_COST, "but the custom card is locked again")
+    now = now + merc.REBUILD_MIN_INTERVAL
+    merc.tick(state, settings)
+    T.eq(engine.rerolls, 2, "rebuilt after the interval"); T.eq(#engine.availableMercs, 3, "three slots again")
+    T.eq(engine.availableMercs[1].cost, plan.LOCK_COST, "still locked")
   end,
   screen_state_reads_the_hire_screen_and_confirmation = function()
     setup()

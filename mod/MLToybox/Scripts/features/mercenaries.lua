@@ -110,14 +110,19 @@ function M.tick(state, settings)
     if result.action == "inplace" then
       list.applyInPlace(engine, result.slots)
       list.refreshScreen()
-    elseif result.action == "rebuild" and now >= st.nextRebuild then
-      local made = list.rebuild(engine, result.desired, result.renames)
-      if made == #result.desired then
-        st.note = nil
-        st.nextRebuild = now + M.REBUILD_MIN_INTERVAL
+    elseif result.action == "rebuild" then
+      if now >= st.nextRebuild then
+        local made = list.rebuild(engine, result.desired, result.renames)
+        if made == #result.desired then
+          st.note = nil
+          st.nextRebuild = now + M.REBUILD_MIN_INTERVAL
+        else
+          st.note = string.format("rebuild produced %d of %d slots", made, #result.desired)
+          st.nextRebuild = now + M.MISMATCH_RETRY
+        end
       else
-        st.note = string.format("rebuild produced %d of %d slots", made, #result.desired)
-        st.nextRebuild = now + M.MISMATCH_RETRY
+        -- 재구성을 기다리는 동안에도 떠 있는 커스텀 칸의 AI 잠금 가격은 맞춘다
+        list.applyCustomCosts(engine, result.desired)
       end
       list.refreshScreen()
     end
