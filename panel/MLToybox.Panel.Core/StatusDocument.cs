@@ -16,6 +16,7 @@ public sealed class StatusDocument
     public PopulationStatus? Population { get; set; }
     public List<RegionResources>? Regions { get; set; }
     public LordStatus? Lord { get; set; }
+    public List<RegionInfo>? PlayerRegions { get; set; }
 }
 
 public sealed class NativeStatus
@@ -52,4 +53,10 @@ public sealed class LordStatus
     public double? Treasury { get; set; }
     public int? Influence { get; set; }
     public int? KingsFavour { get; set; }
+}
+
+public sealed class RegionInfo
+{
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
 }

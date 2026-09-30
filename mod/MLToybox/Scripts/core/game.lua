@@ -52,13 +52,37 @@ end
 M.fname = function(s) return FName(s) end
 
 -- 분대 생성 위치: 내 첫 지역의 영주 저택, 없으면 첫 완공 건물
-function M.anchorLocation()
+-- 영지 식별자: regionUniqueTag(세이브 간 고정, 예 "gold"), 표시 이름: regionName(플레이어가 바꿀 수 있음)
+function M.regionKey(r)
+  local ok, tag = pcall(function() return r.regionUniqueTag:ToString() end)
+  return ok and tag or nil
+end
+
+function M.regionName(r)
+  local ok, name = pcall(function() return r.regionName:ToString() end)
+  return ok and name or nil
+end
+
+-- 패널 영지 선택 목록용: { key, name } (내 영지)
+function M.regionList()
+  local out = {}
+  for _, r in ipairs(M.playerRegions()) do
+    local key = M.regionKey(r)
+    if key then out[#out + 1] = { key = key, name = M.regionName(r) or key } end
+  end
+  return out
+end
+
+-- 분대 생성 위치: key 가 있으면 그 영지, 없으면 내 첫 영지. 영주 저택, 없으면 첫 완공 건물
+function M.anchorLocation(key)
   for _, region in ipairs(M.playerRegions()) do
+    if key ~= nil and M.regionKey(region) ~= key then goto continue end
     if safe.valid(region.manor) then return region.manor:K2_GetActorLocation() end
     for _, w in ipairs(region:GetBuildings()) do
       local b = M.unwrap(w)
       if safe.valid(b) and b:IsConstructed() then return b:K2_GetActorLocation() end
     end
+    ::continue::
   end
   return nil
 end

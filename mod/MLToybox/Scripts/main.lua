@@ -13,6 +13,7 @@ local commandsLib = require("core.commands")
 local spawnSquads = require("features.spawn_squads")
 local population = require("features.population")
 local lord = require("features.lord")
+local game = require("core.game")
 local config = require("config")
 
 safe.setThreshold(config.failureThreshold)
@@ -66,6 +67,8 @@ LoopAsync(config.pollIntervalMs, function()
         if registry.state.inGame then   -- 영주 기능이 꺼져 있어도 현재값은 보고한다
           local lordOk, lordValues = safe.call("lord", lord.read)
           if lordOk then status.lord = lordValues end
+          local regionsOk, regionList = safe.call("regions", game.regionList)   -- 패널 영지 선택 목록(병력 생성 위치 등)
+          if regionsOk and #regionList > 0 then status.playerRegions = regionList end
         end
         local wrote, werr = bridge:writeStatus(status)
         if not wrote then log.error("status write: %s", tostring(werr)) end
