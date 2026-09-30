@@ -269,3 +269,23 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 저장은 `MyPawnCPP_BP3_C:SaveToDiskWithThumbnail("saveGame_900", "MLToybox test")`로 했다. 파일 5개(`.sav`, `_descr.sav`, `.png`, `_coat_1.png`, `_coat_2.png`)가 생긴다.
 - 테스트 세이브 `saveGame_900`("MLToybox test")이 세이브 폴더에 남아 있다. 게임의 로드 화면에는 보이지 않는다.
 - 실제 `saveGame_8`의 용병 상태: 목록 0개. 고용 중 4개(`battle_brothers` 분대 0, `brotherhood_of_the_forest` 내 분대 1, `brigands` 분대 0, `vultures` AI 분대 2).
+
+## 용병 기능 인게임 검증 (2026-09-30, saveGame_8)
+실제 `saveGame_8`(영지 3개, 국고 148,500, 고용 중 4개, 목록 0개)을 불러와, 다른 기능을 모두 끄고 `control.json`의 `features.mercenaries`만 바꿔 가며 확인했다. 고용은 게임의 화면 경로(`tools/lab/merc_hire.lua`)로 했다. 끝난 뒤 게임을 저장 없이 종료했다.
+
+| 항목 | 결과 | 근거 |
+|---|---|---|
+| 자동 보충 | 통과 | 로드 뒤 `available 3`: `crazy_goose@90`, `huntsmen@250`, `brigands_small@15`. 표의 고용비와 같다. `features.mercenaries.active=true`, `lastError` 없음 |
+| 커스텀 등록 | 통과 | `slot 1 name=토이박스 용병단 arrivesIn=1 region=Mandlach units=[mercenary_infantry,mercenary_crossbowmen] traits=[]`. 떠 있던 순정 2개는 2·3번 칸으로 옮겨 가고 도착 정보(`arrivesIn=25`, `10`)를 유지했다 |
+| AI 잠금 | 통과 | 닫힘: `cost=10000000`. 열림: `cost=3000`. 다시 닫으면 `10000000`. 닫은 채 5분(게임 날짜 297 → 306일) 동안 커스텀 칸이 1번에 남았고 AI가 고용하지 않았다 |
+| 고용·상시 유지 | 통과 | `HIRED` 3회. 매번 `available 3`이고 1번 칸이 다시 `토이박스 용병단`. `hired 4·5·6 name=토이박스 용병단 cost=0 squads=2 mine=2 units=[mercenary_infantry:36,mercenary_crossbowmen:36]` |
+| 환급 | 통과 | 국고 148,500 → (3회 고용 뒤) 148,500. `refunded=9000`, `hiredMine=4`(기존 1 + 3) |
+| 전부 고용 | 통과 | 남은 순정 5개(`huntsmen`, `greencaps`, `crazy_goose`, `wayward_sons`, `brigands_small`)를 차례로 고용 → `available 1`(커스텀만). 표 행 이름에 `#mlt` 없음. 그 상태에서 커스텀을 2회 더 고용했고 매번 다시 채워졌다. `refunded=15490`(= 3000×5 + 250 + 90 + 90 + 45 + 15), 국고 148,500 |
+| 안정성·다시 불러오기 | 통과 | `UE4SS.log`에 `mercenaries` 줄 없음. 가장 최근 크래시 폴더는 16:22(검증 전). 게임을 다시 켜고 불러온 뒤 `available 3`, 1번 칸 `토이박스 용병단`, 표 행 이름 정상 |
+| 끄기 | 통과 | `enabled=false` 뒤 목록 3칸이 그대로이고 `status.mercenaries`가 없다(`active=false`) |
+
+검증 중에 새로 확인한 것:
+- **고용 창이 열려 있는 동안 게임은 일시정지다.** `GameplayStatics:IsGamePaused`가 열림에서 `true`, 닫은 뒤 `false`였고, 닫힌 뒤에만 날짜(`WeatherMaster.daysTotal`)가 흘렀다. 그래서 창을 연 동안 커스텀 칸의 잠금이 풀려 있어도 AI가 고용할 수 없다.
+- **게임이 목록 칸을 고용 기록 없이 지우는 때가 있다.** 날짜가 1-12-31에서 2-1-1로 넘어갈 때 `crazy_goose`가 목록에서 사라졌고 `hiredMercs`에는 새 항목이 없었다. 모드가 다음 점검에서 `greencaps`로 채웠다. 스파이크에서 `wayward_sons`가 사라진 것과 같은 현상으로 보인다(지우는 조건은 확인하지 않았다).
+- 계획과 다르게 고친 것: 목록이 꽉 찬 상태에서 커스텀을 등록하면 3번 칸에 들어갔다(이름이 같은 칸을 제자리에 두는 방식). 스펙 2.1에 맞춰, 제자리 수정도 "커스텀 → 순정" 순서를 따르고 옮겨 간 순정 칸의 도착 정보를 함께 옮기게 했다.
+- 확인하지 않은 것: 고용 창과 부대 패널에서 커스텀 용병단이 화면에 어떻게 보이는지(이름, 깃발), 게임의 새 용병단 알림이 실제로 뜨는지.
