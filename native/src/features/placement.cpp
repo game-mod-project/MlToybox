@@ -6,6 +6,9 @@ bool allowPlacement(uint8_t* pawn) {
     if (!pawn) return false;
     // 경계 밖 배치는 어느 지역에도 속하지 않는 건물이 되므로 허용하지 않는다
     if (pawn[kInsideBordersOffset] == 0) return false;
+    // 도로·성벽 배치 함수(0x144B03460)도 이 플래그로 "지점이 어느 영지에도 없음"을 표시하고 뒤 처리를 건너뛴다.
+    // 지우면 null 영지의 +0x738 을 읽어 크래시한다(실측 2026-09-30). 도로 모드에서는 건드리지 않는다
+    if (pawn[kRoadModeOffset] != 0) return false;
     pawn[kInvalidFlagOffset] = 0;
     return true;
 }

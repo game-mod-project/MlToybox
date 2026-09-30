@@ -1,69 +1,133 @@
 # MLToybox
 
-Manor Lords(Steam)용 UE4SS Lua 치트 모드와 외부 제어 패널.
+Manor Lords(Steam, UE5)용 치트 모드와 외부 제어 패널입니다. 구성 요소는 세 가지입니다.
+
+- **UE4SS Lua 모드**: 게임 안에서 실행됩니다.
+- **네이티브 DLL**: C++ 후킹을 맡습니다.
+- **.NET 8 WinForms 패널**: 게임 밖에서 기능을 켜고 끕니다. 게임 단축키와 겹치지 않도록 별도 창으로 만들었습니다.
+
+- 대상 빌드: Steam buildid 24905706. 게임이 업데이트되면 아래 "게임 업데이트 후 복구 절차"를 따릅니다.
+- 전제: 게임 폴더에 UE4SS v3.0.1(`dwmapi.dll` 프록시)이 설치돼 있어야 합니다.
+- 변경 이력: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
+- 설계와 계획: [`docs/superpowers/specs/`](docs/superpowers/specs/), [`docs/superpowers/plans/`](docs/superpowers/plans/)
+- 게임 내부 분석 기록(오프셋·함수·실측값): [`analysis/findings.md`](analysis/findings.md)
 
 ## 구성
-- `mod/MLToybox` — UE4SS Lua 모드 (게임 폴더 `ue4ss/Mods/MLToybox`로 배포)
-- `mod/MLToyboxDump` — 분석용 덤프 모드 (필요할 때만 배포)
-- `panel/` — .NET 8 WinForms 제어 패널 (`dist/panel/MLToybox.Panel.exe`)
-- `tools/` — 배포·백업·덤프 스크립트
-- `analysis/findings.md` — 게임 내부 대상 매핑
 
-전제: 게임 폴더에 UE4SS v3.0.1(`dwmapi.dll` 프록시)이 설치돼 있어야 한다.
+| 경로 | 내용 |
+|---|---|
+| `mod/MLToybox` | UE4SS Lua 모드. 게임 폴더 `ue4ss/Mods/MLToybox`로 배포 |
+| `mod/MLToyboxLab` | 개발용 인게임 Lua 실행기(필요할 때만 배포) |
+| `mod/MLToyboxDump` | 분석용 덤프 모드(필요할 때만 배포) |
+| `native/` | C++20 네이티브 DLL(MinHook). Lua가 `package.loadlib`로 불러옴 |
+| `panel/` | .NET 8 WinForms 제어 패널, 코어 라이브러리, 테스트(Lua 스펙 포함) |
+| `tools/` | 배포·백업·덤프·빌드 스크립트, `tools/re` 실행 파일 분석 도구 |
+| `analysis/` | 분석 기록(`findings.md`). 덤프 결과는 git에서 제외 |
 
-## 기능
+### 동작 구조
+```
+패널 ──control.json──▶ Lua 모드 ──(게임 스레드)──▶ 게임 객체·데이터 표·UFunction
+패널 ◀──status.json── Lua 모드
+                       └─ 네이티브 DLL ◀─control.json / ─▶ native_status.json (후킹)
+```
+- 패널이 `bridge/control.json`에 설정과 일회성 명령을 씁니다. 모드는 1초마다 이 파일을 읽어 적용하고, `status.json`에 현재 상태를 씁니다.
+- 명령은 id로 중복을 걸러 한 번만 실행합니다. 60초가 지난 명령은 무시합니다.
+- 모드의 JSON 인코더는 빈 표를 `[]`로 씁니다. 패널은 이것을 빈 사전으로 읽습니다.
 
-| 기능 | 담당 | 패널 탭 |
-|---|---|---|
-| ① 자원 목표값 유지 (자원 55종 + 지역 재화, 부족분만 보충, 내 지역마다). [자원] 탭 "영지"에서 영지를 고르면 그 영지의 재고를 보고 영지별 목표를 따로 줄 수 있다(빈칸 = 공통 목표 따름, 0 = 그 영지는 보충 안 함). | Lua | 자원 |
-| ① 영주 자원: 국고·영향력·왕의 총애를 영지와 무관한 전체 값으로 따로 목표 유지(항목별 체크, 체크 해제 = 관리 안 함). 예전 설정의 자원 목표 Treasury/Influence는 처음 불러올 때 이쪽으로 옮겨진다 | Lua (`ChangeTreasury`, `changeKingsFavour`) | 영주 |
-| ② 자재 불필요, 즉시 수리, 지역당 개수 제한 해제(`buildingStats.maxInRegion`: 영주 저택 모듈·세금 징수소·장작/식량 수레) | Lua | 건설 |
-| ② 배치 제한 무시(영지 경계 안), 즉시 완공 | 네이티브 DLL | 건설 |
-| ③ 업그레이드 조건·비용·해금 무시 | Lua | 업그레이드 |
-| ④ 부대 수 상한 99, 모집비·용병 비용 0, 장비·훈련·집 레벨 요구 해제 | Lua | 군사 |
-| 인구(영지별): 자연 이민 배율(1~10배, 영지마다 그 영지의 이민만큼 그 영지에), 영지마다 최소 가족 수(공통 값 + 영지별 따로 지정), 즉시 가족 추가(선택한 영지, 공통이면 빈 자리가 많은 영지부터). 추가된 가족은 미배치로 들어온다 | Lua (`spawnManorServantsInside`, `unassignFamily`) | 인구 |
-| ④ 병력 생성: 병종(민병대 6·친위대 2·용병 5종)을 골라 1~5개 분대를 새로 생성 (주민 수와 무관). "위치"에서 고른 내 영지의 영주 저택 옆에 생성(재구성도 같은 위치) | Lua (`spawnArmy`) | 군사 |
-| ④ 생성 분대 재구성: 생성 분대는 집이 없어 게임의 해제→집결이 되지 않는다(해제하면 0/N 빈 카드). [군사] 탭 '재구성'이 빈 카드와 같은 병종으로 다시 생성하고, 빈 카드는 한 틱에 하나씩 정리한다 | Lua (`spawnArmy`, `removeSquad`) | 군사 |
-| 게임 버그 방어: AI 민병대원 가족이 집을 잠깐 비운 사이 AI 틱이 돌면 튕기는 크래시를 막음 (항상 켜짐) | 네이티브 DLL (militia_guard) | 상태 |
+## 기능 (패널 탭별)
 
-데이터 표(업그레이드·건물·유닛·용병) 변경은 메모리에만 적용되며 게임을 다시 켜면 원복된다. 기능을 꺼도 이미 적용된 값은 되돌리지 않는다.
+### 자원
+- 자원 55종과 지역 재화를 **영지마다** 목표값까지 채웁니다. 모자란 만큼만 채우고, 목표보다 많으면 그대로 둡니다.
+- "영지" 목록에서 영지를 고르면 그 영지의 재고가 보이고, 영지별 목표를 따로 줄 수 있습니다.
+  - 빈칸이면 공통 목표를 따릅니다.
+  - 0이면 그 영지는 채우지 않습니다.
+
+### 영주
+- 국고, 영향력, 왕의 총애를 영지와 무관한 **영주 전체 값**으로 따로 관리합니다.
+- 체크한 항목만 목표 아래로 떨어질 때 채웁니다. 체크를 해제하면 관리하지 않습니다.
+- **지금 설정**: 체크 여부와 상관없이 입력한 값으로 한 번 정확히 맞춥니다. 내리는 것도 됩니다.
+- 영향력과 왕의 총애는 값을 바꾼 뒤 HUD 갱신 함수(`updatePlayerStats`)를 부릅니다. 이 함수를 부르지 않으면 게임 화면 숫자가 바뀌지 않습니다.
+- 기능이 꺼져 있어도 "현재" 값은 계속 보고합니다.
+
+### 건설
+- **배치 제한 무시**(영지 경계 안, 건물만): 네이티브 DLL이 담당합니다. 도로·성벽 배치에는 적용되지 않습니다. 성벽도 같은 플래그를 쓰는데, 지우면 크래시가 납니다.
+- **즉시 완공**: 네이티브 DLL이 담당합니다.
+- **자재 불필요, 즉시 수리**: Lua가 담당합니다.
+- **지역당 개수 제한 해제**: `buildingStats.maxInRegion`을 0으로 만듭니다.
+  - 대상 9종: 영주 저택 모듈(수비용 탑 등), 세금 징수소, 장작 수레, 식량 수레.
+
+### 업그레이드
+- 업그레이드 조건, 비용, 해금 요구를 무시합니다.
+
+### 군사
+- 부대 수 상한을 99로 올리고, 모집비와 용병 비용을 0으로 만들고, 장비·훈련·집 레벨 요구를 풉니다.
+- **병력 생성**: 병종(민병대 6종, 친위대 2종, 용병 5종)을 골라 분대를 1~5개 새로 만듭니다(`spawnArmy`). 주민 수와 무관합니다.
+  - "위치"에서 고른 내 영지의 영주 저택 옆에 생깁니다.
+- **재구성**: 생성한 분대의 병사에게는 집이 없습니다. 그래서 게임에서 해제하면 병사가 사라지고 0/N 빈 카드만 남습니다.
+  - "재구성"을 누르면 빈 카드와 같은 병종으로 다시 생성합니다.
+  - 빈 카드는 `removeSquad`로 한 틱에 하나씩, 높은 ID부터 정리합니다.
+
+### 인구 (영지별)
+- **자연 이민 배율(1~10배)**: 영지마다 계산합니다. 그 영지에 자연 이민으로 늘어난 만큼, 그 영지의 집에 추가로 들입니다. 모드가 들인 가족은 배율 계산에서 뺍니다.
+- **목표 가족 수**: 공통 값은 "영지마다 최소 N가족"이라는 뜻입니다. 영지별로 따로 지정할 수 있습니다.
+- **가족 추가**: 선택한 영지에 들입니다. "공통"이면 빈 자리가 많은 영지부터 채웁니다.
+- 추가한 가족은 **미배치** 상태로 들어옵니다. 게임 함수(`spawnManorServantsInside`)는 새 가족을 그 집의 일꾼으로 배치하므로, 들인 직후 `unassignFamily`로 배치를 풉니다.
+
+### 상태
+- 각 기능의 활성 상태, 명령 결과, 네이티브 기능별 installed/active를 보여 줍니다.
+- **게임 버그 방어(항상 켜짐)**: AI 민병대 점검 함수 두 곳이 분대원의 `Home`을 null 검사 없이 읽습니다. 민병대원 가족이 집을 잠깐 비운 사이에 이 함수가 돌면 게임이 튕깁니다. 이 상황에서는 호출을 건너뜁니다(`militia_guard`, `militia_guard_2`). 모드 없이도 같은 크래시가 재현됐습니다.
+
+데이터 표(업그레이드·건물·유닛·용병) 변경은 메모리에만 적용되고, 게임을 다시 켜면 원래대로 돌아갑니다. 기능을 꺼도 이미 적용된 값은 되돌리지 않습니다.
 
 ## 설치
     pwsh tools/backup-saves.ps1
+    pwsh tools/build-native.ps1
     pwsh tools/deploy.ps1 -Mod MLToybox
     pwsh tools/deploy.ps1 -Mod MLToybox -Panel
-게임을 실행한 뒤 `dist/panel/MLToybox.Panel.exe`를 켜고, 탭에서 기능을 설정하고 "적용"을 누른다.
-모드는 게임 시작 시에 로드되므로, 배포는 게임을 끈 상태에서 하거나 배포 후 게임을 재시작한다.
+
+1. 게임을 실행합니다.
+2. `dist/panel/MLToybox.Panel.exe`를 켭니다.
+3. 탭에서 기능을 설정하고 "적용"을 누릅니다.
+
+모드는 게임 시작 시 로드됩니다. 배포는 게임을 끈 상태에서 하거나, 배포한 뒤 게임을 재시작하세요. 패널은 실행 중이면 파일이 잠겨 배포할 수 없습니다.
 
 ## 제거
     pwsh tools/deploy.ps1 -Mod MLToybox -Remove
 
 ## 테스트
-    dotnet test panel/MLToybox.sln
-    pwsh tools/tests/Tools.Tests.ps1
+    dotnet test panel/MLToybox.sln          # 패널 코어 + Lua 스펙(NLua)
+    dotnet build panel/MLToybox.sln         # WinForms 패널 컴파일 확인(테스트와 별도로 확인)
+    pwsh tools/build-native.ps1 -Test       # 네이티브 DLL + 네이티브 테스트
+    pwsh tools/tests/Tools.Tests.ps1        # 배포·백업 스크립트
 
 ## 개발 도구
-- 인게임 Lua 실행기: `pwsh tools/deploy.ps1 -Mod MLToyboxLab` 후 게임 재시작, 그다음 `pwsh tools/lab.ps1 -File probe.lua`. 게임 스레드에서 실행하고 `print` 출력을 돌려준다. 개발이 끝나면 `-Remove`로 제거한다.
-- Lua 파일은 백슬래시가 깨지지 않도록 셸 heredoc이 아닌 편집기로 작성한다.
+- **인게임 Lua 실행기**
+  1. `pwsh tools/deploy.ps1 -Mod MLToyboxLab`로 배포하고 게임을 재시작합니다.
+  2. `pwsh tools/lab.ps1 -File probe.lua`를 실행합니다. 스크립트를 게임 스레드에서 실행하고 `print` 출력을 돌려줍니다.
+  3. 개발이 끝나면 `-Remove`로 제거합니다.
+- **Lua 파일 작성**: 백슬래시가 깨지지 않도록 셸 heredoc이 아닌 편집기로 작성합니다.
+- **크래시 분석**: `%LOCALAPPDATA%\ManorLords\Saved\Crashes\*\UEMinidump.dmp`의 예외 주소를 `tools/re`의 `disasm`으로 역추적합니다(`analysis/findings.md` 크래시 절 참고).
 
-## 네이티브 계층 (spec §11)
-- 빌드: `pwsh tools/build-native.ps1 -Test` → `native/build/mltoybox_native.dll`
-- 배포: `pwsh tools/deploy.ps1 -Mod MLToybox` (DLL이 있으면 `Mods/MLToybox/native/`에 복사. 게임 실행 중에는 DLL이 잠겨 경고만 남음)
-- 상태: 패널 [상태] 탭 "[네이티브]" (미로드/응답 없음/동작 중, 기능별 installed/active)
-- 분석 도구: `dotnet run --project tools/re/MLToybox.Re -- <exec|disasm|sig|count|strings> ...`
-  - `exec <UFunction>`은 후보를 둘 이상 낼 수 있다. `mov rax,[rdx+20h]`로 시작해 구현 함수를 `call`하는 쪽이 exec 썽크이고, `lea rdx,...; call` 형태는 UFunction 생성 함수다.
-- 게임 업데이트로 기능이 `pattern not found`/`pattern ambiguous`가 되면:
-  1. `analysis/findings.md`의 해당 기능 절에 적힌 UFunction 이름 또는 문자열로 `exec`/`strings`를 다시 실행해 대상 함수를 찾는다
-  2. `sig <VA>`로 새 패턴을 만들고 `count`로 1인지 확인한다
-  3. `native/src/features/<기능>.h`의 패턴 상수(`kPattern`)와 오프셋을 바꾸고, `.cpp`의 레이아웃 검사(`bodyChecks`) 명령 바이트도 새 exe에 맞춰 갱신한 뒤 빌드·배포한다
-  - 레이아웃 검사가 실패하면 기능은 `layout check failed: ...`로 설치되지 않는다(잘못된 함수에 쓰는 것을 방지).
-  - 배치 제한 무시는 UFunction이 없어 exec 추적이 불가능하다. 복구하려면 개발용 메모리 프로브(`bridge/probe_request.txt`에 `seq 주소 크기`)로 배치 가능·불가 상태의 플레이어 폰 메모리를 비교해 불가 플래그를 찾고, 그 플래그를 쓰는 함수를 다시 찾는다(Plan 3 부록 A.3 절차).
+## 네이티브 계층
+- **빌드**: `pwsh tools/build-native.ps1 -Test`를 실행하면 `native/build/mltoybox_native.dll`이 만들어집니다.
+- **배포**: `pwsh tools/deploy.ps1 -Mod MLToybox`가 DLL을 `Mods/MLToybox/native/`에 복사합니다. 게임 실행 중에는 DLL이 잠겨 경고만 남깁니다.
+- **기능**: `instant_build`, `placement`, `militia_guard`, `militia_guard_2`. 모두 패턴이 정확히 1곳에서 찾아지고 레이아웃 검사(`bodyChecks`)를 통과할 때만 설치됩니다.
+- **분석 도구**: `dotnet run --project tools/re/MLToybox.Re -- <exec|disasm|sig|count|strings|xrefs> ...`
+  - `exec <UFunction>`은 후보를 둘 이상 낼 수 있습니다.
+  - `mov rax,[rdx+20h]`로 시작해 구현 함수를 `call`하는 쪽이 exec 썽크입니다.
+  - `lea rdx,...; call` 형태는 UFunction 생성 함수입니다.
 
 ## 게임 업데이트 후 복구 절차
-1. `pwsh tools/deploy.ps1 -Mod MLToyboxDump`, 게임 실행 후 세이브 로드
-2. `pwsh tools/dump.ps1` → `analysis/dumps/<시각>/` 생성
-3. 패널 [상태] 탭에서 "비활성(대상 없음)"인 기능을 확인하고, `findings.md`의 해당 항목을 새 덤프로 다시 확인해 식별자를 수정
-4. `pwsh tools/deploy.ps1 -Mod MLToyboxDump -Remove` 후 `pwsh tools/deploy.ps1 -Mod MLToybox`
+1. `pwsh tools/deploy.ps1 -Mod MLToyboxDump`로 배포하고, 게임을 실행해 세이브를 불러옵니다.
+2. `pwsh tools/dump.ps1`을 실행하면 `analysis/dumps/<시각>/`이 생깁니다.
+3. 패널 [상태] 탭에서 비활성인 Lua 기능을 찾습니다. `findings.md`의 해당 항목을 새 덤프와 비교해 식별자를 고칩니다.
+4. 네이티브 기능이 `pattern not found`, `pattern ambiguous`, `layout check failed`이면 다음 순서로 고칩니다.
+   1. `findings.md`에 적힌 UFunction 이름이나 문자열로 `exec`/`strings`를 실행해 대상 함수를 다시 찾습니다.
+   2. `sig <VA>`로 새 패턴을 만들고, `count`로 1곳에서만 찾아지는지 확인합니다.
+   3. `native/src/features/<기능>.h`의 `kPattern`과 오프셋, `.cpp`의 `bodyChecks`를 새 실행 파일에 맞춰 고친 뒤 빌드하고 배포합니다.
+   - 배치 제한 무시는 UFunction이 없습니다. 개발용 메모리 프로브(`bridge/probe_request.txt`에 `seq 주소 크기`)로 배치 가능·불가 상태의 플레이어 폰 메모리를 비교해 다시 찾습니다(Plan 3 부록 A.3).
+5. `pwsh tools/deploy.ps1 -Mod MLToyboxDump -Remove`로 덤프 모드를 제거하고, `pwsh tools/deploy.ps1 -Mod MLToybox`로 다시 배포합니다.
 
 ## 주의
-모드가 기록한 값은 세이브에 저장된다. 테스트 전에 항상 `backup-saves.ps1`을 실행한다.
+- 모드가 바꾼 값은 세이브에 저장됩니다. 테스트 전에는 항상 `backup-saves.ps1`을 실행하세요.
+- 생성 분대, 추가 가족, 지역당 개수 제한 해제로 지은 건물은 모드를 제거해도 세이브에 남습니다.
