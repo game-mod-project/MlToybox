@@ -1,0 +1,11 @@
+analysis/dumps/
+panel/**/bin/
+panel/**/obj/
+dist/
+backups/
+.omc/
+**/.omc/
+*.csproj.user
+native/build/
+tools/re/**/bin/
+tools/re/**/obj/
