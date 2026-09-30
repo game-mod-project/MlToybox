@@ -17,6 +17,7 @@ public sealed class FeaturesControl
     public BuildControl Build { get; set; } = new();
     public UpgradeControl Upgrade { get; set; } = new();
     public MilitaryControl Military { get; set; } = new();
+    public MercenariesControl Mercenaries { get; set; } = new();
     public PopulationControl Population { get; set; } = new();
 }
 
@@ -83,4 +84,23 @@ public sealed class MilitaryControl
     public bool IgnorePopulation { get; set; } = true;
     public bool ZeroUpkeep { get; set; } = true;
     public bool UnlimitedSquads { get; set; } = true;
+}
+
+// 용병 고용 창 관리. 고용비는 원래 값을 유지하고(AI 도 같은 목록에서 고용한다) 플레이어 고용만 환급한다
+public sealed class MercenariesControl
+{
+    public bool Enabled { get; set; }
+    public bool Refund { get; set; } = true;       // 내 용병단 고용비 환급 + 유지비 0
+    public bool LockFromAi { get; set; } = true;   // 커스텀 용병단은 고용 창이 닫혀 있는 동안 AI 가 살 수 없는 가격
+    public List<MercCompany> Companies { get; set; } = new();
+}
+
+// 커스텀 용병단 정의. Units 는 분대마다 병종 id 하나(1~10개), Region 은 내 영지 키(null = 내 첫 영지)
+public sealed class MercCompany
+{
+    public string Name { get; set; } = "";
+    public List<string> Units { get; set; } = new();
+    public int Cost { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Region { get; set; }
+    public bool Enabled { get; set; } = true;
 }
