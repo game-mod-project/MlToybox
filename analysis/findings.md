@@ -203,3 +203,9 @@
 - 1인 행: 57 `manor_keep_lv1`(수비용 탑, garrison 12), 58 Tax Collector, 81 `manor_palace_lv3`, 83 `manor_keep_lv3`, 98 `manor_palace_lv1`, 102 `firewood_cart`, 103 `food_cart`, 474 `manor_palace_lv2`, 475 `manor_keep_lv2`.
 - 툴팁의 "최대 수행원 규모가 12만큼 증가"는 `garrisonLimit` 12와 일치한다.
 - 옵션 `build.noRegionLimit`은 이 값을 0으로 만든다. 데이터 표 변경은 메모리에만 남는다.
+
+## 성벽 배치 크래시 — 배치 제한 무시와 충돌 (2026-09-30)
+- 증상: `EXCEPTION_ACCESS_VIOLATION reading 0x738`, RIP `exe+0x4B047E5`(함수 `0x144B03460`, APawnCPP 도로/성벽 배치 처리. 함수 첫머리에서 `roadmode` +0x7B0을 검사).
+- 이 함수는 성벽 지점이 속한 영지를 `0x144C4F230`(엔진 영지 배열 +0x550에서 점을 포함하는 영지 검색, 없으면 null)으로 찾는다. 없으면 폰의 배치 불가 플래그 `+0x60C`를 1로 세우고 뒤 처리를 건너뛴다. 플래그가 0이면 null 영지의 `+0x738`(`ARegion::CityPlanningComponent`)을 읽는다.
+- 배치 제한 무시(네이티브 `placement`)가 같은 `+0x60C`를 0으로 지우고 있었다. 사용자 재현 결과, 이 기능을 끄면 튕기지 않고 켜면 튕겼다.
+- 수정: 폰이 도로 모드(`roadmode`)이면 플래그를 건드리지 않는다.
