@@ -193,3 +193,7 @@
 ## 영주 값 HUD 갱신 (2026-09-29)
 - `pawn.influence`에 직접 쓰거나 `changeKingsFavour`를 호출해도 영주 HUD(`W_HUD_LordPanel_V2_C`의 `InfluenceNumeric`/`FavorNumeric`)는 갱신되지 않는다(실측: 내부 값 33333, HUD는 13초 뒤에도 20410). `ChangeTreasury`는 HUD를 갱신하므로 국고를 바꾸면 다른 값도 함께 갱신돼 보였다.
 - 위젯의 `updatePlayerStats()`를 호출하면 즉시 갱신된다(영향력 20410→33333, 총애 50000→44444 실측).
+
+## 패널이 상태를 못 읽던 문제 (2026-09-30)
+- 모드의 JSON 인코더는 빈 Lua 테이블을 `[]`로 쓴다. `spawn.byUnit`이 비면 `"byUnit":[]`가 되는데, 패널은 이 필드를 `Dictionary<string,int>`로 읽다가 실패하고 상태 전체를 null로 처리했다(실측 오류: `$.spawn.byUnit`). 그 결과 패널은 "연결 안 됨"을 띄우고, "현재" 값은 "-"로, 영지 목록은 기본값만 보였다. 생성 분대 재구성 기능을 넣은 뒤 해제된 생성 분대가 없는 동안 항상 이 상태였다.
+- 수정: 패널 JSON 옵션에, 문자열 키 사전 자리에 온 배열을 빈 사전으로 읽는 변환기를 추가했다.

@@ -32,6 +32,20 @@ public class SpawnRegionTests
     }
 
     [Fact]
+    public void Status_EmptyLuaTablesEncodedAsArraysStillParse()
+    {
+        // 실측: 모드의 JSON 인코더는 빈 테이블을 [] 로 쓴다. "byUnit":[] 하나로 상태 전체가 null 이 되어 패널이 '연결 안 됨'이 됐다
+        var c = NewClient();
+        File.WriteAllText(c.StatusPath,
+            """{"version":1,"heartbeat":1800000000,"inGame":true,"spawn":{"disbanded":0,"byUnit":[],"pending":0},"commands":[],"resources":[],"playerRegions":[{"key":"gold","name":"Mandlach"}]}""");
+        var s = c.ReadStatus();
+        Assert.NotNull(s);
+        Assert.Empty(s!.Spawn!.ByUnit!);
+        Assert.Empty(s.Commands!);
+        Assert.Single(s.PlayerRegions!);
+    }
+
+    [Fact]
     public void Status_ParsesPlayerRegions()
     {
         var c = NewClient();
