@@ -11,6 +11,7 @@ local gamemode = require("core.gamemode")
 local native = require("core.native")
 local commandsLib = require("core.commands")
 local spawnSquads = require("features.spawn_squads")
+local retinueEditor = require("features.retinue_editor")
 local population = require("features.population")
 local lord = require("features.lord")
 local game = require("core.game")
@@ -23,7 +24,10 @@ local bridge = bridgeLib.new(bridgeDir)
 local nativeLoaded, nativeErr = native.load(paths.parentDir(scriptsDir) .. "\\native")
 log.info("native: %s", nativeLoaded and "loaded" or tostring(nativeErr))
 local registry = registryLib.new()
-local commands = commandsLib.new({ spawnSquads = spawnSquads.spawn, reformSquads = spawnSquads.reform, addFamilies = population.command, setLord = lord.set })
+local commands = commandsLib.new({
+  spawnSquads = spawnSquads.spawn, reformSquads = spawnSquads.reform, addFamilies = population.command, setLord = lord.set,
+  customizeRetinue = retinueEditor.open,
+})
 local appliedSeq = nil
 
 for _, name in ipairs(config.featureModules) do
@@ -59,11 +63,14 @@ LoopAsync(config.pollIntervalMs, function()
         end
         registry:tick(now)
         safe.call("spawnSquads", function() spawnSquads.tick(registry.state.inGame) end)
+        safe.call("retinueEditor", function() retinueEditor.tick(registry.state.inGame) end)
         local status = registry:status(now, appliedSeq, bridge.lastError)
         status.native = native.status(bridgeDir .. "\\native_status.json", now, nativeLoaded, nativeErr)
         status.commands = commands:status()
         local spawnOk, spawnStatus = safe.call("spawnSquads", spawnSquads.status, registry.state.inGame)
         status.spawn = spawnOk and spawnStatus or nil
+        local retinueOk, retinueStatus = safe.call("retinueEditor", retinueEditor.status, registry.state.inGame)
+        status.retinue = retinueOk and retinueStatus or nil
         if registry.state.inGame then   -- 영주 기능이 꺼져 있어도 현재값은 보고한다
           local lordOk, lordValues = safe.call("lord", lord.read)
           if lordOk then status.lord = lordValues end

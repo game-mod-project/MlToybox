@@ -87,6 +87,9 @@ public sealed class MainForm : Form
     private readonly NumericUpDown _spawnCount = new() { Minimum = 1, Maximum = 5, Value = 1, Width = 50 };
     // 병력 생성·재구성 위치(영지). 목록은 모드가 보고하는 내 영지(playerRegions)
     private readonly ComboBox _spawnRegion = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+    private readonly ComboBox _retinueSquad = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
+    private readonly Button _retinueButton = new() { Text = "꾸미기 열기", AutoSize = true, Enabled = false };
+    private string _retinueKey = "";
     private string _spawnRegionsKey = "";
     private readonly Label _reformLabel = new() { Text = "해제된 생성 분대: -", AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
     private readonly Button _reformButton = new() { Text = "재구성", AutoSize = true, Enabled = false };
@@ -134,7 +137,14 @@ public sealed class MainForm : Form
         _reformButton.Click += (_, _) => ReformSquads();
         var reformRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
         reformRow.Controls.AddRange(new Control[] { _reformLabel, _reformButton });
-        tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads, spawnRow, reformRow));
+        // 모드가 만든 수행원 분대에 게임의 꾸미기 화면을 연다(위 "위치" 영지의 영주 저택 기준)
+        _retinueButton.Click += (_, _) => CustomizeRetinue();
+        var retinueRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
+        retinueRow.Controls.AddRange(new Control[]
+        {
+            new Label { Text = "수행원 꾸미기 (생성·고용한 친위대 분대):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _retinueSquad, _retinueButton,
+        });
+        tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads, spawnRow, reformRow, retinueRow));
         var mercPage = new TabPage("용병");
         mercPage.Controls.Add(_mercTab);
         tabs.TabPages.Add(mercPage);
@@ -472,6 +482,33 @@ public sealed class MainForm : Form
 
     private string? SpawnRegionKey() => (_spawnRegion.SelectedItem as ScopeOption)?.Key;
 
+    private void CustomizeRetinue()
+    {
+        if (_retinueSquad.SelectedItem is not RetinueSquad squad) return;
+        SendCommand(ControlCommand.CustomizeRetinue(squad.Id, DateTimeOffset.UtcNow, SpawnRegionKey()));
+    }
+
+    // 선택은 분대 ID 로 유지한다. 화면이 열려 있는 동안(editing)은 버튼을 막는다
+    private void RefreshRetinue(StatusDocument? status)
+    {
+        var retinue = status is { InGame: true } ? status.Retinue : null;
+        var squads = retinue?.Squads ?? new List<RetinueSquad>();
+        var key = string.Join("|", squads.Select(RetinueSquad.Label));
+        if (key != _retinueKey)
+        {
+            _retinueKey = key;
+            var selected = (_retinueSquad.SelectedItem as RetinueSquad)?.Id;
+            _retinueSquad.BeginUpdate();
+            _retinueSquad.Items.Clear();
+            _retinueSquad.Items.AddRange(squads.Cast<object>().ToArray());
+            _retinueSquad.EndUpdate();
+            var index = squads.FindIndex(s => s.Id == selected);
+            _retinueSquad.SelectedIndex = squads.Count == 0 ? -1 : Math.Max(0, index);
+        }
+        _retinueButton.Enabled = squads.Count > 0 && retinue?.Editing is null;
+        _retinueButton.Text = retinue?.Editing is int id ? $"꾸미기 열림 (#{id})" : "꾸미기 열기";
+    }
+
     // 선택은 영지 키로 유지한다. 목록이 없으면(게임 밖·구버전 모드) "첫 영지" 하나만 둔다
     private void RefreshSpawnRegions(StatusDocument? status)
     {
@@ -545,6 +582,7 @@ public sealed class MainForm : Form
         };
         UpdateReform(status);
         RefreshSpawnRegions(status);
+        RefreshRetinue(status);
         _mercTab.ShowStatus(status);
         if (status is null)
         {

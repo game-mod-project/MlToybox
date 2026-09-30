@@ -87,9 +87,9 @@ function M.anchorLocation(key)
   return nil
 end
 
--- 용병 고용 창. 같은 클래스의 객체가 둘 있다: 위젯 트리의 원본(/Game/UI/HUD/...)과 화면에 붙은 실제 위젯(/Engine/Transient...)
-function M.mercScreen()
-  for _, w in ipairs(M.find.all("mercenaryScreen_C")) do
+-- 화면에 붙은 실제 위젯. 같은 클래스의 객체가 둘 있다: 위젯 트리의 원본(/Game/UI/HUD/...)과 실제 위젯(/Engine/Transient...)
+local function liveWidget(className)
+  for _, w in ipairs(M.find.all(className)) do
     if safe.valid(w) then
       local ok, full = pcall(function() return w:GetFullName() end)
       if ok and type(full) == "string" and full:find("/Engine/Transient", 1, true) then return w end
@@ -97,6 +97,12 @@ function M.mercScreen()
   end
   return nil
 end
+
+-- 용병 고용 창
+function M.mercScreen() return liveWidget("mercenaryScreen_C") end
+
+-- 수행원 꾸미기 화면 (findings "수행원 꾸미기" 스파이크)
+function M.retinueEditor() return liveWidget("retinueEditor_C") end
 
 -- 내 영지 가운데 regionUniqueTag 가 key 인 것
 function M.regionByKey(key)
