@@ -209,3 +209,45 @@
 - 이 함수는 성벽 지점이 속한 영지를 `0x144C4F230`(엔진 영지 배열 +0x550에서 점을 포함하는 영지 검색, 없으면 null)으로 찾는다. 없으면 폰의 배치 불가 플래그 `+0x60C`를 1로 세우고 뒤 처리를 건너뛴다. 플래그가 0이면 null 영지의 `+0x738`(`ARegion::CityPlanningComponent`)을 읽는다.
 - 배치 제한 무시(네이티브 `placement`)가 같은 `+0x60C`를 0으로 지우고 있었다. 사용자 재현 결과, 이 기능을 끄면 튕기지 않고 켜면 튕겼다.
 - 수정: 폰이 도로 모드(`roadmode`)이면 플래그를 건드리지 않는다.
+
+## 용병 고용 — 목록 보충과 커스텀 용병단 (2026-09-30, 스파이크)
+exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_8`)을 함께 썼다. 제품 코드는 바꾸지 않았다.
+
+### 함수 (exec 썽크 → 구현)
+- `refillMercenaries`: `0x1449F6FC0` → `0x1410A0950`. 구현이 `ret`뿐인 빈 함수다.
+- `rerollMercenaries`: `0x144A8BDC0` → `0x144C60460`.
+  - `availableMercs`(엔진 +0xC00)를 비우고 `DT_MercenaryCompanies`(+0xBF8)에서 최대 3개를 중복 없이 무작위로 뽑는다.
+  - 후보에서 빠지는 행: 특정 특성 2종 가운데 하나를 가진 행, 그리고 `hiredMercs`(+0xC10)에 같은 `Name`이 있는 행.
+  - 뽑은 항목에 `arrivalRegion`(엔진 영지 배열 +0x550에서 무작위)과 `arrivesIn`(10~40)을 채운다. 결과가 1개 이상이면 알림을 띄운다.
+  - 네이티브 호출처는 두 곳뿐이다: 엔진 시작 처리 `0x144C08CCA`(`engine+0x2F1`이 0일 때만), 새 게임 설정 `0x144D145AA`. 세이브를 불러올 때는 `0x144C1D040`이 저장된 목록을 복원한다.
+- `hireMercs`: `0x144A8A240` → `0x144C50D00`. `arrivalRegion`과 폰이 null이 아니면 고용한다. 국고·부대 수·계약 수 검사는 없다. 빈 ID를 찾아 `hiredMercs`에 넣고, `availableMercs`에서 빼고, 분대를 만들어 `squadType`을 2로 두고, `cost`가 0보다 크면 국고에서 뺀다.
+- `getCompanyCostForPawn`: `0x144A5EF20` → `0x144AE1310`. `company.cost`를 그대로 돌려준다.
+- `canAddNewMilitiaSquad`(구현 `0x144ACAAE0`)는 `commandedSquads` 가운데 `squadType == 1`만 세어 `maxNumOfMilitiaToSpawn`과 비교한다. 용병 고용 화면 BP는 이 함수를 부르지 않는다(덤프의 BP 지역 변수 `CallFunc_*`로 확인. 호출하는 BP는 `W_HUD_ArmyRecruitCardV2_C`, `addSquadCard_C`).
+- AI 영주도 같은 목록에서 고용한다. `0x144BACED0`이 `availableMercs`를 돌며 `pawn+0xA40 >= cost`이면 후보로 삼고 `hireMercs`를 부른다(호출 `0x144BADA15`, `0x144BB773B`, `0x144BB7B24`).
+
+### 인게임 실측
+- 용병 표는 11행이다. `questOnly` 특성의 2행(`hildebolts_army`, `hildebolts_army_large`)은 reroll 100회에 한 번도 나오지 않았다. 나머지 9행은 고용 중이 아니면 모두 나왔다.
+- 진행된 세이브의 상태: `availableMercs` 0개, `hiredMercs` 4개. 후보가 5개 남아 있는데도 목록이 비어 있었다. 목록을 주기적으로 다시 채우는 동작은 없다.
+  - `hiredMercs` 4개 가운데 2개(`battle_brothers`, `brigands`)는 분대가 하나도 없는데 항목이 남아 있었다. 이런 항목도 reroll 후보에서 그 이름을 뺀다.
+- Lua에서 `engine:rerollMercenaries()`를 부르면 목록이 0 → 3개가 된다.
+- **비용이 0이면 AI가 가져간다.** `zeroUpkeep`으로 비용이 0인 상태에서 reroll한 3개 가운데 2개(`brigands_small`, `huntsmen`)를 3분 안에 AI가 고용했다(분대 소유자가 플레이어가 아님). 남은 1개(`wayward_sons`)는 `hiredMercs`에 없이 목록에서 사라졌다(원인 미확인). 비용을 5001 이상으로 올린 목록은 약 2분 동안 변화가 없었다.
+- 고용 버튼(`mercenaryCompanyCard_C.Button_76`)은 `cost`가 국고보다 클 때만 꺼진다(국고 148,500에서 cost 99,999,999 → 꺼짐, 77 → 켜짐).
+- 목록 항목은 Lua에서 제자리 쓰기가 된다: `cost`, `arrivesIn`, `Name`(Lua 문자열, 한글 포함), `arrivalRegion`(영지 객체), `units`(`c.units = { FName(...), ... }` 테이블 대입. 3 → 5 → 1개로 바꾸면 배열이 다시 할당된다).
+  - 고용 창(`mercenaryScreen_C:updateCompanies()`)은 바뀐 값을 그대로 보여 준다. 번역 키가 없는 이름은 문자열 그대로 나온다.
+- UE4SS Lua의 `TArray`에는 추가 함수가 없다(`Empty`, `ForEach`, `GetArrayNum`, `GetArrayMax`, `GetArrayAddress`, `GetArrayDataAddress`뿐). 목록 길이는 reroll로만 늘릴 수 있다.
+- **배열 전체 대입은 게임을 튕긴다.** `engine.availableMercs = { {Name=..., units=..., banner=..., ...}, ... }`는 UE4SS 안에서 `EXCEPTION_ACCESS_VIOLATION reading 0xb`를 냈다. 쓰지 않는다.
+- 커스텀 항목 고용: 목록 1번을 이름 "토이박스 용병단", 비용 77, 분대 2개(`mercenary_infantry`, `mercenary_crossbowmen`), 도착 영지 = 내 영지로 바꾼 뒤, 카드 버튼 이벤트와 확인 창 이벤트(`BndEvt__HireConfirmation_menuButton_K2Node_ComponentBoundEvent_2_onReleased__DelegateSignature`)로 고용했다. `hiredMercs`에 `0=토이박스 용병단`이 생기고 분대 2개(type 2, 36명씩, 플레이어 소유)가 바로 만들어졌다.
+- 이름 제외와 우회: `greencaps`를 고용한 뒤 reroll 30회에 `greencaps`는 0회였다. 표의 그 행 `Name`을 `greencaps#2`로 바꾸자 30회 가운데 10회 나왔다. 표 행 이름을 바꾸면 고용 중인 용병단도 다시 후보가 된다.
+
+### 미확인
+- 커스텀 항목(목록·고용 중)이 세이브와 로드를 거쳐 유지되는지. 덤프상 `FSavedMercenaryCompany`는 같은 필드를 값으로 저장한다.
+- `wayward_sons`가 고용 기록 없이 목록에서 사라진 원인.
+- reroll이 제외하는 두 번째 특성 이름.
+- 분대가 없는 `hiredMercs` 항목이 정리되는 시점.
+
+### 개발 절차 메모
+- Lab으로 메인 메뉴에서 세이브를 불러올 수 있다(화면 조작 불필요).
+  1. 뷰포트에 있는 `mainMenu_widget_C`에 `SwitchToLoadScreen(false)`를 부른다.
+  2. 몇 초 뒤 `LoadMenuWidget.SortedSlotsByDate`에서 `Descriptor.saveSlot`으로 슬롯을 찾는다.
+  3. `LoadGame({ SlotIndex = slot.SlotIndex, Descriptor = slot.Descriptor })`를 부른다.
+- 메인 메뉴의 `menuButton_continue`는 보이지 않는 상태였다(`continue()` 경로는 쓰지 않았다).
