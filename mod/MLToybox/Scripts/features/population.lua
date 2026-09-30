@@ -6,6 +6,9 @@ local safe = require("core.safe")
 -- spawnManorServantsInside 는 새 가족을 그 집의 일꾼으로 배치하므로(일터 = 자기 집), 자연 이민처럼 미배치로 바꾼다.
 local M = { name = "population", intervalSec = 5, MAX_FAMILIES_PER_HOUSE = 2, MAX_COMMAND = 20, MAX_MULTIPLIER = 10 }
 
+-- 모드가 들인 가족 수(영지별). 다음 틱의 자연 이민 계산에서 빼서 배율이 다시 걸리지 않게 한다
+local modAdded = {}
+
 local function regionKey(r)
   local ok, tag = pcall(function() return r.regionUniqueTag:ToString() end)
   return ok and tag or nil
@@ -67,11 +70,14 @@ function M.addFamilies(n, key)
     end
     if not best or not addOne(best.region, best.houses) then break end
     added = added + 1
+    local k = regionKey(best.region)
+    if k then modAdded[k] = (modAdded[k] or 0) + 1 end
   end
   return added
 end
 
 function M.enable(state)
+  modAdded = {}
   state.populationLast = {}
   state.populationNatural = 0
   state.populationMultiplied = 0
@@ -90,8 +96,8 @@ function M.tick(state, settings)
     local key = regionKey(r)
     local families = r:getTotalNumFamilies()
     local last = key and state.populationLast[key]
-    if last and families > last then
-      local grown = families - last
+    local grown = last and (families - last - (modAdded[key] or 0)) or 0
+    if grown > 0 then
       state.populationNatural = (state.populationNatural or 0) + grown
       if multiplier > 1 then
         state.populationMultiplied = (state.populationMultiplied or 0) + M.addFamilies(grown * (multiplier - 1), key)
@@ -112,6 +118,7 @@ function M.tick(state, settings)
     }
     if key then
       state.populationLast[key] = entry.families
+      modAdded[key] = 0
       perRegion[#perRegion + 1] = entry
     end
     for k in pairs(totals) do totals[k] = totals[k] + entry[k] end

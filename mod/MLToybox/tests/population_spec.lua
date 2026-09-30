@@ -90,6 +90,20 @@ T.run({
     T.eq(sel.spawned, 2, "mod-added families are not multiplied again")
     T.eq(st.population.natural, 1, "natural counted"); T.eq(st.population.multiplied, 2, "multiplied counted")
   end,
+  command_added_families_are_not_multiplied_as_natural_growth = function()
+    -- 실측: 명령으로 1가족 추가 → 다음 틱이 자연 이민으로 보고 배율 3 으로 2가족을 더 들였다
+    local hof = world(region("hof", { 0, 0, 0, 0 }))[1]
+    local st = {}
+    population.enable(st, {})
+    population.tick(st, { enabled = true, multiplier = 3 })   -- 기준선
+    T.eq(population.command({ count = 1, region = "hof" }, IN_GAME).added, 1, "command added one")
+    population.tick(st, { enabled = true, multiplier = 3 })
+    T.eq(hof.spawned, 1, "no multiplier bonus for mod-added family")
+    T.eq(st.population.natural, 0, "not counted as natural")
+    hof.natural = 1
+    population.tick(st, { enabled = true, multiplier = 3 })
+    T.eq(hof.spawned, 3, "real natural growth still multiplied")
+  end,
   common_target_is_minimum_per_region = function()
     local hof, sel = table.unpack(world(region("hof", { 0, 0 }, 10), region("sel", { 0, 0 }, 11)))
     local st = {}
