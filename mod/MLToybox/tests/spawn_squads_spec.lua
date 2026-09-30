@@ -65,6 +65,22 @@ T.run({
     T.eq(calls[1].pawn, pawn, "owner"); T.eq(calls[1].company, -1, "militia company"); T.eq(calls[1].days, 0, "immediate")
     T.eq(calls[1].pos.X, 10 + spawn.OFFSET_X, "offset x"); T.eq(calls[1].pos.Y, 20, "y"); T.eq(calls[1].pos.Z, 30, "z")
   end,
+  spawn_and_reform_use_the_selected_region = function()
+    local calls = setup()
+    local asked = {}
+    game.anchorLocation = function(key)
+      asked[#asked + 1] = key or "first"
+      if key == "nus" then return { X = 500, Y = 0, Z = 0 } end
+      if key == nil then return { X = 10, Y = 20, Z = 30 } end
+      return nil
+    end
+    T.eq(spawn.spawn({ unit = "spearMilitia", count = 1, region = "nus" }, IN_GAME).ok, true, "ok")
+    T.eq(calls[1].pos.X, 500 + spawn.OFFSET_X, "spawned at nus manor")
+    local r = spawn.spawn({ unit = "spearMilitia", count = 1, region = "zzz" }, IN_GAME)
+    T.eq(r.ok, false, "unknown region fails"); T.truthy(r.error:find("zzz", 1, true), "names the region")
+    spawn.spawn({ unit = "spearMilitia", count = 1 }, IN_GAME)
+    T.eq(asked[#asked], "first", "no region -> first region")
+  end,
   rejects_when_not_in_game = function()
     local calls = setup()
     local r = spawn.spawn({ unit = "spearMilitia", count = 1 }, { inGame = false })
@@ -123,6 +139,12 @@ T.run({
     T.eq(calls[1].names[1], "FName:mercenary_infantry", "type kept"); T.eq(calls[1].names[2], "FName:retinue_tier1", "type kept 2")
     T.eq(#removed, 0, "removal deferred to ticks")
     T.eq(spawn.pendingRemovals(), 2, "pending")
+  end,
+  reform_spawns_at_selected_region = function()
+    local calls = reformSetup(function(p) return { squad(40, p, { unit = "retinue_tier1" }) } end)
+    game.anchorLocation = function(key) if key == "nus" then return { X = 500, Y = 0, Z = 0 } end return { X = 10, Y = 0, Z = 0 } end
+    T.eq(spawn.reform({ region = "nus" }, IN_GAME).ok, true, "ok")
+    T.eq(calls[1].pos.X, 500 + spawn.OFFSET_X, "at nus")
   end,
   reform_fails_without_ghosts = function()
     local calls = reformSetup(function(p) return { squad(41, p, { units = { 1 }, recruits = { 1 } }) } end)

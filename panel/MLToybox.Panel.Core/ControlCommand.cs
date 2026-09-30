@@ -12,20 +12,23 @@ public sealed class ControlCommand
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public int? Value { get; set; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Region { get; set; }
 
-    public static ControlCommand SpawnSquads(string unit, int count, DateTimeOffset now) => new()
+    // region: 생성 위치 영지 키(없으면 내 첫 영지)
+    public static ControlCommand SpawnSquads(string unit, int count, DateTimeOffset now, string? region = null) => new()
     {
         Id = Guid.NewGuid().ToString("N"),
         Type = "spawnSquads",
         Unit = unit,
         Count = count,
+        Region = region,
         IssuedAt = now.ToUnixTimeSeconds(),
     };
 
     // 해제된 생성 분대(0/N 빈 카드)를 같은 병종으로 다시 생성하고 빈 카드를 정리한다
-    public static ControlCommand ReformSquads(DateTimeOffset now) => new()
+    public static ControlCommand ReformSquads(DateTimeOffset now, string? region = null) => new()
     {
         Id = Guid.NewGuid().ToString("N"),
         Type = "reformSquads",
+        Region = region,
         IssuedAt = now.ToUnixTimeSeconds(),
     };
 

@@ -83,6 +83,9 @@ public sealed class MainForm : Form
 
     private readonly ComboBox _spawnUnit = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 180, DisplayMember = nameof(UnitOption.Label) };
     private readonly NumericUpDown _spawnCount = new() { Minimum = 1, Maximum = 5, Value = 1, Width = 50 };
+    // 병력 생성·재구성 위치(영지). 목록은 모드가 보고하는 내 영지(playerRegions)
+    private readonly ComboBox _spawnRegion = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+    private string _spawnRegionsKey = "";
     private readonly Label _reformLabel = new() { Text = "해제된 생성 분대: -", AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
     private readonly Button _reformButton = new() { Text = "재구성", AutoSize = true, Enabled = false };
 
@@ -123,7 +126,7 @@ public sealed class MainForm : Form
         spawnRow.Controls.AddRange(new Control[]
         {
             new Label { Text = "병력 생성 (주민과 무관):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) },
-            _spawnUnit, _spawnCount, new Label { Text = "개 분대", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, spawnButton,
+            _spawnUnit, _spawnCount, new Label { Text = "개 분대, 위치:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _spawnRegion, spawnButton,
         });
         // 생성 분대는 집이 없어 게임의 해제→집결이 안 된다(해제하면 0/N 빈 카드). 모드가 같은 병종으로 다시 생성한다
         _reformButton.Click += (_, _) => ReformSquads();
@@ -378,7 +381,7 @@ public sealed class MainForm : Form
     private void SpawnSquads()
     {
         if (_spawnUnit.SelectedItem is not UnitOption unit) return;
-        SendCommand(ControlCommand.SpawnSquads(unit.Id, (int)_spawnCount.Value, DateTimeOffset.UtcNow));
+        SendCommand(ControlCommand.SpawnSquads(unit.Id, (int)_spawnCount.Value, DateTimeOffset.UtcNow, SpawnRegionKey()));
     }
 
     private void SendCommand(ControlCommand command)
@@ -457,6 +460,26 @@ public sealed class MainForm : Form
             + $"{Environment.NewLine}이번 세션(전체): 자연 이민 {p.Natural}가족 → 배율로 추가 {p.Multiplied}가족";
     }
 
+    private string? SpawnRegionKey() => (_spawnRegion.SelectedItem as ScopeOption)?.Key;
+
+    // 선택은 영지 키로 유지한다. 목록이 없으면(게임 밖·구버전 모드) "첫 영지" 하나만 둔다
+    private void RefreshSpawnRegions(StatusDocument? status)
+    {
+        var regions = status is { InGame: true } ? status.PlayerRegions ?? new List<RegionInfo>() : new List<RegionInfo>();
+        var key = string.Join("|", regions.Select(r => $"{r.Key}={r.Name}"));
+        if (key == _spawnRegionsKey && _spawnRegion.Items.Count > 0) return;
+        _spawnRegionsKey = key;
+        var selected = SpawnRegionKey();
+        var options = regions.Count == 0
+            ? new List<ScopeOption> { new(null, "내 첫 영지") }
+            : regions.Select(r => new ScopeOption(r.Key, $"{r.Name} ({r.Key})")).ToList();
+        _spawnRegion.BeginUpdate();
+        _spawnRegion.Items.Clear();
+        _spawnRegion.Items.AddRange(options.Cast<object>().ToArray());
+        _spawnRegion.EndUpdate();
+        _spawnRegion.SelectedIndex = Math.Max(0, options.FindIndex(o => o.Key == selected));
+    }
+
     private void UpdateReform(StatusDocument? status)
     {
         var spawn = status is { InGame: true } ? status.Spawn : null;
@@ -476,7 +499,7 @@ public sealed class MainForm : Form
 
     private void ReformSquads()
     {
-        _control.Commands = new List<ControlCommand> { ControlCommand.ReformSquads(DateTimeOffset.UtcNow) };
+        _control.Commands = new List<ControlCommand> { ControlCommand.ReformSquads(DateTimeOffset.UtcNow, SpawnRegionKey()) };
         Apply();
         _control.Commands = new List<ControlCommand>();
     }
@@ -511,6 +534,7 @@ public sealed class MainForm : Form
             _ => Color.Firebrick,
         };
         UpdateReform(status);
+        RefreshSpawnRegions(status);
         if (status is null)
         {
             _statusText.Text = "status.json 없음";

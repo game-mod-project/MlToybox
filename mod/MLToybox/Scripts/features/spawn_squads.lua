@@ -4,6 +4,12 @@ local datatable = require("core.datatable")
 -- 주민 수를 넘는 병력: 용병 생성 경로(spawnArmy)로 플레이어 소유 분대를 새로 만든다 (Plan 3 부록 A.2 대안)
 local M = { MAX_COUNT = 5, OFFSET_X = 800, MILITIA_COMPANY = -1 }
 
+-- 생성 위치: 명령의 region(영지 키)의 영주 저택. 없으면 내 첫 영지
+function M.noAnchor(region)
+  if region then return "no anchor building in region " .. tostring(region) end
+  return "no anchor building in player region"
+end
+
 function M.spawn(command, ctx)
   if not ctx.inGame then return { ok = false, error = "not in game" } end
   local count = tonumber(command.count)
@@ -16,8 +22,8 @@ function M.spawn(command, ctx)
   end
   local pawn, engine = game.pawn(), game.engine()
   if not pawn or not engine then return { ok = false, error = "game objects not ready" } end
-  local loc = game.anchorLocation()
-  if not loc then return { ok = false, error = "no anchor building in player region" } end
+  local loc = game.anchorLocation(command.region)
+  if not loc then return { ok = false, error = M.noAnchor(command.region) } end
 
   local names = {}
   for i = 1, count do names[i] = game.fname(unit) end
@@ -58,14 +64,15 @@ end
 function M.resetReform() reform = { pending = {}, boundary = nil } end
 function M.pendingRemovals() return #reform.pending end
 
-function M.reform(_, ctx)
+function M.reform(command, ctx)
+  command = command or {}
   if not ctx.inGame then return { ok = false, error = "not in game" } end
   local pawn, engine = game.pawn(), game.engine()
   if not pawn or not engine then return { ok = false, error = "game objects not ready" } end
   local ghosts = M.ghosts(pawn, engine)
   if #ghosts == 0 then return { ok = false, error = "no disbanded spawned squads" } end
-  local loc = game.anchorLocation()
-  if not loc then return { ok = false, error = "no anchor building in player region" } end
+  local loc = game.anchorLocation(command.region)
+  if not loc then return { ok = false, error = M.noAnchor(command.region) } end
 
   local names = {}
   for i, g in ipairs(ghosts) do names[i] = game.fname(g.unit) end
