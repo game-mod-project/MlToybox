@@ -65,8 +65,9 @@ public sealed class MainForm : Form
     private readonly CheckBox _milEnabled = new() { Text = "군사 기능 사용", AutoSize = true };
     private readonly CheckBox _ignoreEquipment = new() { Text = "민병대 장비 요구 무시", AutoSize = true };
     private readonly CheckBox _ignorePopulation = new() { Text = "징집 조건(집 레벨·훈련) 무시 — 주민 수보다 많은 병력은 아래 '병력 생성' 사용", AutoSize = true };
-    private readonly CheckBox _zeroUpkeep = new() { Text = "용병 비용·모집비 0 (친위대 유지비는 미지원 — 자원 탭 금고 유지로 보정)", AutoSize = true };
+    private readonly CheckBox _zeroUpkeep = new() { Text = "민병대 모집비 0", AutoSize = true };
     private readonly CheckBox _unlimitedSquads = new() { Text = "부대 수 상한 해제", AutoSize = true };
+    private readonly MercenaryTab _mercTab = new() { Dock = DockStyle.Fill };
 
     private readonly CheckBox _popEnabled = new() { Text = "인구 기능 사용", AutoSize = true };
     private readonly NumericUpDown _popMultiplier = new() { Minimum = 1, Maximum = 10, Value = 2, Width = 50 };
@@ -134,6 +135,10 @@ public sealed class MainForm : Form
         var reformRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
         reformRow.Controls.AddRange(new Control[] { _reformLabel, _reformButton });
         tabs.TabPages.Add(Page("군사", _milEnabled, _ignoreEquipment, _ignorePopulation, _zeroUpkeep, _unlimitedSquads, spawnRow, reformRow));
+        var mercPage = new TabPage("용병");
+        mercPage.Controls.Add(_mercTab);
+        tabs.TabPages.Add(mercPage);
+        _mercTab.ApplyRequested += (_, _) => Apply();
         var addFamilies = new Button { Text = "가족 추가", AutoSize = true };
         addFamilies.Click += (_, _) => SendCommand(ControlCommand.AddFamilies((int)_popAddCount.Value, DateTimeOffset.UtcNow, _popScope));
         _popRegion.Items.Add(new ScopeOption(null, "공통 (모든 내 영지)"));
@@ -287,6 +292,7 @@ public sealed class MainForm : Form
         _ignorePopulation.Checked = f.Military.IgnorePopulation;
         _zeroUpkeep.Checked = f.Military.ZeroUpkeep;
         _unlimitedSquads.Checked = f.Military.UnlimitedSquads;
+        _mercTab.LoadFrom(f.Mercenaries);
         _popEnabled.Checked = f.Population.Enabled;
         _popMultiplier.Value = Math.Clamp(f.Population.Multiplier, 1, 10);
         _popScope = null;
@@ -366,6 +372,7 @@ public sealed class MainForm : Form
         f.Military.IgnorePopulation = _ignorePopulation.Checked;
         f.Military.ZeroUpkeep = _zeroUpkeep.Checked;
         f.Military.UnlimitedSquads = _unlimitedSquads.Checked;
+        f.Mercenaries = _mercTab.Read();
         f.Population.Enabled = _popEnabled.Checked;
         f.Population.Multiplier = (int)_popMultiplier.Value;
         StorePopTarget();
@@ -538,6 +545,7 @@ public sealed class MainForm : Form
         };
         UpdateReform(status);
         RefreshSpawnRegions(status);
+        _mercTab.ShowStatus(status);
         if (status is null)
         {
             _statusText.Text = "status.json 없음";
