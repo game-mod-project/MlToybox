@@ -99,5 +99,14 @@ Test-Case 'deploy copies native dll when built and tolerates locked target' {
     } finally { if ($created) { Remove-Item $built } }
 }
 
+Test-Case 'lab.ps1 replaces __KEY__ tokens from -Vars' {
+    $g = New-FakeGame
+    $lab = New-Item -ItemType Directory -Force (Join-Path $g 'ManorLords\Binaries\Win64\ue4ss\Mods\MLToyboxLab\lab')
+    $src = Join-Path $env:TEMP "mltb-lab-$(Get-Random).lua"
+    Set-Content $src 'print("__NAME__", __COUNT__)' -Encoding utf8NoBOM -NoNewline
+    try { & "$PSScriptRoot\..\lab.ps1" -File $src -GameDir $g -TimeoutSec 1 -Vars @{ NAME = '토이박스'; COUNT = 3 } } catch { }
+    Assert-Equal (Get-Content -Raw (Join-Path $lab.FullName 'run.lua')) 'print("토이박스", 3)' 'substituted'
+}
+
 if ($script:failed -gt 0) { throw "$script:failed test(s) failed" }
 Write-Host 'ALL PASS'

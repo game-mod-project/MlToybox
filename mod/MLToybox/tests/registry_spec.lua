@@ -125,6 +125,12 @@ T.run({
     r.state.population = { families = 3 }
     T.eq(r:status(1, nil, nil).population.families, 3, "present")
   end,
+  status_includes_mercenaries_when_present = function()
+    local r = registry.new(); r:add(fake("a")); r:setInGame(true)
+    T.eq(r:status(1, nil, nil).mercenaries, nil, "absent")
+    r.state.mercenaries = { hiredMine = 2 }
+    T.eq(r:status(1, nil, nil).mercenaries.hiredMine, 2, "present")
+  end,
   status_includes_lord_values_when_present = function()
     local r = registry.new(); r:add(fake("a")); r:setInGame(true)
     T.eq(r:status(1, nil, nil).lord, nil, "absent")
