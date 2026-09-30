@@ -5,7 +5,7 @@ Manor Lords UE4SS Lua 모드 + .NET 8 제어 패널. 설계: `docs/superpowers/s
 ## Git 브랜치 전략
 - `main`은 보호 브랜치: 직접 커밋·푸시 금지.
 - `develop`이 통합 브랜치. 작업은 `develop`에서 `feat/*`·`fix/*`·`chore/*`·`docs/*`로 분기한다.
-- 작업 브랜치 → `develop`, 릴리스 시 `develop` → `main`은 `git merge --no-ff`로 병합한다(원격 GitHub 레포는 비공개, 병합 후 `develop`·`main`을 푸시).
+- 작업 브랜치 → `develop`, 릴리스 시 `develop` → `main`은 `git merge --no-ff`로 병합한다(원격: https://github.com/game-mod-project/MlToybox — 공개 레포. 병합 후 `develop`·`main`을 푸시).
 - 머지 전 테스트 통과를 확인한다.
 
 ## 작업 규칙 (이 레포)
