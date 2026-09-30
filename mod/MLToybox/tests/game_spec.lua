@@ -70,6 +70,28 @@ T.run({
     local list = game.regionList()
     T.eq(#list, 2, "two regions"); T.eq(list[2].key, "nus", "key"); T.eq(list[2].name, "Haderwand", "name")
   end,
+  merc_screen_is_the_live_widget_not_the_template = function()
+    local function widget(full) return F.object({ GetFullName = function() return full end }) end
+    local template = widget("mercenaryScreen_C /Game/UI/HUD/MainUICPP.MainUICPP_C:WidgetTree.mercenaryScreen")
+    local live = widget("mercenaryScreen_C /Engine/Transient.GameEngine_1:BP_MLGameInstance_C_1.MainUICPP_C_1.WidgetTree_1.mercenaryScreen")
+    install({ mercenaryScreen_C = { template, live } })
+    T.eq(game.mercScreen(), live, "live widget")
+    install({ mercenaryScreen_C = { template, F.invalid() } })
+    T.eq(game.mercScreen(), nil, "template and invalid objects are ignored")
+    install({})
+    T.eq(game.mercScreen(), nil, "none")
+  end,
+  region_by_key_finds_only_player_regions = function()
+    local function named(tag, owner)
+      local r = F.object({ ownerPawn = owner })
+      r.regionUniqueTag = { ToString = function() return tag end }
+      return r
+    end
+    local pawn, other = F.object(), F.object()
+    local gold, nus, theirs = named("gold", pawn), named("nus", pawn), named("zzz", other)
+    install({ MyPawnCPP_BP3_C = { pawn }, BP_Region_C = { gold, theirs, nus } })
+    T.eq(game.regionByKey("nus"), nus, "my region"); T.eq(game.regionByKey("zzz"), nil, "someone else's region"); T.eq(game.regionByKey(nil), nil, "no key")
+  end,
   unwrap_handles_wrapped_and_plain = function()    T.eq(game.unwrap(F.wrap(5)), 5, "wrapped"); T.eq(game.unwrap(7), 7, "plain")
   end,
 })
