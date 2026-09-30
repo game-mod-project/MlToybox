@@ -21,7 +21,20 @@ local function setup()
 end
 
 T.run({
-  no_materials_clears_stats_and_unbuilt_only = function()
+  no_region_limit_clears_max_in_region = function()
+    -- 실측: 수비용 탑(manor_keep_lv1) 등 9개 행이 maxInRegion=1, 나머지 93개 행은 0(제한 없음)
+    local rows = setup()
+    rows["57"] = { constructionGoods = F.array({}), maxInRegion = 1 }
+    rows["3"].maxInRegion = 0
+    build.enable({}, { enabled = true, noRegionLimit = true })
+    T.eq(rows["57"].maxInRegion, 0, "limit removed"); T.eq(rows["3"].maxInRegion, 0, "unlimited stays")
+  end,
+  no_region_limit_off_leaves_data = function()
+    local rows = setup()
+    rows["57"] = { constructionGoods = F.array({}), maxInRegion = 1 }
+    build.enable({}, { enabled = true, noRegionLimit = false })
+    T.eq(rows["57"].maxInRegion, 1, "untouched")
+  end,  no_materials_clears_stats_and_unbuilt_only = function()
     local rows, unbuilt, built = setup()
     build.enable({}, { enabled = true, noMaterials = true })
     T.eq(#rows["3"].constructionGoods, 0, "stats row"); T.eq(#rows["72"].constructionGoods, 0, "stats row 2")

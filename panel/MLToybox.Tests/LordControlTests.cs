@@ -72,6 +72,17 @@ public class LordControlTests
     }
 
     [Fact]
+    public void BuildControl_WritesNoRegionLimit()
+    {
+        var c = NewClient();
+        var doc = new ControlDocument();
+        doc.Features.Build.NoRegionLimit = true;
+        c.SaveControl(doc);
+        using var json = JsonDocument.Parse(File.ReadAllText(c.ControlPath));
+        Assert.True(json.RootElement.GetProperty("features").GetProperty("build").GetProperty("noRegionLimit").GetBoolean());
+    }
+
+    [Fact]
     public void ReadStatus_ParsesLordValues()
     {
         var c = NewClient();

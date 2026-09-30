@@ -58,6 +58,7 @@ public sealed class MainForm : Form
     private readonly CheckBox _instantBuild = new() { Text = "즉시 완공 (네이티브 DLL)", AutoSize = true };
     private readonly CheckBox _instantRepair = new() { Text = "즉시 수리", AutoSize = true };
     private readonly CheckBox _noMaterials = new() { Text = "자재 불필요 (건설 자재 없이 공사)", AutoSize = true };
+    private readonly CheckBox _noRegionLimit = new() { Text = "지역당 개수 제한 해제 (영주 저택 모듈·세금 징수소·장작/식량 수레. 끈 뒤에는 게임을 다시 켜야 원래대로)", AutoSize = true };
 
     private readonly CheckBox _upgradeEnabled = new() { Text = "업그레이드 조건·비용·해금 무시", AutoSize = true };
 
@@ -116,7 +117,7 @@ public sealed class MainForm : Form
         }
         tabs.TabPages.Add(Page("영주", _lordEnabled, _lordTreasury.Row(), _lordInfluence.Row(), _lordFavour.Row(),
             new Label { Text = "체크한 항목은 목표값 아래로 내려가면 목표까지 채웁니다(더 많으면 그대로). 체크 해제 = 관리 안 함." + Environment.NewLine + "'지금 설정'은 체크와 상관없이 입력한 값으로 한 번 정확히 맞춥니다(내리기도 가능).", AutoSize = true }));
-        tabs.TabPages.Add(Page("건설", _buildEnabled, _ignorePlacement, _instantBuild, _instantRepair, _noMaterials));
+        tabs.TabPages.Add(Page("건설", _buildEnabled, _ignorePlacement, _instantBuild, _instantRepair, _noMaterials, _noRegionLimit));
         tabs.TabPages.Add(Page("업그레이드", _upgradeEnabled));
         _spawnUnit.Items.AddRange(UnitCatalog.Units.Cast<object>().ToArray());
         _spawnUnit.SelectedIndex = 1;
@@ -279,6 +280,7 @@ public sealed class MainForm : Form
         _instantBuild.Checked = f.Build.InstantBuild;
         _instantRepair.Checked = f.Build.InstantRepair;
         _noMaterials.Checked = f.Build.NoMaterials;
+        _noRegionLimit.Checked = f.Build.NoRegionLimit;
         _upgradeEnabled.Checked = f.Upgrade.Enabled;
         _milEnabled.Checked = f.Military.Enabled;
         _ignoreEquipment.Checked = f.Military.IgnoreEquipment;
@@ -357,6 +359,7 @@ public sealed class MainForm : Form
         f.Build.InstantBuild = _instantBuild.Checked;
         f.Build.InstantRepair = _instantRepair.Checked;
         f.Build.NoMaterials = _noMaterials.Checked;
+        f.Build.NoRegionLimit = _noRegionLimit.Checked;
         f.Upgrade.Enabled = _upgradeEnabled.Checked;
         f.Military.Enabled = _milEnabled.Checked;
         f.Military.IgnoreEquipment = _ignoreEquipment.Checked;

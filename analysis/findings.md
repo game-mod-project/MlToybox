@@ -197,3 +197,9 @@
 ## 패널이 상태를 못 읽던 문제 (2026-09-30)
 - 모드의 JSON 인코더는 빈 Lua 테이블을 `[]`로 쓴다. `spawn.byUnit`이 비면 `"byUnit":[]`가 되는데, 패널은 이 필드를 `Dictionary<string,int>`로 읽다가 실패하고 상태 전체를 null로 처리했다(실측 오류: `$.spawn.byUnit`). 그 결과 패널은 "연결 안 됨"을 띄우고, "현재" 값은 "-"로, 영지 목록은 기본값만 보였다. 생성 분대 재구성 기능을 넣은 뒤 해제된 생성 분대가 없는 동안 항상 이 상태였다.
 - 수정: 패널 JSON 옵션에, 문자열 키 사전 자리에 온 배열을 빈 사전으로 읽는 변환기를 추가했다.
+
+## 지역당 건물 개수 제한 (2026-09-30)
+- `buildingStats` 표의 `FStat.maxInRegion`(0x2D8)이 지역당 최대 개수다. 실측 102개 행 가운데 9개가 1이고 나머지 93개는 0이다(0 = 제한 없음, 주택 등).
+- 1인 행: 57 `manor_keep_lv1`(수비용 탑, garrison 12), 58 Tax Collector, 81 `manor_palace_lv3`, 83 `manor_keep_lv3`, 98 `manor_palace_lv1`, 102 `firewood_cart`, 103 `food_cart`, 474 `manor_palace_lv2`, 475 `manor_keep_lv2`.
+- 툴팁의 "최대 수행원 규모가 12만큼 증가"는 `garrisonLimit` 12와 일치한다.
+- 옵션 `build.noRegionLimit`은 이 값을 0으로 만든다. 데이터 표 변경은 메모리에만 남는다.

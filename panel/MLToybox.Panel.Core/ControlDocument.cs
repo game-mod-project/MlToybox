@@ -68,6 +68,7 @@ public sealed class BuildControl
     public bool InstantBuild { get; set; } = true;
     public bool InstantRepair { get; set; } = true;
     public bool NoMaterials { get; set; } = true;
+    public bool NoRegionLimit { get; set; } = true;   // buildingStats.maxInRegion(지역당 개수 제한) 해제
 }
 
 public sealed class UpgradeControl

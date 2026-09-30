@@ -23,6 +23,12 @@ local function clearConstructionSites()
 end
 
 function M.apply(_, settings)
+  -- 지역당 개수 제한: buildingStats.maxInRegion (실측 9개 행이 1 — 영주 저택 모듈(수비용 탑 등)·세금 징수소·장작/식량 수레, 나머지는 0 = 제한 없음)
+  if settings.noRegionLimit then
+    datatable.forEachRow("buildingStats", function(_, row)
+      if row.maxInRegion ~= 0 then row.maxInRegion = 0 end
+    end)
+  end
   if not settings.noMaterials then return end
   datatable.forEachRow("buildingStats", function(_, row) clear(row.constructionGoods) end)
   clearConstructionSites()
