@@ -19,6 +19,19 @@ public static class MercCompanyRules
 
     public static IReadOnlyList<UnitOption> Units => UnitCatalog.Units.Where(u => !ExcludedUnits.Contains(u.Id)).ToList();
 
+    public const string FirstRegionLabel = "내 첫 영지";
+
+    // 도착 영지 선택지: "내 첫 영지"(Key=null), 내 영지들, 그리고 keep 의 키 가운데 영지 목록에 없는 것.
+    // 게임이 꺼져 있거나 그 영지를 잃어 목록에 없는 키도 남겨야, 용병단을 고쳐 등록할 때 저장된 도착 영지가 사라지지 않는다
+    public static IReadOnlyList<ScopeOption> RegionOptions(IEnumerable<RegionInfo> regions, IEnumerable<string?> keep)
+    {
+        var options = new List<ScopeOption> { new(null, FirstRegionLabel) };
+        options.AddRange(regions.Select(r => new ScopeOption(r.Key, $"{r.Name} ({r.Key})")));
+        foreach (var key in keep)
+            if (key is not null && options.All(o => o.Key != key)) options.Add(new ScopeOption(key, key));
+        return options;
+    }
+
     // 문제가 없으면 null, 있으면 사용자에게 보여 줄 이유. others 에 c 자신이 들어 있어도 된다
     public static string? Validate(MercCompany c, IEnumerable<MercCompany> others)
     {

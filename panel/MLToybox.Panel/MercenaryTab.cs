@@ -14,7 +14,7 @@ public sealed class MercenaryTab : UserControl
         public override string ToString() => MercCompanyRules.Summary(Enumerable.Repeat(Id, Count));
     }
 
-    private const string FirstRegionLabel = "내 첫 영지";
+    private const string FirstRegionLabel = MercCompanyRules.FirstRegionLabel;
 
     private readonly CheckBox _enabled = new() { Text = "용병 기능 사용 (고용 창 자동 보충)", AutoSize = true };
     private readonly CheckBox _refund = new() { Text = "내 용병단 고용비 환급, 유지비 0", AutoSize = true };
@@ -39,6 +39,7 @@ public sealed class MercenaryTab : UserControl
     private MercCompany? _editing;                 // null = 새 용병단
     private List<string> _editUnits = new();
     private string _regionsKey = "";
+    private List<RegionInfo> _regions = new();     // 마지막으로 받은 내 영지 목록(게임 밖이면 비어 있다)
     private bool _loading;
 
     public MercenaryTab()
@@ -102,6 +103,7 @@ public sealed class MercenaryTab : UserControl
         _refund.Checked = control.Refund;
         _lock.Checked = control.LockFromAi;
         _companies = control.Companies.Select(Clone).ToList();
+        RebuildRegionOptions();
         ClearEditor();
         RebuildGrid(null);
     }
@@ -121,17 +123,24 @@ public sealed class MercenaryTab : UserControl
         if (key != _regionsKey)
         {
             _regionsKey = key;
-            var selected = (_region.SelectedItem as ScopeOption)?.Key;
-            var options = new List<ScopeOption> { new(null, FirstRegionLabel) };
-            options.AddRange(regions.Select(r => new ScopeOption(r.Key, $"{r.Name} ({r.Key})")));
-            _region.BeginUpdate();
-            _region.Items.Clear();
-            _region.Items.AddRange(options.Cast<object>().ToArray());
-            _region.EndUpdate();
-            _region.SelectedIndex = Math.Max(0, options.FindIndex(o => o.Key == selected));
+            _regions = regions;
+            RebuildRegionOptions();
             RebuildGrid(_editing);   // 영지 이름 표시를 새 목록으로 갱신
         }
         _status.Text = StatusText(status);
+    }
+
+    // 도착 영지 선택지를 다시 만든다. 등록된 용병단의 도착 영지와 지금 고른 값은 영지 목록에 없어도 남긴다
+    // (게임이 꺼져 있을 때 용병단을 고쳐 등록해도 저장된 도착 영지가 "내 첫 영지"로 바뀌지 않게)
+    private void RebuildRegionOptions()
+    {
+        var selected = (_region.SelectedItem as ScopeOption)?.Key;
+        var options = MercCompanyRules.RegionOptions(_regions, _companies.Select(c => c.Region).Append(selected)).ToList();
+        _region.BeginUpdate();
+        _region.Items.Clear();
+        _region.Items.AddRange(options.Cast<object>().ToArray());
+        _region.EndUpdate();
+        _region.SelectedIndex = Math.Max(0, options.FindIndex(o => o.Key == selected));
     }
 
     private static string StatusText(StatusDocument? status)

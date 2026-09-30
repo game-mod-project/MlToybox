@@ -190,4 +190,19 @@ public class MercenaryTests
         Assert.DoesNotContain(ids, id => MercCompanyRules.ExcludedUnits.Contains(id));
         Assert.Contains("mercenary_infantry", ids);
     }
+
+    [Fact]
+    public void Rules_RegionOptionsKeepSavedKeysThatAreNotInTheRegionList()
+    {
+        var regions = new[] { new RegionInfo { Key = "gold", Name = "Mandlach" } };
+        var options = MercCompanyRules.RegionOptions(regions, new string?[] { "nus", "gold", null, "nus" });
+        Assert.Equal(new string?[] { null, "gold", "nus" }, options.Select(o => o.Key));
+        Assert.Equal(MercCompanyRules.FirstRegionLabel, options[0].Label);
+        Assert.Equal("Mandlach (gold)", options[1].Label);
+        Assert.Equal("nus", options[2].Label);   // 이름을 모르는 영지는 키로 보여 준다
+
+        // 게임이 꺼져 있어 영지 목록이 없어도, 저장된 도착 영지는 선택지로 남는다
+        var offline = MercCompanyRules.RegionOptions(Array.Empty<RegionInfo>(), new string?[] { "nus" });
+        Assert.Equal(new string?[] { null, "nus" }, offline.Select(o => o.Key));
+    }
 }
