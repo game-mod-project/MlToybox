@@ -298,3 +298,35 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 켜기 전에 고용한 용병단이 로드 직후에 잘못 환급되는지 실측: 환급을 끈 채 커스텀을 고용해(`hired 12 cost=3000`, 국고 145,500) `saveGame_900`에 저장하고, 환급을 켠 뒤 게임을 다시 켜 그 세이브를 불러왔다. 로드 뒤 `refunded=0`, `hired 12 cost=0`, 국고 145,500. 환급 없이 0으로만 만들었다(1회 측정).
   - 이 과정에서 `saveGame_900`의 내용이 바뀌었다(M4 때의 새 게임 → 실제 게임에 테스트 고용을 더한 상태). 로드 뒤 목록은 `available 1`(커스텀, 10,000,000)로 유지됐다.
 - 확인하지 않은 것: 고용 창과 부대 패널에서 커스텀 용병단이 화면에 어떻게 보이는지(이름, 깃발), 게임의 새 용병단 알림이 실제로 뜨는지.
+
+## 커스텀 용병단 깃발 (2026-10-01)
+`features.mercenaries.companies[].banner`에 용병 표 용병단 이름을 주면 그 행의 `banner`·`colorA/B`·`emblemA/B`를 카드에 쓴다.
+- `saveGame_8`에서 `banner = "greencaps"`로 등록한 카드: `banner=greencaps.greencaps colors(1,5,1,1)`. 고용한 뒤 `hiredMercs`의 항목도 같았고, `saveGame_900`에 저장하고 게임을 다시 켜 불러온 뒤에도 같았다.
+- 표에서 `greencaps`와 `the_huntsmen`(Name `huntsmen`)은 같은 깃발 그림(`greencaps.greencaps`)과 같은 색(1,5,1,1)을 쓴다. 그래서 칸의 깃발을 이름 하나로 되읽으면 고른 이름과 어긋나 매 점검마다 다시 쓰게 된다. 칸은 그 묶음을 가진 용병단 이름 **목록**으로 되읽고, 고른 이름이 목록에 있으면 같은 것으로 본다.
+- 화면에서 깃발이 어떻게 보이는지는 확인하지 않았다.
+
+## 수행원 꾸미기 — 모드가 만든 분대에 쓸 수 있는가 (2026-10-01, 스파이크)
+질문: 모드로 만든 분대(`spawnArmy`, 커스텀 용병 고용)에 수행원 병종이 있을 때 게임의 수행원 꾸미기 화면을 쓸 수 있는가. `saveGame_8`(영지 gold·Lei·nus)에서 쟀다. 저장은 `saveGame_900`에만 했다.
+
+### 구조 (덤프)
+- 꾸미기 화면 `retinueEditor_C`는 부대 명령 버튼 `W_HUD_ArmyCommandList.Skill_CustomizeRetinue` → `W_HUD_ArmySkillButtonV2_C:OpenRetinueEditor()` → `retinueEditor:Open(ManorRef)`로 열린다. 화면의 필드: `squadID`, `ManorRef`, `selectedRegion`, `retinue`(`TArray<ASMUnit*>`), `Squad`(`FSquad`), `selectedRetainer`.
+- 영지 `ARegion`에 `retinueSquadID`(+0x508)와 `retinueName`이 있다. 저택 `ASMBuildingMaster`에 `getBoundRetinue()`, `canHireRetinue()`, `GetRetinueHireTreasuryCost()`, `hireExtraRetinue()`가 있다. 폰에 `addRetinueSquad(region)`이 있다.
+- 외형은 분대가 아니라 병사(`ASMUnit`)에 있다: `Equipment`(FEquipment 7개 int), `equipmentMeshVariations`·`equipmentTextureVariations`(`TMap<EEquipmentSlot, uint8>`), `equipmentColorSchemeUVs`(`TMap<EEquipmentSlot, FVector>`), `DisplayName`, `Home`. 함수 `setVAMPColorSchemeUVsForSlot(slot, vec)`, `SetVAMPVariationsToEquipment()`.
+
+### 실측
+| # | 내용 | 결과 |
+|---|---|---|
+| R1 | 영지별 수행원 | 영지마다 수행원 분대 1개(`squadType=3`, `unitType=retinue_tier1`, `unitArr` 0개 — 수행원은 집결 전에는 저택에 있다). `maxSize` 24/24/12. 저택에 묶인 수행원 5명, `canHireRetinue=true`, 비용 50 |
+| R1b | 저택에 묶인 수행원 | 이름 있음(Mathes, Fritz, …), `Home`=저택, `assignedSquadID`=수행원 분대, 집에서는 `Equipment=[164,281,0,0,0,292,0]`, 슬롯 7개의 무늬·질감·색 값이 있음 |
+| R2 | 모드 방식 생성(`spawnArmy(…, {retinue_tier1}, pawn, -1, 0)`) | `squadType=0`, 병사 36명, 이름 없음, `Home` 없음, `Equipment=[164,281,312,157,247,276,247]` |
+| R3 | 게임 꾸미기 화면을 모드 분대로 열기 | `region.retinueSquadID`를 모드 분대 번호로 잠깐 바꾸고 `editor:Open(manor)` → `squadID=63`, `retinue=36`(그 분대 병사), `Squad=63/retinue_tier1/n36`. `Set Squad to Squad ID`·`populateRetainerGrid`·`Close` 정상. 번호를 되돌리면 원래대로 |
+| R6 | 열린 화면의 조작이 모드 병사에게 가는가 | `setSelectedRetainer(모드 병사)` → `selectedRetainer`가 그 병사. `upgradeCurrentRetainersArmor(false)` → `isCurrentRetainerUpgraded` false→true(가격 26. 국고 HUD 값은 148,500 그대로). 무늬 버튼·`propagateColorChange`를 코드로 부른 것은 병사 값을 바꾸지 않았다(UI 상태를 쓰는 함수라 이 방법으로는 못 잰다). 이름 입력 핸들러를 Lua 문자열로 부르자 게임이 두 번 튕겼다(`EXCEPTION_ACCESS_VIOLATION reading 0x70`) — 호출 방식 문제이지 기능의 증거가 아니다 |
+| R4 | 외형 값 복사 | 실제 수행원(Mathes)의 `DisplayName`, 무늬·질감 맵(`Add`), 색(`setVAMPColorSchemeUVsForSlot`)을 모드 병사에게 쓰고 `SetVAMPVariationsToEquipment()` → 되읽은 값이 원본과 같음 |
+| R7 | 복사한 값의 저장·로드 | `saveGame_900`에 저장, 게임을 다시 켜 불러온 뒤 그 병사(`MLT Mathes`)의 무늬·질감·색이 그대로. (이 병사는 커스텀 용병으로 고용한 분대의 병사였다 — 모드가 만든 집 없는 병사라는 점은 같다) |
+| R5 | 게임의 수행원 증원 | `manor:hireExtraRetinue()` → 묶인 수행원 5→6명(새 이름 Heintz)이 바로 생김. 국고 HUD 값 변화 없음 |
+
+### 판단
+- 게임의 꾸미기 화면은 영지의 `retinueSquadID`가 가리키는 분대를 대상으로 열리고, 모드 분대를 가리키게 하면 그 분대 병사 36명을 대상으로 열린다. 선택과 갑옷 업그레이드 함수는 그 병사에게 적용됐다. 실제 화면에서 버튼·이름 입력·색 선택이 동작하는지는 사람이 눌러 봐야 한다.
+- 외형 값을 병사에게 직접 쓰는 것은 되고 세이브에 남는다. 화면에 어떻게 보이는지는 확인하지 않았다.
+- 대안: 게임 자체의 수행원 증원(`hireExtraRetinue`)으로 진짜 수행원을 늘리면 꾸미기는 원래 기능 그대로다(영지당 최대 24명).
+- 확인하지 않은 것: `retinueSquadID`를 바꿔 둔 동안 게임 로직(집결·귀환)이 어떻게 되는지, 화면의 `Size/maxSize`(항상 0/0으로 읽힘)의 뜻, 36명이 화면 격자에 다 나오는지.
