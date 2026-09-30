@@ -93,8 +93,18 @@ public sealed class MercenaryTab : UserControl
             Row(register, _error),
             _status,
         });
+        // 표는 탭 너비를 따라간다. 고정 너비면 창이 좁을 때 "도착 영지" 열이 잘리고 가로 스크롤이 생긴다
+        root.ClientSizeChanged += (_, _) => FitGrid(root);
         Controls.Add(root);
         ClearEditor();
+    }
+
+    private const int GridMinWidth = 420;
+
+    private void FitGrid(ScrollableControl root)
+    {
+        var width = root.ClientSize.Width - root.Padding.Horizontal - _grid.Margin.Horizontal;
+        _grid.Width = Math.Max(GridMinWidth, width);
     }
 
     public void LoadFrom(MercenariesControl control)
