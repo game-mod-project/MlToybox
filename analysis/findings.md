@@ -238,14 +238,34 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 이름 제외와 우회: `greencaps`를 고용한 뒤 reroll 30회에 `greencaps`는 0회였다. 표의 그 행 `Name`을 `greencaps#2`로 바꾸자 30회 가운데 10회 나왔다. 표 행 이름을 바꾸면 고용 중인 용병단도 다시 후보가 된다.
 
 ### 미확인
-- 커스텀 항목(목록·고용 중)이 세이브와 로드를 거쳐 유지되는지. 덤프상 `FSavedMercenaryCompany`는 같은 필드를 값으로 저장한다.
+- ~~커스텀 항목(목록·고용 중)이 세이브와 로드를 거쳐 유지되는지.~~ 유지된다(아래 "용병 실측 M1~M5"의 M4).
 - `wayward_sons`가 고용 기록 없이 목록에서 사라진 원인.
 - reroll이 제외하는 두 번째 특성 이름.
 - 분대가 없는 `hiredMercs` 항목이 정리되는 시점.
 
 ### 개발 절차 메모
-- Lab으로 메인 메뉴에서 세이브를 불러올 수 있다(화면 조작 불필요).
-  1. 뷰포트에 있는 `mainMenu_widget_C`에 `SwitchToLoadScreen(false)`를 부른다.
-  2. 몇 초 뒤 `LoadMenuWidget.SortedSlotsByDate`에서 `Descriptor.saveSlot`으로 슬롯을 찾는다.
-  3. `LoadGame({ SlotIndex = slot.SlotIndex, Descriptor = slot.Descriptor })`를 부른다.
+- Lab으로 메인 메뉴에서 세이브를 불러올 수 있다(화면 조작 불필요). 도구: `tools/lab-load.ps1 -Slot <슬롯> [-Start]`.
+  1. `GameplayStatics:LoadGameFromSlot("<슬롯>_descr", 0)`으로 기술자(`UMLSaveGameDescr`)를 읽는다.
+  2. 게임 인스턴스(`BP_MLGameInstance_C`)의 `savefileToLoad`에 슬롯 이름을 쓴다.
+  3. 뷰포트에 있는 `mainMenu_widget_C`에 `LoadGame({ SlotIndex = <번호>, Descriptor = <기술자> })`를 부른다. 번호는 autosave 0, quicksave 1, `saveGame_N`은 N + 2다.
+- **정정(2026-09-30 저녁)**: 처음 적었던 절차(`SwitchToLoadScreen` → `SortedSlotsByDate` → `LoadGame`)는 세이브를 불러오지 않고 **새 게임을 시작했다**. `LoadGame`은 화면 전환만 하고, `savefileToLoad`가 비어 있으면 새 게임이 된다. 불러올 때마다 시작 영지가 달랐고 가구가 5였다(실제 `saveGame_8`은 영지 3개, 가구 155, 국고 148,500).
+  - 따라서 이 절에서 게임을 다시 켠 뒤에 한 실측(커스텀 항목 고용, 이름 제외와 우회 등)은 `saveGame_8`이 아니라 새 게임에서 한 것이다. 엔진과 위젯의 동작을 본 것이라 결론은 그대로다.
+  - "진행된 세이브의 상태"(목록 0개, 고용 4개, 국고 148,500)는 사용자가 직접 불러온 게임에서 잰 값이고, 고친 도구로 `saveGame_8`을 불러와 같은 값을 다시 확인했다.
+- 로드 화면은 번호가 이어진 슬롯만 찾는다. `saveGame_900`은 목록(`SortedSlotsByDate`)에 나오지 않지만 위 절차로는 불러와진다.
 - 메인 메뉴의 `menuButton_continue`는 보이지 않는 상태였다(`continue()` 경로는 쓰지 않았다).
+
+## 용병 실측 M1~M5 (2026-09-30)
+구현 계획 `docs/superpowers/plans/2026-09-30-mercenary-companies.md` Task 1의 결과다. M1, M2, M3, M5는 새 게임(맵 LargeLake)에서, M4는 그 게임을 `saveGame_900`에 저장했다가 게임을 다시 켜고 불러와서 쟀다(위 정정 참고).
+
+| # | 항목 | 결과 | 근거 |
+|---|---|---|---|
+| M1 | 표 행의 깃발·특성을 목록 칸에 쓰기 | PASS | `wayward_sons` 행을 1번 칸에 쓴 뒤 `traits=[excellent_marksmen,melee_capable]`, `banner=.../wayward_sons.wayward_sons`, 색·문장 `1 3 1 1`로 행과 같았다. 특성이 2개 있는 칸에 `traits:Empty()` → 0개. 게임은 튕기지 않았다. |
+| M2 | 민병대·친위대 병종의 용병 고용 경로 생성 | 8종 모두 PASS | `hired 0 name=MLT M2 squads=8 mine=8 units=[militia:32,spearMilitia:32,militiaPole:32,militiaFoot:32,bowMilitia:32,crossbowMilitia:32,retinue_tier1:36,retinue_tier3:36]` |
+| M3 | 부대 패널 위젯의 커스텀 이름 | PASS | `W_HUD_MercenaryCompanyV2_C name=MLT M2`(저장·로드 뒤에도 같음). `hiredMercenaryCompanyBanner_C`에서는 이름을 읽지 못했다. 화면에 실제로 어떻게 보이는지는 확인하지 않았다. |
+| M4 | 저장·로드 뒤 커스텀 목록 칸과 고용 중 용병단 유지 | PASS | 다시 불러온 뒤 `slot 1 name=MLT M4 list cost=1234 arrivesIn=1 units=[mercenary_infantry,mercenary_crossbowmen]`, `hired 0 name=MLT M2 cost=0 squads=8 mine=8` |
+| M5 | 고용 창·확인 창 `IsVisible()` | PASS | `closed screen=false confirm=false` → `open screen=true confirm=false` → `confirming screen=true confirm=true` → `after cancel screen=true confirm=false`, 취소로 고용이 생기지 않음, 닫고 3초 뒤 `screen visible=false` |
+
+- 확인 창의 취소 이벤트는 `BndEvt__HireConfirmation_menuButton_1_K2Node_ComponentBoundEvent_3_onReleased__DelegateSignature`다.
+- 저장은 `MyPawnCPP_BP3_C:SaveToDiskWithThumbnail("saveGame_900", "MLToybox test")`로 했다. 파일 5개(`.sav`, `_descr.sav`, `.png`, `_coat_1.png`, `_coat_2.png`)가 생긴다.
+- 테스트 세이브 `saveGame_900`("MLToybox test")이 세이브 폴더에 남아 있다. 게임의 로드 화면에는 보이지 않는다.
+- 실제 `saveGame_8`의 용병 상태: 목록 0개. 고용 중 4개(`battle_brothers` 분대 0, `brotherhood_of_the_forest` 내 분대 1, `brigands` 분대 0, `vultures` AI 분대 2).
