@@ -81,6 +81,15 @@ T.run({
     install({})
     T.eq(game.mercScreen(), nil, "none")
   end,
+  retinue_editor_is_the_live_widget_not_the_template = function()
+    local function widget(full) return F.object({ GetFullName = function() return full end }) end
+    local template = widget("retinueEditor_C /Game/UI/HUD/MainUICPP.MainUICPP_C:WidgetTree.retinueEditor")
+    local live = widget("retinueEditor_C /Engine/Transient.GameEngine_1:BP_MLGameInstance_C_1.MainUICPP_C_1.WidgetTree_1.retiuneEditor_C_0")
+    install({ retinueEditor_C = { template, live } })
+    T.eq(game.retinueEditor(), live, "live widget")
+    install({})
+    T.eq(game.retinueEditor(), nil, "none")
+  end,
   region_by_key_finds_only_player_regions = function()
     local function named(tag, owner)
       local r = F.object({ ownerPawn = owner })

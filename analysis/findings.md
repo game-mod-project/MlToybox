@@ -330,3 +330,17 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 외형 값을 병사에게 직접 쓰는 것은 되고 세이브에 남는다. 화면에 어떻게 보이는지는 확인하지 않았다.
 - 대안: 게임 자체의 수행원 증원(`hireExtraRetinue`)으로 진짜 수행원을 늘리면 꾸미기는 원래 기능 그대로다(영지당 최대 24명).
 - 확인하지 않은 것: `retinueSquadID`를 바꿔 둔 동안 게임 로직(집결·귀환)이 어떻게 되는지, 화면의 `Size/maxSize`(항상 0/0으로 읽힘)의 뜻, 36명이 화면 격자에 다 나오는지.
+
+## 수행원 꾸미기 기능 인게임 검증 (2026-10-01, saveGame_8)
+`customizeRetinue` 명령(분대 63 = `spawnArmy`로 만든 `retinue_tier1` 36명, 영지 nus)으로 확인했다. 저장하지 않았다.
+
+| 항목 | 결과 |
+|---|---|
+| 상태 보고 | `status.retinue.squads = [{id 63, retinue_tier1, 36, spawned}]`. 진짜 수행원 분대(22, 33, 62)와 민병대 분대는 없다 |
+| 진짜 수행원 분대(22)에 명령 | `squad 22 is not a retinue squad made by the mod` |
+| 열기 | 결과 `{ok, squad 63}`. 화면 `visible=true squadID=63 retinue=36`, 선택된 병사가 분대 63 소속. 영지 nus의 `retinueSquadID` 22 → 63, 다른 영지는 그대로. `status.retinue.editing = 63` |
+| 열려 있는 동안 다시 명령 | `retinue editor is already open` |
+| 닫기(`editor:Close()`) | 3초 안에 `retinueSquadID` 63 → 22 복원, `editing` 없음. 기능 오류 없음 |
+| 일시정지 | 이 방법으로 연 화면에서는 `IsGamePaused=false`였다(용병 고용 창과 다르다) |
+
+- 화면의 무늬·색·이름 조작을 사람이 눌렀을 때의 동작은 확인하지 않았다.
