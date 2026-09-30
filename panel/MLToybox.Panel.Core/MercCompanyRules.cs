@@ -19,6 +19,16 @@ public static class MercCompanyRules
 
     public static IReadOnlyList<UnitOption> Units => UnitCatalog.Units.Where(u => !ExcludedUnits.Contains(u.Id)).ToList();
 
+    // 깃발 선택지: 용병 표 용병단 이름을 정렬한 것
+    public static readonly IReadOnlyList<string> BannerNames = VanillaNames.OrderBy(n => n, StringComparer.Ordinal).ToList();
+
+    // 깃발 입력을 표의 이름으로 맞춘다. 모르는 이름이나 빈 값은 null(칸의 깃발 그대로)
+    public static string? NormalizeBanner(string? banner)
+    {
+        var name = banner?.Trim() ?? "";
+        return BannerNames.FirstOrDefault(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+    }
+
     public const string FirstRegionLabel = "내 첫 영지";
 
     // 도착 영지 선택지: "내 첫 영지"(Key=null), 내 영지들, 그리고 keep 의 키 가운데 영지 목록에 없는 것.

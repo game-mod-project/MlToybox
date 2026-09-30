@@ -45,7 +45,10 @@ function M.validate(companies, ctx)
         end
         local units = {}
         for i, u in ipairs(c.units) do units[i] = u end
-        valid[#valid + 1] = { name = name, units = units, cost = math.floor(c.cost), region = region }
+        -- 깃발: 용병 표 용병단의 이름. 모르는 이름이면 칸에 있던 깃발을 그대로 둔다(nil)
+        local banner = nil
+        if type(c.banner) == "string" and ctx.vanillaNames[trim(c.banner):lower()] then banner = trim(c.banner):lower() end
+        valid[#valid + 1] = { name = name, units = units, cost = math.floor(c.cost), region = region, banner = banner }
       end
     end
   end
@@ -64,7 +67,13 @@ end
 local function same(e, d)
   if e.name ~= d.name or e.cost ~= d.cost then return false end
   if d.kind == "custom" then
-    return sameUnits(e.units or {}, d.company.units) and e.region == d.company.region
+    if not sameUnits(e.units or {}, d.company.units) or e.region ~= d.company.region then return false end
+    -- 깃발을 골랐으면, 칸의 깃발·색을 쓰는 표 용병단(e.banner 목록) 가운데 고른 이름이 있어야 한다
+    if d.company.banner == nil then return true end
+    for _, name in ipairs(e.banner or {}) do
+      if name == d.company.banner then return true end
+    end
+    return false
   end
   return true
 end

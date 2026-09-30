@@ -73,13 +73,50 @@ function M.hiredNames(engine)
   return out
 end
 
+-- 용병 표 행의 깃발 묶음(그림 객체 주소, 색, 문장). 여러 행이 같은 그림을 쓸 수 있다
+local function bannerSets()
+  local out = {}
+  datatable.forEachRow("mercenaries", function(_, row)
+    if safe.valid(row.banner) then
+      out[#out + 1] = { name = str(row.Name):lower(), addr = row.banner:GetAddress(), colorA = row.colorA, colorB = row.colorB, emblemA = row.emblemA, emblemB = row.emblemB }
+    end
+  end)
+  return out
+end
+
+local function sameBanner(c, set)
+  return safe.valid(c.banner) and c.banner:GetAddress() == set.addr
+    and c.colorA == set.colorA and c.colorB == set.colorB and c.emblemA == set.emblemA and c.emblemB == set.emblemB
+end
+
+-- 칸의 깃발·색과 같은 묶음을 가진 표 용병단 이름들(정렬). 없으면 nil
+local function bannerNames(c, sets)
+  local out = {}
+  for _, set in ipairs(sets) do
+    if sameBanner(c, set) then out[#out + 1] = set.name end
+  end
+  if #out == 0 then return nil end
+  table.sort(out)
+  return out
+end
+
+-- 이름(소문자)이 name 인 용병 표 행
+local function rowNamed(name)
+  local found = nil
+  datatable.forEachRow("mercenaries", function(_, row)
+    if not found and str(row.Name):lower() == name then found = row end
+  end)
+  return found
+end
+
 function M.read(engine)
   local out, avail = {}, engine.availableMercs
+  local sets = bannerSets()
   for i = 1, #avail do
     local c = avail[i]
     local region = nil
     if safe.valid(c.arrivalRegion) then region = game.regionKey(c.arrivalRegion) end
-    out[i] = { name = str(c.Name), cost = c.cost, units = names(c.units), region = region }
+    out[i] = { name = str(c.Name), cost = c.cost, units = names(c.units), region = region, banner = bannerNames(c, sets) }
   end
   return out
 end
@@ -108,6 +145,14 @@ local function writeCustom(c, d)
   if c.arrivesIn ~= M.CUSTOM_ARRIVES_IN then c.arrivesIn = M.CUSTOM_ARRIVES_IN end
   local region = game.regionByKey(company.region)
   if region and not sameObject(c.arrivalRegion, region) then c.arrivalRegion = region end
+  -- 깃발을 골랐으면 그 용병단의 깃발·색·문장을 한 묶음으로 쓴다. 고르지 않았으면 칸의 것을 그대로 둔다
+  if company.banner then
+    local row = rowNamed(company.banner)
+    if row and safe.valid(row.banner) and not sameBanner(c, { addr = row.banner:GetAddress(), colorA = row.colorA, colorB = row.colorB, emblemA = row.emblemA, emblemB = row.emblemB }) then
+      c.banner = row.banner
+      c.colorA, c.colorB, c.emblemA, c.emblemB = row.colorA, row.colorB, row.emblemA, row.emblemB
+    end
+  end
 end
 
 -- saved: 유지하는 순정 칸의 재구성 전 도착 정보({ arrivalRegion, arrivesIn }) 또는 nil

@@ -97,6 +97,26 @@ T.run({
     T.eq(table.concat(cur[1].units, ","), "inf,bow", "units"); T.eq(cur[1].region, "nus", "region key")
     T.eq(cur[2].region, nil, "no arrival region")
   end,
+  read_reports_every_company_whose_banner_and_colours_the_slot_has = function()
+    local engine, rows = setup({ list = { entry("x", { colorA = 1, colorB = 2, emblemA = 3, emblemB = 4 }), entry("y", { colorA = 1, colorB = 2, emblemA = 3, emblemB = 4 }), entry("z") } })
+    rows.c.banner = rows.b.banner                     -- 두 용병단이 같은 깃발 그림을 쓴다
+    rows.d.banner, rows.d.colorA = rows.b.banner, 9   -- 같은 그림, 다른 색
+    engine.availableMercs[1].banner = rows.b.banner
+    engine.availableMercs[2].banner = F.object({})
+    engine.availableMercs[3].banner = rows.b.banner   -- 색이 다르다(0)
+    local cur = list.read(engine)
+    T.eq(table.concat(cur[1].banner, ","), "b,c", "companies sharing banner and colours"); T.eq(cur[2].banner, nil, "unknown banner object")
+    T.eq(cur[3].banner, nil, "same picture but other colours is not a match")
+  end,
+  write_custom_copies_the_banner_and_colours_of_the_named_company = function()
+    local engine, rows = setup({ list = { entry("토이박스"), entry("궁수대") } })
+    rows.b.colorA, rows.b.colorB, rows.b.emblemA, rows.b.emblemB = 5, 6, 7, 8
+    local before = engine.availableMercs[2].banner
+    list.applyInPlace(engine, { custom("토이박스", { banner = "b" }), custom("궁수대") })
+    local first, second = engine.availableMercs[1], engine.availableMercs[2]
+    T.eq(first.banner, rows.b.banner, "banner copied"); T.eq(first.colorA, 5, "colorA"); T.eq(first.colorB, 6, "colorB"); T.eq(first.emblemA, 7, "emblemA"); T.eq(first.emblemB, 8, "emblemB")
+    T.eq(second.banner, before, "no banner chosen -> slot keeps its own")
+  end,
   hired_names_lists_every_hired_company = function()
     local engine = setup({ hired = { "a", "토이박스" } })
     local names = list.hiredNames(engine)
