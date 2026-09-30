@@ -177,6 +177,25 @@ T.run({
     local valid, skipped = plan.validate({ def() }, ctx({ regionKeys = {} }))
     T.eq(#valid, 0, "none"); T.eq(skipped[1].reason, "no player region", "reason")
   end,
+  validate_keeps_a_known_banner_and_drops_the_rest = function()
+    local valid = plan.validate({ def({ banner = "Greencaps" }), def({ name = "B", banner = "dragon" }), def({ name = "C", banner = 7 }), def({ name = "D" }) }, ctx())
+    T.eq(#valid, 3, "banner never rejects a definition (the fourth is over the limit)")
+    T.eq(valid[1].banner, "greencaps", "known banner, lower-cased"); T.eq(valid[2].banner, nil, "unknown banner -> inherit")
+    T.eq(valid[3].banner, nil, "non-string -> inherit")
+  end,
+  a_changed_banner_is_dirty_and_an_inherited_one_is_not = function()
+    local c = company({ banner = "greencaps" })
+    -- 칸의 banner 는 그 깃발·색을 쓰는 표 용병단 이름의 목록이다(여러 용병단이 같은 깃발을 쓸 수 있다)
+    local cur = listed(c, plan.LOCK_COST); cur.banner = { "a" }
+    local rest = { { name = "a", cost = 10 }, { name = "b", cost = 20 } }
+    T.eq(plan.build(input({ customs = { c }, current = { cur, rest[1], rest[2] } })).action, "inplace", "banner differs")
+    cur.banner = { "huntsmen", "greencaps" }
+    T.eq(plan.build(input({ customs = { c }, current = { cur, rest[1], rest[2] } })).action, "none", "banner shared with another company still matches")
+    cur.banner = nil
+    T.eq(plan.build(input({ customs = { c }, current = { cur, rest[1], rest[2] } })).action, "inplace", "unknown banner -> write")
+    cur.banner = { "a" }
+    T.eq(plan.build(input({ customs = { company() }, current = { cur, rest[1], rest[2] } })).action, "none", "no banner chosen -> whatever the slot has is fine")
+  end,
   validate_tolerates_garbage_settings = function()
     local valid, skipped = plan.validate(nil, ctx())
     T.eq(#valid, 0, "nil companies"); T.eq(#skipped, 0, "nothing to report")

@@ -46,6 +46,35 @@ public class MercenaryTests
     }
 
     [Fact]
+    public void SaveControl_WritesBannerOnlyWhenChosen()
+    {
+        var c = NewClient();
+        var doc = new ControlDocument();
+        var chosen = Company();
+        chosen.Banner = "greencaps";
+        doc.Features.Mercenaries.Companies.Add(chosen);
+        doc.Features.Mercenaries.Companies.Add(Company("B"));
+        c.SaveControl(doc);
+        using var json = JsonDocument.Parse(File.ReadAllText(c.ControlPath));
+        var companies = json.RootElement.GetProperty("features").GetProperty("mercenaries").GetProperty("companies");
+        Assert.Equal("greencaps", companies[0].GetProperty("banner").GetString());
+        Assert.False(companies[1].TryGetProperty("banner", out _));
+        Assert.Equal("greencaps", c.LoadControl().Features.Mercenaries.Companies[0].Banner);
+    }
+
+    [Fact]
+    public void Rules_BannerIsAKnownCompanyNameOrNothing()
+    {
+        Assert.Equal("greencaps", MercCompanyRules.NormalizeBanner("Greencaps"));
+        Assert.Equal("brotherhood_of_the_forest", MercCompanyRules.NormalizeBanner(" brotherhood_of_the_forest "));
+        Assert.Null(MercCompanyRules.NormalizeBanner("dragon"));
+        Assert.Null(MercCompanyRules.NormalizeBanner(""));
+        Assert.Null(MercCompanyRules.NormalizeBanner(null));
+        Assert.Equal(11, MercCompanyRules.BannerNames.Count);
+        Assert.Equal(MercCompanyRules.BannerNames.OrderBy(n => n, StringComparer.Ordinal), MercCompanyRules.BannerNames);
+    }
+
+    [Fact]
     public void SaveControl_OmitsRegionWhenNotChosen()
     {
         var c = NewClient();

@@ -102,5 +102,7 @@ public sealed class MercCompany
     public List<string> Units { get; set; } = new();
     public int Cost { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Region { get; set; }
+    // 깃발: 용병 표 용병단의 이름(그 용병단의 깃발·색·문장을 쓴다). null = 카드가 들어간 칸의 것을 그대로 둔다
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Banner { get; set; }
     public bool Enabled { get; set; } = true;
 }

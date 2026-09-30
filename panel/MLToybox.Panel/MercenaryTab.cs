@@ -15,6 +15,7 @@ public sealed class MercenaryTab : UserControl
     }
 
     private const string FirstRegionLabel = MercCompanyRules.FirstRegionLabel;
+    private const string InheritBannerLabel = "칸의 것 그대로";
 
     private readonly CheckBox _enabled = new() { Text = "용병 기능 사용 (고용 창 자동 보충)", AutoSize = true };
     private readonly CheckBox _refund = new() { Text = "내 용병단 고용비 환급, 유지비 0", AutoSize = true };
@@ -32,6 +33,7 @@ public sealed class MercenaryTab : UserControl
     private readonly Label _total = new() { AutoSize = true, Padding = new Padding(0, 6, 0, 0) };
     private readonly NumericUpDown _cost = new() { Minimum = 0, Maximum = 10_000_000, Value = 1000, Width = 110 };
     private readonly ComboBox _region = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+    private readonly ComboBox _banner = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
     private readonly Label _error = new() { AutoSize = true, ForeColor = Color.Firebrick };
     private readonly Label _status = new() { AutoSize = true };
 
@@ -62,6 +64,9 @@ public sealed class MercenaryTab : UserControl
         if (_unit.Items.Count > 0) _unit.SelectedIndex = Math.Max(0, infantry);
         _region.Items.Add(new ScopeOption(null, FirstRegionLabel));
         _region.SelectedIndex = 0;
+        _banner.Items.Add(new ScopeOption(null, InheritBannerLabel));
+        _banner.Items.AddRange(MercCompanyRules.BannerNames.Select(n => (object)new ScopeOption(n, n)).ToArray());
+        _banner.SelectedIndex = 0;
 
         var newButton = new Button { Text = "새 용병단", AutoSize = true };
         newButton.Click += (_, _) => StartNew();
@@ -90,6 +95,7 @@ public sealed class MercenaryTab : UserControl
             Row(Field("구성"), _composition, removeUnit, _total),
             Row(Field("고용비"), _cost),
             Row(Field("도착 영지"), _region),
+            Row(Field("깃발"), _banner),
             Row(register, _error),
             _status,
         });
@@ -172,7 +178,7 @@ public sealed class MercenaryTab : UserControl
 
     private static MercCompany Clone(MercCompany c) => new()
     {
-        Name = c.Name, Units = new List<string>(c.Units), Cost = c.Cost, Region = c.Region, Enabled = c.Enabled,
+        Name = c.Name, Units = new List<string>(c.Units), Cost = c.Cost, Region = c.Region, Banner = c.Banner, Enabled = c.Enabled,
     };
 
     private static Label Caption(string text) => new()
@@ -194,6 +200,12 @@ public sealed class MercenaryTab : UserControl
         if (key is null) return FirstRegionLabel;
         var option = _region.Items.OfType<ScopeOption>().FirstOrDefault(o => o.Key == key);
         return option?.Label ?? key;
+    }
+
+    private void SelectBanner(string? name)
+    {
+        var index = _banner.Items.OfType<ScopeOption>().ToList().FindIndex(o => o.Key == name);
+        _banner.SelectedIndex = Math.Max(0, index);
     }
 
     private void SelectRegion(string? key)
@@ -250,6 +262,7 @@ public sealed class MercenaryTab : UserControl
         _editUnits = new List<string>(c.Units);
         _cost.Value = Math.Clamp(c.Cost, 0, (int)_cost.Maximum);
         SelectRegion(c.Region);
+        SelectBanner(c.Banner);
         _error.Text = "";
         RefreshComposition();
     }
@@ -261,6 +274,7 @@ public sealed class MercenaryTab : UserControl
         _editUnits = new List<string>();
         _cost.Value = 1000;
         SelectRegion(null);
+        SelectBanner(null);
         _error.Text = "";
         RefreshComposition();
     }
@@ -312,6 +326,7 @@ public sealed class MercenaryTab : UserControl
             Units = new List<string>(_editUnits),
             Cost = (int)_cost.Value,
             Region = (_region.SelectedItem as ScopeOption)?.Key,
+            Banner = MercCompanyRules.NormalizeBanner((_banner.SelectedItem as ScopeOption)?.Key),
             Enabled = _editing?.Enabled ?? MercCompanyRules.CanEnable(_companies, null),
         };
         var error = MercCompanyRules.Validate(candidate, _companies.Where(c => !ReferenceEquals(c, _editing)));
@@ -331,6 +346,7 @@ public sealed class MercenaryTab : UserControl
             _editing.Units = candidate.Units;
             _editing.Cost = candidate.Cost;
             _editing.Region = candidate.Region;
+            _editing.Banner = candidate.Banner;
         }
         _error.Text = isNew && !candidate.Enabled ? $"사용 중인 용병단이 {MercCompanyRules.MaxEnabled}개라 '사용'을 끈 채로 등록했습니다." : "";
         RebuildGrid(_editing);
