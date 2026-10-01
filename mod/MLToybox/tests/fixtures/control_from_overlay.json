@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "seq": 7,
+  "features": {
+    "build": {
+      "enabled": true,
+      "ignorePlacement": true,
+      "instantBuild": true,
+      "instantRepair": false,
+      "noMaterials": true,
+      "noRegionLimit": true
+    },
+    "upgrade": {
+      "enabled": true
+    },
+    "lord": {
+      "enabled": true,
+      "intervalSec": 2,
+      "treasury": 150000,
+      "kingsFavour": 0
+    }
+  },
+  "commands": [
+    {
+      "id": "0123456789abcdef0123456789abcdef",
+      "type": "setLord",
+      "issuedAt": 1790000000,
+      "key": "influence",
+      "value": 20000
+    }
+  ]
+}

@@ -21,8 +21,12 @@ safe.setThreshold(config.failureThreshold)
 
 local bridgeDir = paths.parentDir(scriptsDir) .. "\\bridge"
 local bridge = bridgeLib.new(bridgeDir)
-local nativeLoaded, nativeErr = native.load(paths.parentDir(scriptsDir) .. "\\native")
+local nativeDir = paths.parentDir(scriptsDir) .. "\\native"
+local nativeLoaded, nativeErr = native.load(nativeDir)
 log.info("native: %s", nativeLoaded and "loaded" or tostring(nativeErr))
+local overlayLoaded, overlayErr = false, "disabled in config"
+if config.overlay then overlayLoaded, overlayErr = native.loadFile(nativeDir, native.OVERLAY_DLL) end
+log.info("overlay: %s", overlayLoaded and "loaded" or tostring(overlayErr))
 local registry = registryLib.new()
 local commands = commandsLib.new({
   spawnSquads = spawnSquads.spawn, reformSquads = spawnSquads.reform, addFamilies = population.command, setLord = lord.set,
@@ -66,6 +70,7 @@ LoopAsync(config.pollIntervalMs, function()
         safe.call("retinueEditor", function() retinueEditor.tick(registry.state.inGame) end)
         local status = registry:status(now, appliedSeq, bridge.lastError)
         status.native = native.status(bridgeDir .. "\\native_status.json", now, nativeLoaded, nativeErr)
+        status.overlay = native.overlayStatus(bridgeDir .. "\\overlay_status.json", now, overlayLoaded, overlayErr)
         status.commands = commands:status()
         local spawnOk, spawnStatus = safe.call("spawnSquads", spawnSquads.status, registry.state.inGame)
         status.spawn = spawnOk and spawnStatus or nil

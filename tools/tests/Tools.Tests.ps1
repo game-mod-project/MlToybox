@@ -99,6 +99,19 @@ Test-Case 'deploy copies native dll when built and tolerates locked target' {
     } finally { if ($created) { Remove-Item $built } }
 }
 
+Test-Case 'deploy copies the overlay dll when built' {
+    $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $built = Join-Path $repo 'native\build\mltoybox_overlay.dll'
+    $created = $false
+    if (-not (Test-Path $built)) { New-Item -ItemType Directory -Force (Split-Path $built) | Out-Null; Set-Content $built 'fake'; $created = $true }
+    try {
+        $g = New-FakeGame
+        $mods = Join-Path $g 'ManorLords\Binaries\Win64\ue4ss\Mods'
+        & "$PSScriptRoot\..\deploy.ps1" -Mod MLToybox -GameDir $g | Out-Null
+        Assert-True (Test-Path "$mods\MLToybox\native\mltoybox_overlay.dll") 'overlay dll copied'
+    } finally { if ($created) { Remove-Item $built } }
+}
+
 Test-Case 'lab.ps1 replaces __KEY__ tokens from -Vars' {
     $g = New-FakeGame
     $lab = New-Item -ItemType Directory -Force (Join-Path $g 'ManorLords\Binaries\Win64\ue4ss\Mods\MLToyboxLab\lab')
