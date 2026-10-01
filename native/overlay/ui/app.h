@@ -21,12 +21,17 @@ struct App : Session {
     OverlaySettings settings;
     bool settingsDirty = false;
     std::string reason;                        // state 가 Disabled 일 때의 이유
+    std::string clipboardOut;                  // 화면에서 복사한 글. 작업 스레드가 Windows 클립보드에 쓴다
+    bool clipboardPending = false;
 
     // --- 잠금 없이 읽고 쓴다 ---
     std::atomic<OverlayState> state{OverlayState::Starting};
     std::atomic<bool> visible{false};
     std::atomic<bool> wantMouse{false};        // 직전 프레임에 ImGui 가 마우스를 원했는가
     std::atomic<bool> wantKeyboard{false};
+    std::atomic<bool> wantText{false};         // 직전 프레임에 글자 입력 칸에 커서가 있었는가(창 스레드가 IME 를 켜고 끈다)
+    std::atomic<int> imeX{0};                  // 입력 커서의 위치(게임 창 안 좌표). 조합 중인 글자를 여기에 띄운다
+    std::atomic<int> imeY{0};
     std::atomic<int> toggleVk{0x2D};
     std::atomic<float> scale{1.0f};
     std::atomic<long long> frames{0};

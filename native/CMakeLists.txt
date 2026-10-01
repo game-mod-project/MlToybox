@@ -67,6 +67,7 @@ add_library(overlay_impl STATIC
     overlay/render/dx12_hook.cpp
     overlay/render/imgui_layer.cpp
     overlay/render/input.cpp
+    overlay/render/clipboard.cpp
     overlay/render/guard.cpp
     overlay/ui/app.cpp
     overlay/ui/window.cpp
@@ -74,7 +75,7 @@ add_library(overlay_impl STATIC
     overlay/ui/tab_build.cpp
     overlay/ui/tab_lord.cpp
     overlay/ui/tab_status.cpp)
-target_link_libraries(overlay_impl PUBLIC overlay_core imgui minhook d3d12 dxgi user32)
+target_link_libraries(overlay_impl PUBLIC overlay_core imgui minhook d3d12 dxgi user32 imm32)
 
 # mltoybox_overlay: 게임에 올리는 DLL
 add_library(mltoybox_overlay SHARED overlay/dllmain.cpp)

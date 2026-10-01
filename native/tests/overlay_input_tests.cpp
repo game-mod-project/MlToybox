@@ -1,10 +1,12 @@
 #include "test.h"
 #include "overlay/render/input.h"
 #include "overlay/ui/app.h"
+#include <cstdio>
 #include <cstring>
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <windows.h>
+#include <imm.h>
 
 using namespace mlt::ov;
 
@@ -125,4 +127,66 @@ TEST(overlay_input_releases_held_buttons_when_the_window_closes) {
     f.a.visible = false;                                          // 닫기 버튼이나 다른 스레드가 닫은 경우: 다음 메시지에서 정리한다
     f.send(WM_NULL);
     CHECK(GetCapture() == nullptr);
+}
+
+// 게임이 창의 IME(한글 입력기)를 꺼 두었으면 오버레이의 글자 칸에 커서가 있는 동안만 켜고, 끝나면 되돌린다
+TEST(overlay_input_turns_the_ime_on_only_while_a_text_field_has_the_cursor) {
+    if (!GetSystemMetrics(SM_IMMENABLED)) {
+        std::printf("SKIP overlay_input ime: IMM is not enabled on this system\n");
+        return;
+    }
+    Fixture f;
+    auto imeOn = [&] {
+        const HIMC imc = ImmGetContext(f.hwnd);
+        if (imc) ImmReleaseContext(f.hwnd, imc);
+        return imc != nullptr;
+    };
+    ImmAssociateContext(f.hwnd, nullptr);          // 게임이 꺼 둔 상태
+    CHECK(!imeOn());
+    f.send(WM_NULL);
+    CHECK(!imeOn());                               // 글자 칸에 커서가 없으면 건드리지 않는다
+    f.a.wantText = true;
+    f.send(WM_NULL);
+    CHECK(imeOn());                                // 글자 칸에 커서가 있다: 한글을 칠 수 있다
+    f.a.wantText = false;
+    f.send(WM_NULL);
+    CHECK(!imeOn());                               // 게임이 꺼 두었던 상태로 되돌린다
+
+    f.a.wantText = true;
+    f.send(WM_NULL);
+    CHECK(imeOn());
+    f.send(WM_KEYDOWN, VK_INSERT, 0x00000001);     // 글자 칸에 커서를 둔 채 창을 닫아도 되돌린다
+    CHECK(!f.a.visible.load() && !imeOn());
+    f.a.wantText = false;
+}
+
+TEST(overlay_input_leaves_the_ime_alone_when_the_game_had_it_on) {
+    if (!GetSystemMetrics(SM_IMMENABLED)) return;
+    Fixture f;
+    const HIMC before = ImmGetContext(f.hwnd);     // 게임의 입력 칸에 커서가 있어 IME 가 켜져 있던 경우
+    if (!before) return;
+    ImmReleaseContext(f.hwnd, before);
+    f.a.wantText = true;
+    f.send(WM_NULL);
+    f.a.wantText = false;
+    f.send(WM_NULL);
+    const HIMC after = ImmGetContext(f.hwnd);
+    CHECK(after != nullptr);                       // 우리가 켠 것이 아니면 끄지 않는다
+    if (after) ImmReleaseContext(f.hwnd, after);
+}
+
+// 글자 칸에 커서가 있을 때의 한글 조합 메시지는 게임에 넘기지 않는다. 조합이 끝난 글자는 WM_CHAR 로 와서 ImGui 가 받는다
+TEST(overlay_input_keeps_korean_composition_away_from_the_game) {
+    Fixture f;
+    f.send(WM_IME_STARTCOMPOSITION);
+    f.send(WM_IME_ENDCOMPOSITION);
+    CHECK(g_reached[WM_IME_STARTCOMPOSITION] == 1 && g_reached[WM_IME_ENDCOMPOSITION] == 1);   // 글자 칸이 아니면 게임의 것
+    f.a.wantText = true;
+    f.a.wantKeyboard = true;
+    f.send(WM_IME_STARTCOMPOSITION);
+    f.send(WM_IME_CHAR, 0xAC00, 1);                // '가': 기본 처리가 WM_CHAR 로 바꿔 다시 보낸다
+    f.send(WM_IME_ENDCOMPOSITION);
+    CHECK(g_reached[WM_IME_STARTCOMPOSITION] == 1 && g_reached[WM_IME_ENDCOMPOSITION] == 1);
+    CHECK(g_reached[WM_IME_CHAR] == 0 && g_reached[WM_CHAR] == 0);
+    f.a.wantText = false;
 }
