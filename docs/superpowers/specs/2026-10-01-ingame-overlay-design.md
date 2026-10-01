@@ -137,7 +137,8 @@
 | 타깃 | 종류 | 내용 |
 |---|---|---|
 | `overlay_core` | 정적 라이브러리 | 문서 모델, 브리지, 명령, 규칙, 오버레이 설정. Windows 그래픽에 의존하지 않는다 |
-| `mltoybox_overlay` | DLL | 렌더·입력 층, 화면 층, 작업 스레드, `DllMain` |
+| `overlay_impl` | 정적 라이브러리 | 렌더·입력 층, 화면 층, 작업 스레드. DLL과 테스트가 함께 쓴다(창 프로시저와 화면 출력 후킹을 게임 없이 시험) |
+| `mltoybox_overlay` | DLL | `DllMain`과 `overlay_impl` |
 | `native_tests` | 실행 파일(기존) | `overlay_core` 테스트를 더한다 |
 
 기존 `mlt_core`와 `mltoybox_native`는 바꾸지 않는다. `overlay_core`는 `mlt_core`의 `runtime`(파일 읽기, 원자적 쓰기, 시각, 모듈 고정)을 쓴다.
@@ -151,7 +152,8 @@ native/overlay/core/
   status_doc.h/.cpp      상태 문서 읽기(Lua 의 빈 표 [] 허용)
   bridge.h/.cpp          control.json 저장(seq, 임시 파일 + 이름 바꾸기), status.json 읽기, 연결 상태 판정
   commands.h/.cpp        일회성 명령 만들기(id, issuedAt)
-  session.h/.cpp         나눠 쓰는 문서 상태와 저장·다시 읽기 규칙(변경 표시, 보낼 명령, 실패 뒤 되돌리기)
+  session.h/.cpp         나눠 쓰는 문서 상태와 저장·다시 읽기 규칙(변경 표시, 끝나지 않은 명령 다시 싣기)
+  frame_gate.h/.cpp      GPU 가 아직 쓰는 명령 할당자를 다시 쓰지 않게 가린다
   merc_rules.h/.cpp      용병단 검증, 구성 요약, 사용 가능 여부, 깃발·영지 선택지
   units.h/.cpp           병종 13종과 한글 이름
   resources.h/.cpp       자원 범위와 표 행 만들기
@@ -160,7 +162,7 @@ native/overlay/core/
   status_file.h/.cpp     overlay_status.json
   text.h/.cpp            UTF-8 글자 수, 앞뒤 공백 떼기, 소문자 비교
 native/overlay/render/
-  dx12_hook.h/.cpp       가상 함수 표 찾기, Present/ResizeBuffers/ExecuteCommandLists 후킹, 큐 선택, 백버퍼 관리
+  dx12_hook.h/.cpp       가상 함수 표 찾기, Present/ResizeBuffers/ExecuteCommandLists 후킹, 큐 선택, 프레임 그리기
   imgui_layer.h/.cpp     ImGui 초기화, 글꼴, 프레임 시작·끝
   input.h/.cpp           창 프로시저 후킹, 토글 키, ImGui 에 입력 전달(잠금)
   guard.h/.cpp           프레임 실행을 구조적 예외로 감싸기, 예외 뒤 잠금 풀기
@@ -197,7 +199,8 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 - **설정 문서**: nlohmann `ordered_json`을 그대로 들고, 아는 키는 접근 함수로 읽고 쓴다. 모르는 키는 건드리지 않아 보존된다. 키가 없으면 패널의 기본값을 쓴다(예: `build.instantBuild = true`, `mercenaries.refund = true`, `population.multiplier = 2`, `resources.intervalSec = 2`).
 - **옛 설정 옮기기**: `features.lord`가 없고 `resources.targets`에 `Treasury`·`Influence`가 있으면 영주 설정으로 옮긴다(패널의 `LordControl.MigrateFrom`).
 - **저장**: `version = 1`, `seq = max(파일의 seq, 메모리의 seq) + 1`. 들여쓰기한 UTF-8로 `control.json.tmp`에 쓰고 이름을 바꾼다. 이름 바꾸기가 실패하면 50ms 간격으로 5번까지 다시 한다.
-- **명령**: `commands`에 넣어 한 번 저장하고 바로 비운다. `id`는 32자리 16진수, `issuedAt`은 UTC 초.
+- **명령**: `id`는 32자리 16진수, `issuedAt`은 UTC 초. 보낸 명령은 모드가 실행했다고 알릴 때까지(`status.json`의 `commands`에 그 `id`가 보일 때까지) 저장할 때마다 `commands`에 다시 싣는다. 60초가 지난 명령은 뺀다(모드도 버린다).
+  - 패널처럼 "한 번 저장하고 바로 비우면" 안 된다. 모드는 1초마다 읽고 오버레이는 바뀔 때마다 저장하므로, 모드가 읽기 전에 나간 다음 저장이 명령을 지운다("지금 설정"을 연달아 누르면 앞의 것이 사라진다. 코드 리뷰에서 찾아 2026-10-01에 고쳤다). 모드는 같은 `id`를 한 번만 실행하므로 여러 번 실어도 된다.
 - **상태 문서**: Lua의 JSON 인코더는 빈 표를 `{}`가 아니라 `[]`로 쓴다. 객체 자리에 온 배열은 빈 객체로 읽는다.
 - **연결 상태**: 패널의 `BridgeClient.Evaluate`와 같다(`heartbeat` 5초).
 - **용병단 검증**(패널 `MercCompanyRules`, 모드 `merc_plan.validate`와 같은 규칙):
@@ -264,7 +267,8 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 
 - 큐 선택: `ExecuteCommandLists` 후킹에서 직접(DIRECT) 큐마다 마지막으로 실행한 스레드를 기록한다. `Present` 후킹에서 지금 스레드와 같은 스레드의 큐를 고른다. 스파이크에서 직접 큐가 둘이었고, 다른 큐로 그리면 GPU 크래시가 났다.
 - 그리는 대상: 스왑체인의 `OutputWindow`가 게임 메인 창(프로세스의 보이는 최상위 창 가운데 가장 큰 것)일 때만 그린다.
-- `ResizeBuffers`: 원래 함수를 부르기 전에 백버퍼 참조와 ImGui 장치 객체를 풀고, 뒤에 다시 만든다(스파이크에서 확인).
+- 백버퍼 참조는 프레임 사이에 들고 있지 않는다(그릴 때 얻고 그 프레임 안에서 놓는다). 참조가 남아 있으면 게임의 `ResizeBuffers`가 실패하는데, 오버레이가 스스로 꺼진 뒤에는 놓아 줄 기회가 없다(코드 리뷰에서 찾아 테스트로 재현하고 고쳤다). `ResizeBuffers` 뒤 백버퍼 개수나 형식이 달라졌으면 명령 할당자와 ImGui 장치 객체를 다시 만든다.
+- 명령 할당자는 GPU가 그 할당자의 지난 명령을 끝낸 뒤에만 다시 쓴다(펜스로 확인). 쓸 것이 없으면 할당자를 늘리고(최대 8개), 그래도 없으면 그 프레임은 그리지 않는다.
 - `disabled`가 되면 창 프로시저 후킹은 토글 키를 포함해 아무것도 가로채지 않는다.
 
 ### 5.3 그 밖

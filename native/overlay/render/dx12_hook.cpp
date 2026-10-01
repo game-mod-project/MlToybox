@@ -2,6 +2,7 @@
 #include "guard.h"
 #include "imgui_layer.h"
 #include "input.h"
+#include "overlay/core/frame_gate.h"
 #include "overlay/ui/app.h"
 #include "overlay/ui/window.h"
 #include <MinHook.h>
@@ -47,8 +48,10 @@ ID3D12CommandQueue* g_queue = nullptr;
 ID3D12DescriptorHeap* g_rtvHeap = nullptr;
 ID3D12GraphicsCommandList* g_list = nullptr;
 std::vector<ID3D12CommandAllocator*> g_allocators;
-std::vector<ID3D12Resource*> g_backBuffers;
-std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> g_rtvs;
+ID3D12Resource* g_frameBuffer = nullptr;   // 이번 프레임에 그리는 백버퍼. 프레임이 끝나면 놓는다
+ID3D12Fence* g_fence = nullptr;            // 우리가 맡긴 명령을 GPU 가 끝냈는지 본다
+FrameGate g_gate;                          // 다시 써도 되는 명령 할당자를 고른다(g_allocators 와 칸이 같다)
+constexpr size_t kMaxAllocators = 8;
 UINT g_bufferCount = 0;
 DXGI_FORMAT g_format = DXGI_FORMAT_UNKNOWN;
 bool g_contextReady = false;        // ImGui 컨텍스트와 창 프로시저
@@ -82,36 +85,21 @@ HWND mainWindow() {
     return best.hwnd;
 }
 
-void releaseBackBuffers() {
-    for (auto* r : g_backBuffers) {
-        if (r) r->Release();
+// 백버퍼 참조는 프레임 사이에 들고 있지 않는다. 남아 있으면 게임의 ResizeBuffers 가 실패하는데,
+// 오버레이가 스스로 꺼진 뒤에는 놓아 줄 기회가 없다
+void dropFrameBuffer() {
+    if (g_frameBuffer) {
+        g_frameBuffer->Release();
+        g_frameBuffer = nullptr;
     }
-    g_backBuffers.clear();
-    g_rtvs.clear();
-}
-
-bool createBackBuffers(IDXGISwapChain* swap) {
-    const UINT step = g_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-    D3D12_CPU_DESCRIPTOR_HANDLE handle = g_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-    for (UINT i = 0; i < g_bufferCount; ++i) {
-        ID3D12Resource* buffer = nullptr;
-        if (FAILED(swap->GetBuffer(i, IID_PPV_ARGS(&buffer)))) {
-            releaseBackBuffers();
-            return false;
-        }
-        g_device->CreateRenderTargetView(buffer, nullptr, handle);
-        g_backBuffers.push_back(buffer);
-        g_rtvs.push_back(handle);
-        handle.ptr += step;
-    }
-    return true;
 }
 
 void destroyFrameObjects() {
-    releaseBackBuffers();
+    dropFrameBuffer();
     if (g_list) { g_list->Release(); g_list = nullptr; }
     for (auto* a : g_allocators) a->Release();
     g_allocators.clear();
+    if (g_fence) { g_fence->Release(); g_fence = nullptr; }
     if (g_rtvHeap) { g_rtvHeap->Release(); g_rtvHeap = nullptr; }
 }
 
@@ -128,6 +116,8 @@ bool createFrameObjects(std::string& err) {
     }
     if (FAILED(g_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_allocators[0], nullptr, IID_PPV_ARGS(&g_list)))) { err = "command list"; return false; }
     g_list->Close();
+    if (FAILED(g_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&g_fence)))) { err = "fence"; return false; }
+    g_gate.reset(g_allocators.size());
     return true;
 }
 
@@ -199,19 +189,40 @@ void renderFrame(IDXGISwapChain* swap) {
     if (FAILED(swap->QueryInterface(IID_PPV_ARGS(&swap3)))) return;
     index = swap3->GetCurrentBackBufferIndex();
     swap3->Release();
-    if (index >= g_backBuffers.size()) return;
+    if (index >= g_bufferCount) return;
 
-    ID3D12CommandAllocator* allocator = g_allocators[index];
-    allocator->Reset();
-    g_list->Reset(allocator, nullptr);
+    // GPU 가 아직 실행 중인 할당자를 Reset 하면 안 된다. 다 쓴 칸을 고르고, 없으면 칸을 늘리고, 그래도 없으면 이번 프레임은 그리지 않는다
+    size_t slot = g_gate.firstReady(g_fence->GetCompletedValue());
+    if (slot == FrameGate::npos) {
+        if (g_allocators.size() >= kMaxAllocators) return;
+        ID3D12CommandAllocator* extra = nullptr;
+        if (FAILED(g_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&extra)))) return;
+        g_allocators.push_back(extra);
+        slot = g_gate.add();
+    }
+
+    if (FAILED(swap->GetBuffer(index, IID_PPV_ARGS(&g_frameBuffer)))) {
+        g_frameBuffer = nullptr;
+        return;
+    }
+    // RTV 서술자는 명령을 기록할 때 읽히므로 같은 칸을 프레임마다 다시 써도 된다
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = g_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    rtv.ptr += static_cast<SIZE_T>(index) * g_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    g_device->CreateRenderTargetView(g_frameBuffer, nullptr, rtv);
+
+    ID3D12CommandAllocator* allocator = g_allocators[slot];
+    if (FAILED(allocator->Reset()) || FAILED(g_list->Reset(allocator, nullptr))) {
+        dropFrameBuffer();
+        return;
+    }
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = g_backBuffers[index];
+    barrier.Transition.pResource = g_frameBuffer;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     g_list->ResourceBarrier(1, &barrier);
-    g_list->OMSetRenderTargets(1, &g_rtvs[index], FALSE, nullptr);
+    g_list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
     ID3D12DescriptorHeap* heaps[] = { imguiSrvHeap() };
     g_list->SetDescriptorHeaps(1, heaps);
     {
@@ -221,10 +232,13 @@ void renderFrame(IDXGISwapChain* swap) {
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
     g_list->ResourceBarrier(1, &barrier);
-    g_list->Close();
-    ID3D12CommandList* lists[] = { g_list };
-    g_queue->ExecuteCommandLists(1, lists);
-    ++a.frames;
+    if (SUCCEEDED(g_list->Close())) {   // 닫히지 않은 목록을 게임의 큐에 실행하면 장치가 제거된다
+        ID3D12CommandList* lists[] = { g_list };
+        g_queue->ExecuteCommandLists(1, lists);
+        g_queue->Signal(g_fence, g_gate.submitted(slot));
+        ++a.frames;
+    }
+    dropFrameBuffer();
 }
 
 void frame(IDXGISwapChain* swap) {
@@ -249,7 +263,6 @@ void frame(IDXGISwapChain* swap) {
         a.wantKeyboard = false;
         return;
     }
-    if (g_backBuffers.empty() && !createBackBuffers(swap)) return;
     renderFrame(swap);
 }
 
@@ -275,6 +288,7 @@ HRESULT WINAPI HookedPresent(IDXGISwapChain* swap, UINT sync, UINT flags) {
     if (app().state.load() != OverlayState::Disabled) {
         unsigned long code = 0;
         if (!runGuarded(frameThunk, swap, &code)) afterCrash(code);
+        dropFrameBuffer();   // 프레임이 예외로 끊겼어도 백버퍼 참조는 남기지 않는다
     }
     return g_origPresent(swap, sync, flags);
 }
@@ -284,19 +298,19 @@ struct ResizeArgs {
     bool after;
 };
 
-// 크기를 바꾸기 전에 백버퍼 참조를 놓고, 바꾼 뒤 개수나 형식이 달라졌으면 그에 맞춰 다시 만든다
+// 크기를 바꾼 뒤 백버퍼 개수나 형식이 달라졌으면 그에 맞춰 다시 만든다. 백버퍼 참조는 프레임 사이에 들고 있지 않아 놓을 것이 없다
 void resizeThunk(void* p) {
     auto* args = static_cast<ResizeArgs*>(p);
     if (!g_initialized || args->swap != g_swap) return;
     TrackedLock imguiLock(imguiMutex(), g_holdsImgui);
     if (!args->after) {
-        releaseBackBuffers();
+        dropFrameBuffer();
         return;
     }
     app().applyWindowRect = true;   // 해상도가 줄었으면 창을 화면 안으로 옮긴다
     DXGI_SWAP_CHAIN_DESC desc{};
     if (FAILED(args->swap->GetDesc(&desc))) return;
-    if (desc.BufferCount == g_bufferCount && desc.BufferDesc.Format == g_format) return;   // 백버퍼는 다음 프레임에 다시 얻는다
+    if (desc.BufferCount == g_bufferCount && desc.BufferDesc.Format == g_format) return;
     std::string err;
     shutdownImGuiDx12();
     destroyFrameObjects();

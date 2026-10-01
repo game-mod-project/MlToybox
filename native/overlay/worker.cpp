@@ -44,7 +44,13 @@ static void readStatus(App& a, const Bridge& bridge) {
     auto status = bridge.readStatus();
     std::shared_ptr<const StatusDoc> shared;
     if (status) shared = std::make_shared<const StatusDoc>(std::move(*status));
+    // 모드가 실행했다고 알린 명령은 더 싣지 않는다(core/session)
+    std::vector<std::string> reported;
+    if (shared && shared->commands) {
+        for (const auto& entry : *shared->commands) reported.push_back(entry.first);
+    }
     std::lock_guard<std::mutex> lock(a.mutex);
+    dropFinishedCommands(a, reported, nowEpochSeconds());
     if (shared || !a.status) a.status = std::move(shared);
     // 읽기에 실패하면(모드가 쓰는 순간) 직전 값을 둔다. heartbeat 로 오래된 것을 가려낸다
 }
