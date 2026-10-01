@@ -12,6 +12,12 @@ static std::optional<long long> asInteger(const Json& v) {
     return std::nullopt;
 }
 
+static std::optional<int> asInt(const Json& v) {
+    auto n = asInteger(v);
+    if (!n || *n < -2147483648LL || *n > 2147483647LL) return std::nullopt;
+    return static_cast<int>(*n);
+}
+
 bool boolOr(const Json* obj, const char* key, bool def) {
     if (!obj || !obj->is_object()) return def;
     auto it = obj->find(key);
@@ -22,9 +28,7 @@ std::optional<int> optInt(const Json* obj, const char* key) {
     if (!obj || !obj->is_object()) return std::nullopt;
     auto it = obj->find(key);
     if (it == obj->end()) return std::nullopt;
-    auto n = asInteger(*it);
-    if (!n || *n < -2147483648LL || *n > 2147483647LL) return std::nullopt;
-    return static_cast<int>(*n);
+    return asInt(*it);
 }
 
 int intOr(const Json* obj, const char* key, int def) {
@@ -32,10 +36,40 @@ int intOr(const Json* obj, const char* key, int def) {
     return v ? *v : def;
 }
 
+std::optional<std::string> optString(const Json* obj, const char* key) {
+    if (!obj || !obj->is_object()) return std::nullopt;
+    auto it = obj->find(key);
+    if (it == obj->end() || !it->is_string()) return std::nullopt;
+    return it->get<std::string>();
+}
+
 const Json* objectAt(const Json* obj, const char* key) {
     if (!obj || !obj->is_object()) return nullptr;
     auto it = obj->find(key);
     return (it != obj->end() && it->is_object()) ? &*it : nullptr;
+}
+
+const Json* arrayAt(const Json* obj, const char* key) {
+    if (!obj || !obj->is_object()) return nullptr;
+    auto it = obj->find(key);
+    return (it != obj->end() && it->is_array()) ? &*it : nullptr;
+}
+
+// { "이름": 정수 } 꼴의 객체를 읽는다. 정수가 아니거나 음수인 값은 건너뛴다
+static std::map<std::string, int> readIntMap(const Json* obj) {
+    std::map<std::string, int> out;
+    if (!obj || !obj->is_object()) return out;
+    for (auto it = obj->begin(); it != obj->end(); ++it) {
+        auto n = asInt(it.value());
+        if (n && *n >= 0) out[it.key()] = *n;
+    }
+    return out;
+}
+
+static Json writeIntMap(const std::map<std::string, int>& map) {
+    Json out = Json::object();
+    for (const auto& [key, value] : map) out[key] = value;
+    return out;
 }
 
 ControlDoc::ControlDoc() {
@@ -167,6 +201,11 @@ static void setOptional(Json& obj, const char* key, const std::optional<int>& va
     else obj.erase(key);
 }
 
+static void setOptional(Json& obj, const char* key, const std::optional<std::string>& value) {
+    if (value) obj[key] = *value;
+    else obj.erase(key);
+}
+
 void ControlDoc::setLord(const LordSettings& v) {
     Json& f = feature("lord");
     f["enabled"] = v.enabled;
@@ -174,6 +213,114 @@ void ControlDoc::setLord(const LordSettings& v) {
     setOptional(f, "treasury", v.treasury);
     setOptional(f, "influence", v.influence);
     setOptional(f, "kingsFavour", v.kingsFavour);
+}
+
+MilitarySettings ControlDoc::military() const {
+    const Json* f = findFeature("military");
+    const MilitarySettings d;
+    MilitarySettings v;
+    v.enabled = boolOr(f, "enabled", d.enabled);
+    v.ignoreEquipment = boolOr(f, "ignoreEquipment", d.ignoreEquipment);
+    v.ignorePopulation = boolOr(f, "ignorePopulation", d.ignorePopulation);
+    v.zeroUpkeep = boolOr(f, "zeroUpkeep", d.zeroUpkeep);
+    v.unlimitedSquads = boolOr(f, "unlimitedSquads", d.unlimitedSquads);
+    return v;
+}
+
+void ControlDoc::setMilitary(const MilitarySettings& v) {
+    Json& f = feature("military");
+    f["enabled"] = v.enabled;
+    f["ignoreEquipment"] = v.ignoreEquipment;
+    f["ignorePopulation"] = v.ignorePopulation;
+    f["zeroUpkeep"] = v.zeroUpkeep;
+    f["unlimitedSquads"] = v.unlimitedSquads;
+}
+
+PopulationSettings ControlDoc::population() const {
+    const Json* f = findFeature("population");
+    PopulationSettings v;
+    v.enabled = boolOr(f, "enabled", false);
+    v.multiplier = intOr(f, "multiplier", 2);
+    v.targetFamilies = intOr(f, "targetFamilies", 0);
+    v.regionTargets = readIntMap(objectAt(f, "regionTargets"));
+    return v;
+}
+
+void ControlDoc::setPopulation(const PopulationSettings& v) {
+    Json& f = feature("population");
+    f["enabled"] = v.enabled;
+    f["multiplier"] = v.multiplier;
+    f["targetFamilies"] = v.targetFamilies;
+    f["regionTargets"] = writeIntMap(v.regionTargets);
+}
+
+ResourcesSettings ControlDoc::resources() const {
+    const Json* f = findFeature("resources");
+    ResourcesSettings v;
+    v.enabled = boolOr(f, "enabled", false);
+    v.intervalSec = intOr(f, "intervalSec", 2);
+    v.targets = readIntMap(objectAt(f, "targets"));
+    if (const Json* regions = objectAt(f, "regionTargets")) {
+        for (auto it = regions->begin(); it != regions->end(); ++it) {
+            if (it.value().is_object()) v.regionTargets[it.key()] = readIntMap(&it.value());
+        }
+    }
+    return v;
+}
+
+void ControlDoc::setResources(const ResourcesSettings& v) {
+    Json& f = feature("resources");
+    f["enabled"] = v.enabled;
+    f["intervalSec"] = v.intervalSec;
+    f["targets"] = writeIntMap(v.targets);
+    Json regions = Json::object();
+    for (const auto& [key, targets] : v.regionTargets) regions[key] = writeIntMap(targets);
+    f["regionTargets"] = std::move(regions);
+}
+
+MercSettings ControlDoc::mercenaries() const {
+    const Json* f = findFeature("mercenaries");
+    MercSettings v;
+    v.enabled = boolOr(f, "enabled", false);
+    v.refund = boolOr(f, "refund", true);
+    v.lockFromAi = boolOr(f, "lockFromAi", true);
+    if (const Json* companies = arrayAt(f, "companies")) {
+        for (const Json& c : *companies) {
+            if (!c.is_object()) continue;   // 손으로 고친 설정의 이상한 항목은 건너뛴다
+            MercCompany company;
+            company.name = optString(&c, "name").value_or("");
+            if (const Json* units = arrayAt(&c, "units")) {
+                for (const Json& u : *units) {
+                    if (u.is_string()) company.units.push_back(u.get<std::string>());
+                }
+            }
+            company.cost = intOr(&c, "cost", 0);
+            company.region = optString(&c, "region");
+            company.banner = optString(&c, "banner");
+            company.enabled = boolOr(&c, "enabled", true);
+            v.companies.push_back(std::move(company));
+        }
+    }
+    return v;
+}
+
+void ControlDoc::setMercenaries(const MercSettings& v) {
+    Json& f = feature("mercenaries");
+    f["enabled"] = v.enabled;
+    f["refund"] = v.refund;
+    f["lockFromAi"] = v.lockFromAi;
+    Json companies = Json::array();
+    for (const MercCompany& c : v.companies) {
+        Json company = Json::object();
+        company["name"] = c.name;
+        company["units"] = c.units;
+        company["cost"] = c.cost;
+        setOptional(company, "region", c.region);   // 고르지 않았으면 키를 쓰지 않는다(패널과 같다)
+        setOptional(company, "banner", c.banner);
+        company["enabled"] = c.enabled;
+        companies.push_back(std::move(company));
+    }
+    f["companies"] = std::move(companies);
 }
 
 void ControlDoc::setCommands(const std::vector<Json>& commands) {

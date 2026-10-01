@@ -41,7 +41,8 @@ add_library(overlay_core STATIC
     overlay/core/status_file.cpp
     overlay/core/session.cpp
     overlay/core/frame_gate.cpp
-    overlay/core/hint.cpp)
+    overlay/core/hint.cpp
+    overlay/core/units.cpp)
 target_include_directories(overlay_core PUBLIC . third_party)
 target_link_libraries(overlay_core PUBLIC mlt_core)
 
@@ -87,6 +88,8 @@ add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_t
     tests/overlay_session_tests.cpp
     tests/overlay_frame_gate_tests.cpp
     tests/overlay_hint_tests.cpp
+    tests/overlay_features_tests.cpp
+    tests/overlay_status_tabs_tests.cpp
     # 창 프로시저 후킹은 실제 창으로, 화면 출력 후킹은 실제 D3D12 스왑체인으로 시험한다(게임 없이). 입력 테스트가 먼저다
     tests/overlay_input_tests.cpp
     tests/overlay_render_tests.cpp)

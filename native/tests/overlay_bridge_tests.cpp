@@ -169,9 +169,33 @@ TEST(overlay_fixture_for_the_lua_spec_matches_core_output) {
     lord.treasury = 150000;
     lord.kingsFavour = 0;
     doc.setLord(lord);
+    MilitarySettings military;
+    military.enabled = true;
+    military.zeroUpkeep = false;
+    doc.setMilitary(military);
+    PopulationSettings population;
+    population.enabled = true;
+    population.multiplier = 3;
+    population.targetFamilies = 12;
+    population.regionTargets["nus"] = 30;
+    doc.setPopulation(population);
+    ResourcesSettings resources;
+    resources.enabled = true;
+    resources.targets["Timber"] = 500;
+    resources.regionTargets["gold"]["Timber"] = 2000;
+    doc.setResources(resources);
+    MercSettings mercenaries;
+    mercenaries.enabled = true;
+    mercenaries.companies = {
+        { "토이박스 용병단", { "mercenary_infantry", "mercenary_crossbowmen" }, 3000, "gold", "greencaps", true },
+        { "예비대", { "militia" }, 0, std::nullopt, std::nullopt, false },
+    };
+    doc.setMercenaries(mercenaries);
     Json command = makeSetLord("influence", 20000, 1790000000);
     command["id"] = "0123456789abcdef0123456789abcdef";
-    doc.setCommands({ command });
+    Json spawn = makeSpawnSquads("spearMilitia", 2, 1790000000, "nus");
+    spawn["id"] = "fedcba9876543210fedcba9876543210";
+    doc.setCommands({ command, spawn });
     const std::string text = doc.dump();
 
     const fs::path path = fs::path(MLT_LUA_FIXTURES_DIR) / "control_from_overlay.json";

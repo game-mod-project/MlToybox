@@ -26,10 +26,42 @@ static Json base(const char* type, long long nowEpochSeconds) {
     return c;
 }
 
+static void setRegion(Json& c, const std::optional<std::string>& region) {
+    if (region) c["region"] = *region;
+}
+
 Json makeSetLord(const std::string& key, int value, long long nowEpochSeconds) {
     Json c = base("setLord", nowEpochSeconds);
     c["key"] = key;
     c["value"] = value;
+    return c;
+}
+
+Json makeSpawnSquads(const std::string& unit, int count, long long nowEpochSeconds, const std::optional<std::string>& region) {
+    Json c = base("spawnSquads", nowEpochSeconds);
+    c["unit"] = unit;
+    c["count"] = count;
+    setRegion(c, region);
+    return c;
+}
+
+Json makeReformSquads(long long nowEpochSeconds, const std::optional<std::string>& region) {
+    Json c = base("reformSquads", nowEpochSeconds);
+    setRegion(c, region);
+    return c;
+}
+
+Json makeCustomizeRetinue(int squadId, long long nowEpochSeconds, const std::optional<std::string>& region) {
+    Json c = base("customizeRetinue", nowEpochSeconds);
+    c["value"] = squadId;
+    setRegion(c, region);
+    return c;
+}
+
+Json makeAddFamilies(int count, long long nowEpochSeconds, const std::optional<std::string>& region) {
+    Json c = base("addFamilies", nowEpochSeconds);
+    c["count"] = count;
+    setRegion(c, region);
     return c;
 }
 
