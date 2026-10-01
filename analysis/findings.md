@@ -387,8 +387,36 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
   - 창 프로시저가 잠금을 쥔 채 `ReleaseCapture`를 부르면 Windows가 같은 스레드에 `WM_CAPTURECHANGED`를 보내 창 프로시저가 다시 불린다. 거기서 같은 잠금을 다시 잡으면 예외가 나고 프로세스가 끝난다(이 프로그램에서는 종료 코드 `0xC0000409`).
 - ImGui의 Win32 백엔드는 `WM_LBUTTONDOWN`에서 `SetCapture`, 버튼을 뗄 때 `ReleaseCapture`를 부른다(`imgui_impl_win32.cpp`). 숨은 창에 후킹한 창 프로시저를 걸고 `WM_LBUTTONDOWN`/`WM_LBUTTONUP`을 보내는 테스트(`overlay_input_survives_reentrant_window_messages`)는 당시 코드에서 테스트 프로세스를 `0xC0000409`로 끝냈고, 잠금을 `std::recursive_mutex`로 바꾸자 통과했다.
 - 16:17에 게임 창에 실제로 마우스 버튼 입력이 있었는지는 확인하지 못했다(추정). 예외 코드가 테스트(`0xC0000409`)와 게임(`0xc000041d`)에서 다른 이유도 확인하지 않았다.
-- 고친 코드(재진입 잠금, 입력 경로의 예외 보호, 다른 스레드가 보낸 메시지는 ImGui에 넘기지 않기)는 게임에서 아직 돌리지 않았다. 계획 A의 Task 6에서 확인한다.
+- 고친 코드(재진입 잠금, 입력 경로의 예외 보호, 다른 스레드가 보낸 메시지는 ImGui에 넘기지 않기)는 게임에서 아직 돌리지 않았다. 계획 A의 Task 6에서 확인한다(아래 "계획 A 구현 검증").
 
 ### 구현할 때 지킬 것
 - 창 프로시저는 같은 스레드에서 다시 불린다. 그 안에서 잡는 잠금은 재진입 잠금이어야 한다.
 - 후킹한 창 프로시저 밖으로 예외를 내보내지 않는다. Windows가 게임을 끝낸다.
+
+## 게임 안 오버레이 창 — 계획 A 구현 검증 (2026-10-01, saveGame_8)
+`feat/overlay`의 빌드를 `deploy.ps1`로 배포하고 게임을 여섯 번 켜서 쟀다(매번 저장 없이 종료). 화면은 `tools/capture-game.ps1`로 게임 창만 찍었다. 17:30~17:50 사이 이벤트 로그에 게임의 Application Error는 없었고 `Saved/Crashes`에 새 폴더도 없었다.
+
+### 올리기와 그리기
+- 모드가 게임 시작 때 DLL을 올린다. `UE4SS.log`: `native: loaded`, 0.6초 뒤 `overlay: loaded`. `status.json`의 `overlay`는 `loaded = true`, `state = ready`, `stale = false`.
+- Steam으로 게임을 켠 지 15초 뒤 `overlay_status.json`이 `ready`였다(`frames` 40, `font = malgun`). 세이브를 불러온 뒤에도 `frames`가 계속 늘었다.
+- 닫힌 채로 시작하면 화면 왼쪽 위에 "Insert: MLToybox" 안내가 뜨고 10초 뒤 캡처에서는 없었다. 안내가 뜬 때는 게임이 아직 검은 시작 화면일 때였다(메인 메뉴가 나오기 전).
+
+### 화면
+- 탭 순서는 영주, 건설, 업그레이드, 상태. 영주 탭의 목표(150000 / 20000 / 50000)와 체크는 `control.json`의 `features.lord`, "현재"(148500 / 27910 / 50000)는 `status.json`의 `lord`와 같았다. 건설 탭의 체크 6개와 업그레이드 탭의 체크도 `control.json`과 같았다.
+- 상태 탭: heartbeat, inGame, appliedSeq / sent, bridgeError, 기능 7줄, 네이티브 4줄, 오버레이(빌드 날짜, 글꼴 맑은 고딕, 여닫는 키, 글자 배율). 열이 맞게 그려졌다.
+- 메인 메뉴: 맨 위 줄 "● 메인 메뉴", "지금 설정" 버튼이 흐리게 보이고 "현재: -", 아래에 "게임에 들어가면 표시됩니다".
+
+### 동작
+- Insert 키 메시지: `visible`이 `true` → `false` → `true`.
+- 창이 열린 상태에서 마우스 버튼 메시지(`capture-game.ps1 -Click 400,500`)를 5번, 다른 실행에서 3번 보냈다. 게임 프로세스가 살아 있었고 `state = ready`, `frames`가 계속 늘었다. 고치기 전 DLL에 같은 메시지를 보내 튕기는지는 재지 않았다.
+- `control.json`을 밖에서 고쳐 `seq`를 133으로 올리고 국고 목표를 123456으로 바꾸자 3초 뒤 캡처에 123456과 "● 적용됨"이 보였다(`appliedSeq = 133`).
+- 창을 (1250, 300)에 두고 해상도를 1280×720 창 모드로 줄이자 창이 (640, 0)으로 옮겨져 화면 안에 다 들어왔고 `overlay.json`에도 그 위치가 적혔다. 1920×1080 전체 창으로 되돌린 뒤에도 `state = ready`였다.
+
+### 안전장치
+- 배포된 `config.lua`의 `overlay = false`: `status.overlay`가 `loaded = false`, `error = "disabled in config"`, `stale = true`이고 `state`가 없었다(지난 실행의 `overlay_status.json`에는 `ready`가 남아 있었다). `features.build.active = true`, `native.loaded = true`, 화면에 오버레이 창 없음.
+- 배포된 `mltoybox_overlay.dll`을 다른 이름으로 바꿈: `error = "not deployed"`, `native.loaded = true`, `features.build.active = true`.
+
+### 확인하지 못한 것
+- 실제 마우스·키보드 조작(체크, 숫자 입력, "지금 설정", 창 끌기와 크기 바꾸기, 창 위 입력이 게임에 새지 않는지, 여닫는 키와 글자 배율 바꾸기). 게임 창이 앞에 있어야 해서 사용자 확인 항목이다.
+- 화면에서 값을 바꿨을 때 `control.json`에 저장되는 경로는 단위 테스트(`overlay_session_*`, `overlay_bridge_*`)로만 확인했다.
+- 프레임 생성(FSR·DLSS FG), HDR, 전체 화면 전용 모드, 모니터 사이 이동, 오래 켜 둔 상태.
