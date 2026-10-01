@@ -36,7 +36,10 @@ add_library(overlay_core STATIC
     overlay/core/control_doc.cpp
     overlay/core/status_doc.cpp
     overlay/core/bridge.cpp
-    overlay/core/commands.cpp)
+    overlay/core/commands.cpp
+    overlay/core/settings.cpp
+    overlay/core/status_file.cpp
+    overlay/core/session.cpp)
 target_include_directories(overlay_core PUBLIC . third_party)
 target_link_libraries(overlay_core PUBLIC mlt_core)
 
@@ -46,7 +49,9 @@ add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_t
     tests/overlay_text_tests.cpp
     tests/overlay_control_doc_tests.cpp
     tests/overlay_status_doc_tests.cpp
-    tests/overlay_bridge_tests.cpp)
+    tests/overlay_bridge_tests.cpp
+    tests/overlay_settings_tests.cpp
+    tests/overlay_session_tests.cpp)
 target_link_libraries(native_tests PRIVATE mlt_core overlay_core)
 # 테스트가 읽는 견본 파일의 위치
 target_compile_definitions(native_tests PRIVATE
