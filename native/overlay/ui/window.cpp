@@ -16,8 +16,11 @@ struct Tab {
     const char* name;
     void (*draw)(TabContext&);
 };
-// 패널과 같은 이름. 탭은 뒤 태스크에서 더한다
+// 패널과 같은 이름·순서
 const Tab kTabs[] = {
+    { "영주", drawLordTab },
+    { "건설", drawBuildTab },
+    { "업그레이드", drawUpgradeTab },
     { "상태", drawStatusTab },
 };
 

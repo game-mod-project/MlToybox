@@ -65,6 +65,9 @@ add_library(mltoybox_overlay SHARED
     overlay/render/guard.cpp
     overlay/ui/app.cpp
     overlay/ui/window.cpp
+    overlay/ui/widgets.cpp
+    overlay/ui/tab_build.cpp
+    overlay/ui/tab_lord.cpp
     overlay/ui/tab_status.cpp)
 target_link_libraries(mltoybox_overlay PRIVATE overlay_core imgui minhook d3d12 dxgi user32)
 

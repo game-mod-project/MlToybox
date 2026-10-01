@@ -12,6 +12,9 @@ struct TabContext {
     long long now;             // UTC 초
 };
 
+void drawLordTab(TabContext& ctx);
+void drawBuildTab(TabContext& ctx);
+void drawUpgradeTab(TabContext& ctx);
 void drawStatusTab(TabContext& ctx);
 
 // 설정 문서를 바꿨다고 표시한다(작업 스레드가 0.2초 안에 저장한다)
