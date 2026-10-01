@@ -2,7 +2,9 @@
 
 - 작성일: 2026-10-01
 - 근거: `analysis/findings.md` "게임 안 오버레이 창 — DX12 후킹 + Dear ImGui (2026-10-01, 스파이크)"
-- 상태: 사용자 승인 대기
+- 상태: 승인됨(2026-10-01)
+- 구현 계획: 계획 A `docs/superpowers/plans/2026-10-01-ingame-overlay-plan-a.md`(8절의 1~3단계). 계획 B(4~7단계)는 계획 A를 끝낸 뒤 쓴다.
+- 계획을 쓰며 고친 곳(2026-10-01): 3.2 파일 목록, 3.3 입력 처리 방식(큐 대신 잠금), 4.2 밖에서 고친 `overlay.json` 다시 읽기, 6 도구
 
 ## 1. 목적과 범위
 
@@ -149,6 +151,7 @@ native/overlay/core/
   status_doc.h/.cpp      상태 문서 읽기(Lua 의 빈 표 [] 허용)
   bridge.h/.cpp          control.json 저장(seq, 임시 파일 + 이름 바꾸기), status.json 읽기, 연결 상태 판정
   commands.h/.cpp        일회성 명령 만들기(id, issuedAt)
+  session.h/.cpp         나눠 쓰는 문서 상태와 저장·다시 읽기 규칙(변경 표시, 보낼 명령, 실패 뒤 되돌리기)
   merc_rules.h/.cpp      용병단 검증, 구성 요약, 사용 가능 여부, 깃발·영지 선택지
   units.h/.cpp           병종 13종과 한글 이름
   resources.h/.cpp       자원 범위와 표 행 만들기
@@ -159,12 +162,14 @@ native/overlay/core/
 native/overlay/render/
   dx12_hook.h/.cpp       가상 함수 표 찾기, Present/ResizeBuffers/ExecuteCommandLists 후킹, 큐 선택, 백버퍼 관리
   imgui_layer.h/.cpp     ImGui 초기화, 글꼴, 프레임 시작·끝
-  input.h/.cpp           창 프로시저 후킹, 입력 큐, 토글 키
-  guard.h/.cpp           프레임 실행을 구조적 예외로 감싸기
+  input.h/.cpp           창 프로시저 후킹, 토글 키, ImGui 에 입력 전달(잠금)
+  guard.h/.cpp           프레임 실행을 구조적 예외로 감싸기, 예외 뒤 잠금 풀기
 native/overlay/ui/
-  app.h/.cpp             화면과 작업 스레드가 나눠 쓰는 상태(잠금), 변경 표시
-  window.cpp             메인 창, 상태 줄, 탭 막대, 안내
-  tab_resources.cpp, tab_lord.cpp, tab_build.cpp, tab_upgrade.cpp, tab_military.cpp,
+  app.h/.cpp             화면과 작업 스레드가 나눠 쓰는 상태(잠금)
+  window.h/.cpp          메인 창, 상태 줄, 탭 막대, 안내
+  tabs.h                 탭 함수 선언과 탭에 넘기는 문맥
+  widgets.h/.cpp         숫자 칸 등 여러 탭이 쓰는 화면 조각
+  tab_resources.cpp, tab_lord.cpp, tab_build.cpp(건설·업그레이드), tab_military.cpp,
   tab_mercenaries.cpp, tab_population.cpp, tab_status.cpp
 native/overlay/worker.h/.cpp        작업 스레드
 native/overlay/dllmain.cpp
@@ -174,14 +179,16 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 ### 3.3 스레드
 | 스레드 | 하는 일 | 하지 않는 일 |
 |---|---|---|
-| 화면 출력(게임의 RHI 스레드, `Present` 후킹 안) | 입력 큐 비우기, ImGui 프레임, 화면 코드, 그리기 | 파일 읽기·쓰기 |
-| 창(게임 스레드, 창 프로시저 후킹 안) | 토글 키 처리, 메시지를 입력 큐에 넣기, 게임에 넘길지 결정 | ImGui 호출 |
-| 작업(오버레이 DLL이 만든 스레드) | 후킹 설치, `status.json` 읽기(1초), `control.json` 저장(변경 뒤 0.2초 안), 밖에서 바뀐 설정 다시 읽기, `overlay.json`·`overlay_status.json` 쓰기 | 화면 그리기 |
+| 화면 출력(게임의 RHI 스레드, `Present` 후킹 안) | ImGui 프레임, 화면 코드, 그리기 | 파일 읽기·쓰기 |
+| 창(게임 스레드, 창 프로시저 후킹 안) | 토글 키 처리, 창이 열려 있으면 ImGui에 입력 전달, 게임에 넘길지 결정 | 화면 그리기, 파일 읽기·쓰기 |
+| 작업(오버레이 DLL이 만든 스레드) | 후킹 설치, `status.json` 읽기(1초), `control.json` 저장(변경 뒤 0.2초 안), 밖에서 바뀐 설정 다시 읽기, `overlay.json`·`overlay_status.json` 쓰기 | 화면 그리기, ImGui 호출 |
 
-- 나눠 쓰는 상태(`app`)는 잠금 하나로 보호한다: 설정 문서, 최신 상태 문서(불변 사본의 공유 포인터), 변경 표시, 보낼 명령, 마지막으로 보낸 `seq`, 저장 오류.
-- 화면 스레드는 프레임마다 잠금을 잡고 상태 사본 포인터를 받고, 설정을 고칠 때만 문서를 바꾼다. 작업 스레드는 저장할 때 문서를 문자열로 만든 뒤 잠금을 풀고 파일에 쓴다.
-- 창 스레드는 ImGui를 부르지 않는다. 스파이크는 창 프로시저에서 ImGui 입력 함수를 바로 불러 경합 가능성이 있었다. 메시지(`hwnd, msg, wParam, lParam`)를 잠금이 걸린 큐에 넣고, 화면 스레드가 프레임을 시작하기 전에 꺼내 `ImGui_ImplWin32_WndProcHandler`에 넘긴다.
+- 나눠 쓰는 상태(`app`)는 잠금 하나(`App::mutex`)로 보호한다: 설정 문서, 최신 상태 문서(불변 사본의 공유 포인터), 변경 표시, 보낼 명령, 마지막으로 보낸 `seq`, 저장 오류. 저장·다시 읽기의 순서 규칙은 코어의 `session`에 두어 단위 테스트한다.
+- 화면 스레드는 프레임마다 잠금을 잡고 상태 사본 포인터를 받고, 설정을 고칠 때만 문서를 바꾼다. 작업 스레드는 저장할 때 문서의 사본을 만든 뒤 잠금을 풀고 파일에 쓴다.
+- ImGui는 스레드 안전하지 않다. 스파이크는 창 프로시저에서 ImGui 입력 함수를 잠금 없이 불러 경합 가능성이 있었다. ImGui를 부르는 곳(화면 스레드의 프레임, 창 스레드의 입력 전달)은 모두 잠금 하나(`imguiMutex`) 아래에서 부른다. 잠금 순서는 `imguiMutex` 다음 `App::mutex`다.
+  - 입력을 큐에 넣었다가 화면 스레드에서 넘기는 방식은 쓰지 않는다. `ImGui_ImplWin32_WndProcHandler`가 부르는 Win32의 마우스 캡처·키 상태 함수는 창을 가진 스레드에서 불러야 하기 때문이다.
 - 게임에 넘길지는 창 스레드가 바로 정해야 하므로, 화면 스레드가 프레임마다 갱신하는 원자 값(`wantMouse`, `wantKeyboard`, `visible`)을 본다. 한 프레임 늦은 값이다.
+- 구조적 예외가 나면 C++ 소멸자가 불리지 않아 잠금이 풀리지 않는다. 화면 스레드는 잠금을 쥐고 있는지 적어 두고, 예외 처리기가 직접 푼다.
 
 ### 3.4 코어의 규칙 (패널 `Panel.Core`와 같은 동작)
 - **설정 문서**: nlohmann `ordered_json`을 그대로 들고, 아는 키는 접근 함수로 읽고 쓴다. 모르는 키는 건드리지 않아 보존된다. 키가 없으면 패널의 기본값을 쓴다(예: `build.instantBuild = true`, `mercenaries.refund = true`, `population.multiplier = 2`, `resources.intervalSec = 2`).
@@ -213,6 +220,7 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 - `scale`: 0.8~1.5. 범위를 벗어나면 가까운 끝값.
 - `startOpen`, `devTab`: 개발·검증용. `startOpen`이 참이면 열린 채로 시작하고, `devTab`에 탭 이름을 주면 그 탭을 연다(마우스 없이 창 캡처로 화면을 확인하기 위한 것). 화면에서는 고칠 수 없다.
 - 파일이 없거나 깨졌으면 기본값을 쓴다.
+- 게임이 켜져 있는 동안 이 파일을 밖에서 고치면 작업 스레드가 1초 안에 다시 읽는다(저장 대기 중인 오버레이 쪽 변경이 없을 때). 게임을 다시 켜지 않고 `devTab`을 바꿔 가며 화면을 확인하기 위한 것이다.
 
 ### 4.3 `bridge/overlay_status.json` (오버레이가 쓴다, 1초마다)
 ```json
@@ -226,7 +234,7 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 "overlay": { "loaded": true, "error": null, "state": "ready", "reason": null, "stale": false }
 ```
 - `loaded`·`error`: Lua가 DLL을 올린 결과. `config.overlay`가 거짓이면 `loaded = false, error = "disabled in config"`.
-- 나머지는 `overlay_status.json`에서 가져온다(`native.status`와 같은 방식. `heartbeat`가 5초 넘게 지나면 `stale = true`).
+- 나머지는 `overlay_status.json`에서 가져온다(`native.status`와 같은 방식. `heartbeat`가 5초 넘게 지나면 `stale = true`). DLL을 올리지 못했으면 이 파일을 보지 않는다(지난 실행의 파일이 남아 있을 수 있다).
 
 ### 4.5 Lua 변경
 - `config.lua`: `overlay = true`.
@@ -270,6 +278,7 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 - `tools/build-native.ps1`: 그대로 쓴다(CMake가 모든 타깃을 빌드한다). `-Test`는 `overlay_core` 테스트를 포함한다.
 - `tools/deploy.ps1 -Mod MLToybox`: `native/build/mltoybox_overlay.dll`이 있으면 `Mods/MLToybox/native/`에 복사한다. 게임 실행 중이라 잠겨 있으면 네이티브 DLL과 같이 경고만 남긴다.
 - `tools/capture-game.ps1`(새 개발 도구): 게임 창만 캡처(`PrintWindow`)하고 키 메시지를 보낸다. 화면 전체나 다른 창은 찍지 않는다. 실제 마우스·키보드와 전경 창은 건드리지 않는다.
+- `tools/lab/resize.lua`(새 개발 도구): Lab으로 해상도와 창 모드를 바꾼다(설정 파일에는 저장하지 않는다). 해상도 변경 확인에 쓴다.
 
 ## 7. 테스트
 
@@ -318,9 +327,9 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 - 프레임 생성을 켰을 때(쓰는 경우).
 
 ## 8. 구현 순서
-단계마다 게임에서 돌아가는 상태로 끝낸다.
+단계마다 게임에서 돌아가는 상태로 끝낸다. 구현 계획은 둘로 나눈다: 계획 A가 1~3단계, 계획 B가 4~7단계다. 계획 A가 끝나면 오버레이에 탭 4개(영주, 건설, 업그레이드, 상태)가 있고 나머지 탭은 패널로 설정한다. 계획 A 안에서는 단위 테스트를 먼저 쓸 수 있도록 코어(2단계)를 기반(1단계)의 DLL보다 먼저 만든다.
 
-1. **기반**: 라이브러리 추가, 오버레이 DLL 골격(후킹, 빈 창, 토글, 입력 큐, 안전장치, 상태 파일), Lua에서 올리기와 `config.overlay`, 배포 도구, `capture-game.ps1`.
+1. **기반**: 라이브러리 추가, 오버레이 DLL 골격(후킹, 빈 창, 토글, 입력, 안전장치, 상태 파일), Lua에서 올리기와 `config.overlay`, 배포 도구, `capture-game.ps1`.
 2. **코어**: 설정·상태 문서, 브리지, 명령, 규칙, 테스트와 호환 견본. 작업 스레드와 `app` 상태, 상태 줄.
 3. **간단한 탭**: 건설, 업그레이드, 영주, 상태(오버레이 설정 포함).
 4. **군사, 인구**.
