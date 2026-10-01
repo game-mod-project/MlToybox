@@ -74,6 +74,8 @@ add_library(overlay_impl STATIC
     overlay/ui/widgets.cpp
     overlay/ui/tab_build.cpp
     overlay/ui/tab_lord.cpp
+    overlay/ui/tab_military.cpp
+    overlay/ui/tab_population.cpp
     overlay/ui/tab_status.cpp)
 target_link_libraries(overlay_impl PUBLIC overlay_core imgui minhook d3d12 dxgi user32 imm32)
 
