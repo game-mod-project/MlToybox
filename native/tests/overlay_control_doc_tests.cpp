@@ -96,6 +96,23 @@ TEST(overlay_control_broken_or_odd_input_falls_back_to_defaults) {
     CHECK(!doc.lord().treasury && doc.lord().intervalSec == 2);
 }
 
+TEST(overlay_control_try_parse_tells_broken_text_apart) {
+    CHECK(!ControlDoc::tryParse("").has_value());
+    CHECK(!ControlDoc::tryParse("{").has_value());
+    CHECK(!ControlDoc::tryParse("[1,2]").has_value());
+    CHECK(ControlDoc::tryParse("{}").has_value());
+    CHECK(ControlDoc::tryParse(R"({"version":1,"seq":4})")->seq() == 4);
+}
+
+// 저장할 때 예외가 나면 작업 스레드의 그 회차가 날아가고 저장이 되지 않는다. 잘린 글자는 대체 문자로 쓴다
+TEST(overlay_control_dump_replaces_bad_utf8_instead_of_throwing) {
+    ControlDoc doc;
+    doc.feature("mercenaries")["companies"] = Json::array({ Json::object({ { "name", std::string("\xEA\xB2") } }) });   // 한글 한 글자의 앞 두 바이트
+    const std::string text = doc.dump();
+    CHECK(text.find("\xEF\xBF\xBD") != std::string::npos);   // U+FFFD
+    CHECK(ControlDoc::tryParse(text).has_value());
+}
+
 TEST(overlay_control_commands_are_replaced_as_a_whole) {
     ControlDoc doc;
     Json c = Json::object();

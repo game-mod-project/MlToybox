@@ -37,6 +37,8 @@ public:
     ControlDoc();
     // 깨졌거나 객체가 아니면 빈 문서. 옛 설정(자원 목표에 든 국고·영향력)을 영주 설정으로 옮긴다
     static ControlDoc parse(std::string_view text);
+    // 해석하지 못하면 값 없음(파일이 깨졌는지 가릴 때 쓴다)
+    static std::optional<ControlDoc> tryParse(std::string_view text);
     std::string dump() const;
 
     long long seq() const;

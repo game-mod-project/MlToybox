@@ -32,6 +32,7 @@ struct App : Session {
     std::atomic<long long> frames{0};
     std::atomic<bool> koreanFont{false};
     std::atomic<bool> applyWindowRect{true};   // 설정의 창 위치·크기를 다음 프레임에 적용한다
+    std::atomic<long long> workerErrors{0};    // 작업 스레드가 예외로 건너뛴 회차 수(0 이 아니면 상태 탭에 보인다)
 };
 
 App& app();

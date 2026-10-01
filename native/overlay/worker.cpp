@@ -63,7 +63,11 @@ static void saveSettingsIfDirty(App& a, const Bridge& bridge, std::filesystem::f
         copy = a.settings;
         a.settingsDirty = false;
     }
-    if (!writeFileAtomic(bridge.settingsPath(), dumpSettings(copy))) return;
+    if (!writeFileAtomic(bridge.settingsPath(), dumpSettings(copy))) {
+        std::lock_guard<std::mutex> lock(a.mutex);
+        a.settingsDirty = true;   // 다음 회차에 다시 쓴다
+        return;
+    }
     std::error_code ec;
     known = std::filesystem::last_write_time(bridge.settingsPath(), ec);   // 우리가 쓴 것은 밖에서 바뀐 것으로 보지 않는다
 }
@@ -74,7 +78,7 @@ static void reloadSettingsIfChangedOutside(App& a, const Bridge& bridge, std::fi
     const auto written = std::filesystem::last_write_time(bridge.settingsPath(), ec);
     if (ec || written == known) return;
     known = written;
-    auto text = readFileUtf8(bridge.settingsPath());
+    auto text = readFileShared(bridge.settingsPath());
     if (!text) return;
     std::lock_guard<std::mutex> lock(a.mutex);
     if (a.settingsDirty) return;
@@ -103,10 +107,13 @@ void runOverlayWorker(void* selfModule) {
     App& a = app();
     {
         std::lock_guard<std::mutex> lock(a.mutex);
-        a.settings = parseSettings(readFileUtf8(bridge.settingsPath()).value_or(""));
+        a.settings = parseSettings(readFileShared(bridge.settingsPath()).value_or(""));
         syncSettingsAtoms(a);
         a.visible = a.settings.startOpen;
-        a.control = bridge.loadControl();
+        // control.json 이 있는데 읽지 못했으면(손으로 고치다 문법을 틀린 경우) 기본값으로 덮기 전에 사본을 남긴다
+        LoadedControl loaded = bridge.loadControlChecked();
+        if (loaded.unreadable) bridge.backupControl();
+        a.control = std::move(loaded.doc);
         a.lastSentSeq = a.control.seq();
     }
     std::error_code ec;
@@ -123,15 +130,20 @@ void runOverlayWorker(void* selfModule) {
 
     unsigned saveRetryAt = 0;
     for (unsigned tick = 0;; ++tick) {
-        if (tick % 2 == 0 && tick >= saveRetryAt) {                // 0.2초마다. 실패했으면 1초 뒤에 다시 한다
-            if (!saveControlIfDirty(a, bridge)) saveRetryAt = tick + 10;
-        }
-        if (tick % 10 == 0) {                                      // 1초마다
-            readStatus(a, bridge);
-            reloadControlIfChangedOutside(a, bridge);
-            saveSettingsIfDirty(a, bridge, settingsWritten);
-            reloadSettingsIfChangedOutside(a, bridge, settingsWritten);
-            writeOverlayStatus(a, bridge);
+        // 이 스레드가 예외로 끝나면 저장이 조용히 멈춘다. 그 회차만 건너뛰고 계속한다
+        try {
+            if (tick % 2 == 0 && tick >= saveRetryAt) {            // 0.2초마다. 실패했으면 1초 뒤에 다시 한다
+                if (!saveControlIfDirty(a, bridge)) saveRetryAt = tick + 10;
+            }
+            if (tick % 10 == 0) {                                  // 1초마다
+                readStatus(a, bridge);
+                reloadControlIfChangedOutside(a, bridge);
+                saveSettingsIfDirty(a, bridge, settingsWritten);
+                reloadSettingsIfChangedOutside(a, bridge, settingsWritten);
+                writeOverlayStatus(a, bridge);
+            }
+        } catch (...) {
+            ++a.workerErrors;
         }
         Sleep(100);
     }

@@ -47,9 +47,13 @@ ControlDoc::ControlDoc() {
 }
 
 ControlDoc ControlDoc::parse(std::string_view text) {
+    return tryParse(text).value_or(ControlDoc());
+}
+
+std::optional<ControlDoc> ControlDoc::tryParse(std::string_view text) {
     ControlDoc doc;
     Json parsed = Json::parse(text.begin(), text.end(), nullptr, false);
-    if (parsed.is_discarded() || !parsed.is_object()) return doc;
+    if (parsed.is_discarded() || !parsed.is_object()) return std::nullopt;
     doc.root_ = std::move(parsed);
     Json& root = doc.root_;
     if (!root.contains("features") || !root["features"].is_object()) root["features"] = Json::object();
@@ -85,7 +89,8 @@ ControlDoc ControlDoc::parse(std::string_view text) {
 }
 
 std::string ControlDoc::dump() const {
-    return root_.dump(2);
+    // 잘못된 UTF-8 이 섞여 있어도 예외를 던지지 않고 대체 문자(U+FFFD)로 쓴다
+    return root_.dump(2, ' ', false, Json::error_handler_t::replace);
 }
 
 long long ControlDoc::seq() const {

@@ -112,6 +112,46 @@ TEST(overlay_command_set_lord_has_the_fields_the_mod_reads) {
     CHECK(newCommandId() != newCommandId());
 }
 
+// 저장 실패의 실제 방아쇠: 다른 프로그램이 control.json 을 잡고 있어 이름 바꾸기가 안 된다
+TEST(overlay_bridge_failed_save_reports_and_leaves_the_seq_alone) {
+    Bridge b(freshDir("locked"));
+    ControlDoc doc;
+    CHECK(b.saveControl(doc) == 1);
+    HANDLE held = CreateFileW(b.controlPath().c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);   // 공유 없이 연다
+    CHECK(held != INVALID_HANDLE_VALUE);
+    CHECK(!b.saveControl(doc).has_value());
+    CHECK(doc.seq() == 1);                 // 실패하면 문서의 seq 를 올리지 않는다
+    CloseHandle(held);
+    CHECK(b.saveControl(doc) == 2);        // 풀리면 다음 번호로 저장된다
+    CHECK(b.peekSeq() == 2);
+}
+
+// 손으로 고치다 문법을 틀린 control.json 으로 시작하면 오버레이는 기본값으로 뜬다.
+// 그 상태에서 무엇이든 바꾸면 파일을 기본값으로 덮으므로, 덮기 전에 사본을 남길 수 있어야 한다
+TEST(overlay_bridge_tells_an_unreadable_control_file_from_a_missing_one) {
+    Bridge b(freshDir("broken"));
+    CHECK(!b.loadControlChecked().unreadable);                       // 파일이 없다: 첫 실행
+    CHECK(!b.backupControl());                                       // 남길 것이 없다
+    writeText(b.controlPath(), R"({"version":1,"seq":9,"features":{"build":{"enabled":true}})");   // 닫는 괄호가 없다
+    const LoadedControl loaded = b.loadControlChecked();
+    CHECK(loaded.unreadable && loaded.doc.seq() == 0 && !loaded.doc.build().enabled);
+    CHECK(b.backupControl());
+    auto kept = readFileShared(b.controlBackupPath());
+    CHECK(kept.has_value() && kept->find("\"seq\":9") != std::string::npos);
+    writeText(b.controlPath(), R"({"version":1,"seq":9,"features":{"build":{"enabled":true}}})");
+    const LoadedControl good = b.loadControlChecked();
+    CHECK(!good.unreadable && good.doc.seq() == 9 && good.doc.build().enabled);
+}
+
+TEST(overlay_bridge_shared_read_returns_the_bytes_or_nothing) {
+    Bridge b(freshDir("shared"));
+    CHECK(!readFileShared(b.statusPath()).has_value());
+    writeText(b.statusPath(), "{\"name\":\"검사대\"}");
+    CHECK(readFileShared(b.statusPath()) == "{\"name\":\"검사대\"}");
+    writeText(b.statusPath(), "");
+    CHECK(readFileShared(b.statusPath()) == "");
+}
+
 // Lua 스펙(overlay_fixture_spec.lua)이 읽는 견본. 코어의 출력이 바뀌면 이 테스트가 실패한다.
 // 견본을 다시 만들려면 환경 변수 MLT_WRITE_FIXTURES=1 로 테스트를 한 번 돌린다.
 TEST(overlay_fixture_for_the_lua_spec_matches_core_output) {
