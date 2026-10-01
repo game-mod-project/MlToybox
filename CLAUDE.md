@@ -12,4 +12,5 @@ Manor Lords UE4SS Lua 모드 + .NET 8 제어 패널. 설계: `docs/superpowers/s
 - 원인은 실측(게임 값·로그·덤프·상태 파일)으로 확인한 뒤 보고한다. 추정을 결론처럼 쓰지 않는다.
 - 게임 확인은 가능한 한 직접 한다: Lab 모드(`tools/lab.ps1`)로 값 읽기, `bridge/control.json`에 명령을 써서 결과를 `status.json`으로 확인.
 - 패널을 고치면 `dotnet test`와 별도로 `dotnet build panel/MLToybox.sln`을 실행한다(테스트가 WinForms 컴파일 오류를 잡지 못한 적이 있음).
-- Lua 모드 변경은 게임 재시작 후 적용, 패널은 실행 중이면 배포 불가(파일 잠김), 네이티브 DLL은 게임 실행 중 잠김.
+- Lua 모드 변경은 게임 재시작 후 적용, 패널은 실행 중이면 배포 불가(파일 잠김), 네이티브 DLL과 오버레이 DLL은 게임 실행 중 잠김.
+- 오버레이 화면은 `bridge/overlay.json`의 `startOpen`·`devTab`과 `tools/capture-game.ps1`로 마우스 없이 확인한다. 게임을 켜는 확인은 한 번에 몰아서 하고 끝나면 바로 끈다. 켜기 전에 사용자에게 게임 창을 누르지 말라고 알린다.
