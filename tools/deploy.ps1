@@ -60,11 +60,14 @@ $global:LASTEXITCODE = 0
 if ($Mod -eq 'MLToybox') { New-Item -ItemType Directory -Force (Join-Path $target 'bridge') | Out-Null }
 if ($Mod -eq 'MLToyboxLab') { New-Item -ItemType Directory -Force (Join-Path $target 'lab') | Out-Null }
 if ($Mod -eq 'MLToybox') {
-    $dll = Join-Path $repo 'native\build\mltoybox_native.dll'
-    if (Test-Path $dll) {
-        $nativeDir = New-Item -ItemType Directory -Force (Join-Path $target 'native')
-        try { Copy-Item $dll $nativeDir -Force -ErrorAction Stop }
-        catch { Write-Warning "native dll not copied (game running?): $($_.Exception.Message)" }
+    # 네이티브 DLL 과 오버레이 DLL. 빌드돼 있는 것만 복사한다. 게임이 켜져 있으면 잠겨 있어 경고만 남긴다
+    foreach ($name in 'mltoybox_native.dll', 'mltoybox_overlay.dll') {
+        $dll = Join-Path $repo "native\build\$name"
+        if (Test-Path $dll) {
+            $nativeDir = New-Item -ItemType Directory -Force (Join-Path $target 'native')
+            try { Copy-Item $dll $nativeDir -Force -ErrorAction Stop }
+            catch { Write-Warning "$name not copied (game running?): $($_.Exception.Message)" }
+        }
     }
 }
 Update-ModsTxt $true

@@ -9,4 +9,6 @@ return {
   featureModules = { "resources", "lord", "build", "upgrade", "military", "mercenaries", "population" },
   -- control.json 이 아직 없을 때 쓰는 기본 설정 (features 테이블과 같은 모양)
   defaults = {},
+  -- 게임 안 오버레이 창(native/mltoybox_overlay.dll)을 올린다. 오버레이가 말썽이면 false 로 끈다(다른 기능은 그대로 동작)
+  overlay = true,
 }

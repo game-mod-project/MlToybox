@@ -26,5 +26,6 @@ T.run({
     local cfg = dofile(scriptsPath("config.lua"))
     T.eq(cfg.menuGameModePattern, "MenuGameMode_ML_C", "menu pattern")
     T.eq(type(cfg.featureModules), "table", "featureModules")
+    T.eq(cfg.overlay, true, "overlay on by default")
   end,
 })
