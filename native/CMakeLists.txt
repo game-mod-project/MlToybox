@@ -32,13 +32,19 @@ target_link_libraries(mltoybox_native PRIVATE mlt_core)
 # overlay_core: 문서 모델·브리지·규칙. Windows 그래픽에 의존하지 않아 단위 테스트한다
 add_library(overlay_core STATIC
     overlay/core/text.cpp
-    overlay/core/number_input.cpp)
+    overlay/core/number_input.cpp
+    overlay/core/control_doc.cpp)
 target_include_directories(overlay_core PUBLIC . third_party)
 target_link_libraries(overlay_core PUBLIC mlt_core)
 
 enable_testing()
 add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_tests.cpp
     tests/json_tests.cpp tests/control_tests.cpp tests/status_tests.cpp tests/hooks_tests.cpp tests/instant_build_tests.cpp tests/probe_tests.cpp tests/placement_tests.cpp tests/pin_tests.cpp tests/militia_guard_tests.cpp
-    tests/overlay_text_tests.cpp)
+    tests/overlay_text_tests.cpp
+    tests/overlay_control_doc_tests.cpp)
 target_link_libraries(native_tests PRIVATE mlt_core overlay_core)
+# 테스트가 읽는 견본 파일의 위치
+target_compile_definitions(native_tests PRIVATE
+    MLT_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures"
+    MLT_LUA_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../mod/MLToybox/tests/fixtures")
 add_test(NAME native_tests COMMAND native_tests)
