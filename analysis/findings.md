@@ -365,4 +365,30 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 ### 구현할 때 지킬 것
 - 그리는 큐는 `Present` 스레드의 직접 큐로 고른다. 큐를 못 찾으면 그리지 않는다.
 - 창 프로시저(게임 스레드)와 `Present`(RHI 스레드)는 다른 스레드다. 스파이크는 ImGui 입력을 창 프로시저에서 바로 넣었다(경합 가능). 구현은 입력 메시지를 큐에 모아 `Present` 스레드에서 넣어야 한다.
+  - 정정(2026-10-01): 큐에 모았다가 넘기는 방식은 쓰지 않는다. 백엔드가 부르는 캡처·키 상태 함수는 창을 가진 스레드에서 불러야 한다. 두 스레드가 재진입 잠금 하나 아래에서 ImGui를 부르게 한다(아래 "계획 코드 사전 검증").
 - UE4SS의 자체 GUI는 별도 창으로 뜬다(게임 화면 안이 아니다).
+
+## 게임 안 오버레이 창 — 계획 코드 사전 검증 (2026-10-01, saveGame_8)
+구현 계획(`docs/superpowers/plans/2026-10-01-ingame-overlay-plan-a.md`)에 넣을 코드를 레포 밖에서 빌드해 Lab의 `package.loadlib`로 게임 도중에 올려 쟀다(Dear ImGui v1.92.9b). 게임 시작 때 올리는 경로는 재지 않았다.
+
+### 실측
+- `overlay_status.json`: 올린 지 8초 뒤에 읽었을 때 `state = ready`, `font = malgun`이었고 `frames`가 계속 늘었다(약 6분 동안 20786).
+- 게임 창 캡처로 탭 4개(영주, 건설, 업그레이드, 상태)를 확인했다. 영주 탭의 목표는 `control.json`의 `features.lord`(150000 / 20000 / 50000), "현재"는 `status.json`의 `lord`(148500 / 27910 / 50000)와 같았고 맨 위 줄은 "● 적용됨"이었다.
+- `overlay.json`의 `devTab`을 밖에서 고치고 3초 뒤에 찍은 캡처에서 그 탭이 열려 있었다.
+- Insert 키 메시지(`PostMessage`)로 `visible`이 `false` → `true`로 바뀌었다.
+- `control.json`을 밖에서 고쳐 `seq`를 133으로 올리고 국고 목표를 150001로 바꾸자 3초 뒤 화면의 목표가 150001이 됐다(패널과 함께 쓰는 경로).
+- 해상도·창 모드 변경(1600×900 창 → 1920×1080 전체 창) 뒤에도 `state = ready`였고 `frames`가 늘었다.
+
+### 튕김: 창 프로시저의 재진입과 재진입이 안 되는 잠금
+- 16:17:37 게임이 종료됐다. 이벤트 로그(Application Error 1000): `ManorLords-Win64-Shipping.exe`, 모듈 `KERNELBASE.dll`, 예외 코드 `0xc000041d`(창 프로시저 등 사용자 콜백 안에서 처리되지 않은 예외), 오프셋 `0xc483a`. 게임의 `Saved/Crashes`에는 새 폴더가 없었다. `status.json`은 16:17:19에, 오버레이의 `overlay_status.json`은 16:17:36에 마지막으로 쓰였다.
+- 당시 코드는 창 프로시저(게임 스레드)와 `Present`(RHI 스레드)가 `std::mutex` 하나 아래에서 ImGui를 불렀다.
+- 레포 밖 작은 프로그램으로 잰 것(이 레포의 네이티브 빌드와 같은 MSVC 도구, `/MT`):
+  - 같은 스레드가 `std::mutex`를 두 번 잠그면 `std::system_error`(`resource deadlock would occur`)를 던진다.
+  - 창 프로시저가 잠금을 쥔 채 `ReleaseCapture`를 부르면 Windows가 같은 스레드에 `WM_CAPTURECHANGED`를 보내 창 프로시저가 다시 불린다. 거기서 같은 잠금을 다시 잡으면 예외가 나고 프로세스가 끝난다(이 프로그램에서는 종료 코드 `0xC0000409`).
+- ImGui의 Win32 백엔드는 `WM_LBUTTONDOWN`에서 `SetCapture`, 버튼을 뗄 때 `ReleaseCapture`를 부른다(`imgui_impl_win32.cpp`). 숨은 창에 후킹한 창 프로시저를 걸고 `WM_LBUTTONDOWN`/`WM_LBUTTONUP`을 보내는 테스트(`overlay_input_survives_reentrant_window_messages`)는 당시 코드에서 테스트 프로세스를 `0xC0000409`로 끝냈고, 잠금을 `std::recursive_mutex`로 바꾸자 통과했다.
+- 16:17에 게임 창에 실제로 마우스 버튼 입력이 있었는지는 확인하지 못했다(추정). 예외 코드가 테스트(`0xC0000409`)와 게임(`0xc000041d`)에서 다른 이유도 확인하지 않았다.
+- 고친 코드(재진입 잠금, 입력 경로의 예외 보호, 다른 스레드가 보낸 메시지는 ImGui에 넘기지 않기)는 게임에서 아직 돌리지 않았다. 계획 A의 Task 6에서 확인한다.
+
+### 구현할 때 지킬 것
+- 창 프로시저는 같은 스레드에서 다시 불린다. 그 안에서 잡는 잠금은 재진입 잠금이어야 한다.
+- 후킹한 창 프로시저 밖으로 예외를 내보내지 않는다. Windows가 게임을 끝낸다.

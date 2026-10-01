@@ -4,7 +4,7 @@
 - 근거: `analysis/findings.md` "게임 안 오버레이 창 — DX12 후킹 + Dear ImGui (2026-10-01, 스파이크)"
 - 상태: 승인됨(2026-10-01)
 - 구현 계획: 계획 A `docs/superpowers/plans/2026-10-01-ingame-overlay-plan-a.md`(8절의 1~3단계). 계획 B(4~7단계)는 계획 A를 끝낸 뒤 쓴다.
-- 계획을 쓰며 고친 곳(2026-10-01): 3.2 파일 목록, 3.3 입력 처리 방식(큐 대신 잠금), 4.2 밖에서 고친 `overlay.json` 다시 읽기, 6 도구
+- 계획을 쓰며 고친 곳(2026-10-01): 3.2 파일 목록, 3.3 입력 처리 방식(큐 대신 재진입 잠금, 기본 IME 처리 끄기), 4.2 밖에서 고친 `overlay.json` 다시 읽기, 5.2 입력 예외, 6 도구
 
 ## 1. 목적과 범위
 
@@ -186,9 +186,12 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 - 나눠 쓰는 상태(`app`)는 잠금 하나(`App::mutex`)로 보호한다: 설정 문서, 최신 상태 문서(불변 사본의 공유 포인터), 변경 표시, 보낼 명령, 마지막으로 보낸 `seq`, 저장 오류. 저장·다시 읽기의 순서 규칙은 코어의 `session`에 두어 단위 테스트한다.
 - 화면 스레드는 프레임마다 잠금을 잡고 상태 사본 포인터를 받고, 설정을 고칠 때만 문서를 바꾼다. 작업 스레드는 저장할 때 문서의 사본을 만든 뒤 잠금을 풀고 파일에 쓴다.
 - ImGui는 스레드 안전하지 않다. 스파이크는 창 프로시저에서 ImGui 입력 함수를 잠금 없이 불러 경합 가능성이 있었다. ImGui를 부르는 곳(화면 스레드의 프레임, 창 스레드의 입력 전달)은 모두 잠금 하나(`imguiMutex`) 아래에서 부른다. 잠금 순서는 `imguiMutex` 다음 `App::mutex`다.
+  - `imguiMutex`는 재진입 잠금이다. 창 프로시저는 같은 스레드에서 다시 불린다(백엔드가 부르는 `ReleaseCapture`가 `WM_CAPTURECHANGED`를 보낸다). 재진입이 안 되는 잠금이면 그 안에서 예외가 나고, 창 프로시저 밖으로 나간 예외는 게임을 끝낸다(사전 검증에서 실제로 튕겼다. `analysis/findings.md` "게임 안 오버레이 창 — 계획 코드 사전 검증").
+  - 다른 스레드가 `SendMessage`로 보낸 메시지는 ImGui에 넘기지 않는다(보낸 쪽이 잠금을 쥐고 기다리면 서로 멈춘다). 마우스·키 입력은 큐로 오는 메시지라 해당하지 않는다.
+  - ImGui의 기본 IME 처리는 프레임을 그리는 스레드에서 창에 IME 함수를 부르므로 끈다(`IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS`). 한글 입력 위치 맞추기는 창 스레드 쪽에 따로 만든다(계획 B).
   - 입력을 큐에 넣었다가 화면 스레드에서 넘기는 방식은 쓰지 않는다. `ImGui_ImplWin32_WndProcHandler`가 부르는 Win32의 마우스 캡처·키 상태 함수는 창을 가진 스레드에서 불러야 하기 때문이다.
 - 게임에 넘길지는 창 스레드가 바로 정해야 하므로, 화면 스레드가 프레임마다 갱신하는 원자 값(`wantMouse`, `wantKeyboard`, `visible`)을 본다. 한 프레임 늦은 값이다.
-- 구조적 예외가 나면 C++ 소멸자가 불리지 않아 잠금이 풀리지 않는다. 화면 스레드는 잠금을 쥐고 있는지 적어 두고, 예외 처리기가 직접 푼다.
+- 구조적 예외가 나면 C++ 소멸자가 불리지 않아 잠금이 풀리지 않는다. 화면 스레드와 창 스레드는 잠금을 쥐고 있는지 적어 두고, 예외 처리기가 직접 푼다.
 
 ### 3.4 코어의 규칙 (패널 `Panel.Core`와 같은 동작)
 - **설정 문서**: nlohmann `ordered_json`을 그대로 들고, 아는 키는 접근 함수로 읽고 쓴다. 모르는 키는 건드리지 않아 보존된다. 키가 없으면 패널의 기본값을 쓴다(예: `build.instantBuild = true`, `mercenaries.refund = true`, `population.multiplier = 2`, `resources.intervalSec = 2`).
@@ -257,6 +260,7 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 | ImGui·DX12 객체 초기화 실패 | 그리지 않는다 | `init failed: …` |
 | `GetDeviceRemovedReason()`이 `S_OK`가 아님 | 그 세션에서 다시 그리지 않는다 | `device removed 0x…` |
 | 프레임 실행 중 C++ 예외 또는 구조적 예외(접근 위반 등) | 잡아서 오버레이를 끈다 | `frame exception …` |
+| 창 프로시저에서 ImGui에 입력을 넘기는 중 C++ 예외 또는 구조적 예외 | 잡아서 오버레이를 끈다. 창 프로시저 밖으로 예외를 내보내지 않는다 | `input exception …` |
 
 - 큐 선택: `ExecuteCommandLists` 후킹에서 직접(DIRECT) 큐마다 마지막으로 실행한 스레드를 기록한다. `Present` 후킹에서 지금 스레드와 같은 스레드의 큐를 고른다. 스파이크에서 직접 큐가 둘이었고, 다른 큐로 그리면 GPU 크래시가 났다.
 - 그리는 대상: 스왑체인의 `OutputWindow`가 게임 메인 창(프로세스의 보이는 최상위 창 가운데 가장 큰 것)일 때만 그린다.

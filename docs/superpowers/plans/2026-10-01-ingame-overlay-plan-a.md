@@ -12,7 +12,11 @@
 
 **범위:** 스펙 8절의 7단계 가운데 1~3단계(기반, 코어, 간단한 탭)다. 4~7단계(군사, 인구, 자원, 용병 탭, 한글 입력, 패널 대체 문서)는 계획 B로 따로 쓴다. 계획 A가 끝나면 오버레이에는 탭 4개가 있고, 나머지 탭은 패널로 설정한다.
 
-**사전 검증:** 이 문서의 코드는 레포 밖 사본에서 태스크 순서대로 적용해 빌드와 테스트를 통과시킨 것이다. 2026-10-01에 게임에서도 한 번 돌렸다(Lab으로 게임 도중에 DLL을 올림, `saveGame_8`): 창과 탭 4개 표시, Insert 토글, 밖에서 고친 `control.json` 반영, 해상도 변경 뒤 계속 그리기를 확인했다. 그 뒤에 고친 부분(저장 규칙을 `core/session`으로 옮김, 저장 실패 뒤 1초 쉬기, 상태 탭의 표, 해상도 변경 뒤 창 위치 다시 맞추기, 큐 찾기 제한 시간의 시작점)과 **게임 시작 때 DLL을 올리는 경로**, 마우스 입력은 게임에서 확인하지 못했다. Task 6과 Task 7에서 확인한다.
+**사전 검증:** 이 문서의 코드는 레포 밖 사본에서 태스크 순서대로 적용해 빌드와 테스트를 통과시킨 것이다. 2026-10-01에 게임에서도 한 번 돌렸다(Lab으로 게임 도중에 DLL을 올림, `saveGame_8`): 창과 탭 4개 표시, Insert 토글, 밖에서 고친 `control.json` 반영, 해상도 변경 뒤 계속 그리기를 확인했다.
+
+그 사전 검증에서 **게임이 한 번 튕겼다**(16:17, 이벤트 로그: `KERNELBASE.dll`, 예외 코드 `0xc000041d` = 창 프로시저 안에서 처리되지 않은 예외). 재현해서 확인한 원인: 당시 코드는 ImGui 잠금이 `std::mutex`였다. ImGui의 Win32 백엔드는 마우스 버튼을 뗄 때 `ReleaseCapture`를 부르고, 그러면 Windows가 같은 스레드에 `WM_CAPTURECHANGED`를 보내 창 프로시저가 자기 안에서 다시 불린다. 같은 스레드가 `std::mutex`를 두 번 잠그면 MSVC는 예외를 던지고(`resource deadlock would occur`), 창 프로시저 밖으로 나간 예외는 프로세스를 끝낸다. 이 문서의 코드는 재진입 잠금으로 바꾸고 입력 경로를 예외 보호로 감쌌으며, 그 경로를 실제 창으로 시험하는 테스트(Task 6 `overlay_input_survives_reentrant_window_messages`)를 넣었다. 고치기 전 코드로 이 테스트를 돌리면 테스트 프로세스가 죽는 것을 확인했다. 16:17에 실제로 마우스 버튼 입력이 있었는지는 확인하지 못했다(추정).
+
+사전 검증 뒤에 고쳐서 **게임에서 아직 확인하지 못한 것**: 위 입력 수정, 저장 규칙을 `core/session`으로 옮긴 것, 저장 실패 뒤 1초 쉬기, 상태 탭의 표, 해상도 변경 뒤 창 위치 다시 맞추기, 큐 찾기 제한 시간의 시작점. **게임 시작 때 DLL을 올리는 경로**와 실제 마우스 조작도 확인하지 못했다. Task 6과 Task 7에서 확인한다.
 
 ## Global Constraints
 
@@ -21,7 +25,8 @@
 - 브리지 프로토콜(`control.json` version 1, `status.json`)의 모양을 바꾸지 않는다. 추가는 `status.overlay` 하나다(R6).
 - 오버레이가 실패해도 게임을 튕기게 하지 않는다(R5). 실패는 `disableOverlay(이유)`로 물러나고, 이유는 `overlay_status.json`의 `reason`에 남는다.
 - 상수: 토글 키 기본 `Insert`(선택지 `Insert`, `Home`, `End`, `F7`, `F8`, `F9`), 글자 배율 0.8~1.5, 창 기본 640×720 위치 (80, 80), 글꼴 맑은 고딕 18px, 안내 8초, heartbeat 5초, 큐 찾기 20초, 설정 저장 확인 0.2초, 상태 읽기 1초, 저장 실패 뒤 다시 시도 1초, 파일 이름 바꾸기 재시도 5번(50ms 간격).
-- 스레드 규칙: ImGui 함수는 `imguiMutex()` 아래에서만 부른다. 잠금 순서는 `imguiMutex()` 다음 `App::mutex`다. 화면 스레드(Present 후킹 안)에서는 파일을 읽거나 쓰지 않는다.
+- 스레드 규칙: ImGui 함수는 `imguiMutex()` 아래에서만 부른다. 이 잠금은 재진입 잠금(`std::recursive_mutex`)이어야 한다(창 프로시저는 같은 스레드에서 다시 불린다). 잠금 순서는 `imguiMutex()` 다음 `App::mutex`다. 화면 스레드(Present 후킹 안)에서는 파일을 읽거나 쓰지 않는다.
+- 후킹한 함수(창 프로시저, Present, ResizeBuffers) 밖으로 예외를 내보내지 않는다. 창 프로시저 밖으로 나간 예외는 Windows가 게임을 끝낸다(`0xC000041D`).
 - 화면 문구는 패널과 같게 한다(`panel/MLToybox.Panel/MainForm.cs`).
 - 이름공간은 `mlt::ov`. 포함 경로의 뿌리는 `native/`와 `native/third_party`다(`#include "overlay/core/text.h"`, `#include <nlohmann/json.hpp>`). 기존 `mlt_core`의 헤더는 `#include "runtime.h"`처럼 쓴다.
 - C++ 소스는 UTF-8(BOM 없음)로 쓴다(프로젝트가 `/utf-8`로 컴파일한다). Lua 파일은 Write/Edit 도구로만 고친다(셸 heredoc은 백슬래시를 깨뜨린다).
@@ -34,13 +39,13 @@
 
 ## Review Focus
 
-1. **저장이 실패한 순간**(모드가 `control.json`을 읽는 중이거나 다른 프로그램이 파일을 잡고 있음): 바꾼 값과 눌러 둔 일회성 명령이 사라지면 안 되고, 다음 시도에 누른 순서대로 실려야 한다. → Task 4 `overlay_session_failed_save_keeps_changes_and_commands`
-2. **패널과 함께 쓸 때**: 패널이 방금 저장한 것을 오버레이가 옛 문서로 덮으면 안 되고(더 큰 `seq`로 써야 한다), 오버레이에 저장 대기 중인 변경을 패널 것으로 날려도 안 된다. → Task 3 `overlay_bridge_save_goes_past_a_newer_seq_in_the_file`, Task 4 `overlay_session_reloads_only_newer_files_and_never_over_pending_changes`
-3. **손으로 고쳤거나 쓰다 만 파일**(`control.json`, `status.json`, `overlay.json`에 형식이 다른 값, Lua가 쓴 빈 표 `[]`, 잘린 내용): 기본값으로 읽고 오버레이가 죽지 않아야 한다. → Task 2 `overlay_control_broken_or_odd_input_falls_back_to_defaults`, Task 3 `overlay_status_treats_lua_empty_tables_as_empty_objects`와 `overlay_status_rejects_broken_text`, Task 4 `overlay_settings_reads_values_and_repairs_bad_ones`
-4. **숫자 칸의 이상한 입력**(음수, 글자, 소수, int 범위를 넘는 수, 전각 숫자와 쉼표): 받아들일 수 없는 것은 버리고 이전 값을 유지해야 한다. → Task 1 `overlay_parse_number_rejects_everything_else`
-5. **오버레이를 껐거나 DLL이 없는데 지난 실행의 `overlay_status.json`이 남은 경우**: 상태에 "ready"로 보이면 안 된다. → Task 5 `overlay_status_without_the_dll_ignores_a_leftover_file`
+1. **창이 열린 채 게임 창을 클릭하는 순간**(마우스 버튼을 떼면 창 프로시저가 자기 안에서 다시 불린다): 게임이 튕기면 안 된다. 사전 검증에서 실제로 튕긴 경로다. → Task 6 `overlay_input_survives_reentrant_window_messages`, Task 6 Step 14(게임에서 버튼 메시지 보내기)
+2. **저장이 실패한 순간**(모드가 `control.json`을 읽는 중이거나 다른 프로그램이 파일을 잡고 있음): 바꾼 값과 눌러 둔 일회성 명령이 사라지면 안 되고, 다음 시도에 누른 순서대로 실려야 한다. → Task 4 `overlay_session_failed_save_keeps_changes_and_commands`
+3. **패널과 함께 쓸 때**: 패널이 방금 저장한 것을 오버레이가 옛 문서로 덮으면 안 되고(더 큰 `seq`로 써야 한다), 오버레이에 저장 대기 중인 변경을 패널 것으로 날려도 안 된다. → Task 3 `overlay_bridge_save_goes_past_a_newer_seq_in_the_file`, Task 4 `overlay_session_reloads_only_newer_files_and_never_over_pending_changes`
+4. **손으로 고쳤거나 쓰다 만 파일**(`control.json`, `status.json`, `overlay.json`에 형식이 다른 값, Lua가 쓴 빈 표 `[]`, 잘린 내용, 지난 실행이 남긴 `overlay_status.json`): 기본값으로 읽고, 오버레이가 죽거나 틀린 상태를 보이지 않아야 한다. → Task 2 `overlay_control_broken_or_odd_input_falls_back_to_defaults`, Task 3 `overlay_status_treats_lua_empty_tables_as_empty_objects`와 `overlay_status_rejects_broken_text`, Task 4 `overlay_settings_reads_values_and_repairs_bad_ones`, Task 5 `overlay_status_without_the_dll_ignores_a_leftover_file`
+5. **숫자 칸의 이상한 입력**(음수, 글자, 소수, int 범위를 넘는 수, 전각 숫자와 쉼표): 받아들일 수 없는 것은 버리고 이전 값을 유지해야 한다. → Task 1 `overlay_parse_number_rejects_everything_else`
 
-단위 테스트로 잡을 수 없는 것(게임에서만 확인): 화면 스레드와 창 스레드의 잠금 경합, 해상도 변경, 게임 시작 때의 후킹. Task 6의 게임 확인 단계가 맡는다.
+단위 테스트로 잡을 수 없는 것(게임에서만 확인): 화면 스레드와 창 스레드가 서로 기다려 멈추는 경우, 해상도 변경, 게임 시작 때의 후킹. Task 6의 게임 확인 단계가 맡는다.
 
 ## File Structure
 
@@ -2236,7 +2241,7 @@ git -C E:/MLToybox commit -m "feat(overlay): overlay settings, status file, save
   - Lua `native.loadFile(nativeDir, fileName)` → `true, nil` 또는 `false, 이유`; `native.NATIVE_DLL`, `native.OVERLAY_DLL`; `native.overlayStatus(statusPath, now, loaded, loadErr)` → `{ loaded, error, stale, state?, reason? }`
   - `config.overlay`(기본 `true`), `status.json`의 `overlay`
   - `tools/deploy.ps1 -Mod MLToybox`가 `native/build/mltoybox_overlay.dll`도 복사한다
-  - `tools/capture-game.ps1 [-Out <png>] [-Key Insert|Home|End|F7|F8|F9] [-WaitMs <n>]`, `tools/lab/resize.lua`(`lab.ps1 -Vars @{ W; H; MODE }`)
+  - `tools/capture-game.ps1 [-Out <png>] [-Key Insert|Home|End|F7|F8|F9] [-Click <x>,<y>] [-WaitMs <n>]`, `tools/lab/resize.lua`(`lab.ps1 -Vars @{ W; H; MODE }`)
 
 - [ ] **Step 1: 실패하는 Lua 스펙 작성**
 
@@ -2502,17 +2507,19 @@ Expected: `ALL PASS`
 
 - [ ] **Step 7: 개발 도구 작성**
 
-게임 창만 찍고 키 메시지를 보내는 도구. 마우스 메시지는 게임 창이 앞에 없으면 ImGui가 받지 않으므로(스파이크에서 확인) 지원하지 않는다.
+게임 창만 찍고 키 메시지를 보내는 도구. 게임 창이 앞에 없으면 ImGui가 마우스 위치를 받지 않으므로(스파이크에서 확인) 화면 조작은 할 수 없다. `-Click`은 마우스 버튼 메시지가 창 프로시저를 지나가도 게임이 버티는지 볼 때만 쓴다.
 
 <!-- file: tools/capture-game.ps1 -->
 ```powershell
 # 개발용: 게임 창만 캡처하고(다른 창이나 화면 전체는 찍지 않는다), 필요하면 그 전에 키 메시지를 보낸다.
 # 창이 가려져 있어도 된다(PrintWindow). 실제 마우스·키보드와 전경 창은 건드리지 않는다.
-# 마우스 메시지는 게임 창이 앞에 없으면 ImGui 에 먹히지 않으므로(findings 오버레이 스파이크) 지원하지 않는다.
+# 게임 창이 앞에 없으면 ImGui 는 마우스 위치를 받지 않는다(findings 오버레이 스파이크). 그래서 화면 조작은 할 수 없고,
+# -Click 은 마우스 버튼 메시지가 창 프로시저를 지나가도 게임이 버티는지 볼 때만 쓴다(게임에도 그 자리의 클릭으로 전달된다).
 #   -Out <png>      저장할 파일. 없으면 캡처하지 않는다
 #   -Key <이름>     보낼 키: Insert, Home, End, F7, F8, F9
-#   -WaitMs <n>     키를 보낸 뒤 캡처하기 전에 기다릴 시간
-param([string]$Out, [ValidateSet('Insert', 'Home', 'End', 'F7', 'F8', 'F9')][string]$Key, [int]$WaitMs = 700)
+#   -Click <x>,<y>  창 안 좌표에 왼쪽 버튼을 눌렀다 떼는 메시지를 보낸다
+#   -WaitMs <n>     메시지를 보낸 뒤 캡처하기 전에 기다릴 시간
+param([string]$Out, [ValidateSet('Insert', 'Home', 'End', 'F7', 'F8', 'F9')][string]$Key, [int[]]$Click, [int]$WaitMs = 700)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 if (-not ('MLToyboxCapture' -as [type])) {
@@ -2558,6 +2565,14 @@ if ($Key) {
     Start-Sleep -Milliseconds 60
     [void][MLToyboxCapture]::PostMessage($hwnd, 0x101, [IntPtr]$vk, [IntPtr]([Int64]0xC0000001))    # WM_KEYUP
     Write-Host "posted $Key"
+}
+if ($Click) {
+    if ($Click.Count -ne 2) { throw '-Click needs x,y' }
+    $pos = [IntPtr](($Click[1] -shl 16) -bor ($Click[0] -band 0xFFFF))
+    [void][MLToyboxCapture]::PostMessage($hwnd, 0x201, [IntPtr]1, $pos)   # WM_LBUTTONDOWN (MK_LBUTTON)
+    Start-Sleep -Milliseconds 60
+    [void][MLToyboxCapture]::PostMessage($hwnd, 0x202, [IntPtr]0, $pos)   # WM_LBUTTONUP
+    Write-Host "posted click $($Click[0]),$($Click[1])"
 }
 if (-not $Out) { return }
 Start-Sleep -Milliseconds $WaitMs
@@ -2614,12 +2629,13 @@ git -C E:/MLToybox commit -m "feat(overlay): load the overlay dll from Lua, stat
 
 ### Task 6: 오버레이 DLL — 후킹, 입력, 안전장치, 작업 스레드, 창과 "상태" 탭
 
-화면 출력과 입력은 단위 테스트를 할 수 없다. 빌드한 뒤 게임에서 확인한다.
+화면 출력은 단위 테스트를 할 수 없다. 빌드한 뒤 게임에서 확인한다. 창 프로시저 후킹은 그래픽 장치 없이 실제 창으로 시험할 수 있어 테스트를 둔다.
 
 **Files:**
 - Create: `native/overlay/dllmain.cpp`, `native/overlay/worker.h/.cpp`
 - Create: `native/overlay/render/guard.h/.cpp`, `input.h/.cpp`, `imgui_layer.h/.cpp`, `dx12_hook.h/.cpp`
 - Create: `native/overlay/ui/app.h/.cpp`, `window.h/.cpp`, `tabs.h`, `tab_status.cpp`
+- Create: `native/tests/overlay_input_tests.cpp`
 - Modify: `native/CMakeLists.txt`
 
 **Interfaces:**
@@ -2628,8 +2644,8 @@ git -C E:/MLToybox commit -m "feat(overlay): load the overlay dll from Lua, stat
   - `overlay/ui/app.h`: `struct App : Session { std::mutex mutex; std::shared_ptr<const StatusDoc> status; OverlaySettings settings; bool settingsDirty; std::string reason; std::atomic<…> state, visible, wantMouse, wantKeyboard, toggleVk, scale, frames, koreanFont, applyWindowRect; }`, `App& app()`, `void disableOverlay(const std::string& reason)`, `void syncSettingsAtoms(App&)`
   - `overlay/ui/tabs.h`: `struct TabContext { App& app; const StatusDoc* status; bool inGame; long long now; }`, `void drawStatusTab(TabContext&)`, `void markDirty(App&)`, `void sendCommand(App&, Json)`
   - `overlay/ui/window.h`: `bool overlayWantsFrame(App&)`, `void drawOverlay(App&)`, `void notifyOverlayReady()`
-  - `overlay/render/input.h`: `std::mutex& imguiMutex()`, `bool installWndProc(HWND)`
-  - `overlay/render/guard.h`: `bool runGuarded(void (*fn)(void*), void* arg, unsigned long* code)`, `class TrackedLock`
+  - `overlay/render/input.h`: `std::recursive_mutex& imguiMutex()`, `bool installWndProc(HWND)`
+  - `overlay/render/guard.h`: `bool runGuarded(void (*fn)(void*), void* arg, unsigned long* code)`, `std::string hexCode(unsigned long)`, `template <class Mutex> class TrackedLock`
   - `overlay/render/imgui_layer.h`: `initImGuiContext`, `initImGuiDx12`, `shutdownImGuiDx12`, `imguiSrvHeap`
   - `overlay/render/dx12_hook.h`: `bool installRenderHooks(std::string& err)`
   - `overlay/worker.h`: `void runOverlayWorker(void* selfModule)`
@@ -2638,13 +2654,78 @@ git -C E:/MLToybox commit -m "feat(overlay): load the overlay dll from Lua, stat
 스레드와 잠금(스펙 3.3):
 - 화면 스레드(Present 후킹): `imguiMutex()`와 `App::mutex`를 잡고 ImGui 프레임을 만든다. 파일을 만지지 않는다.
 - 창 스레드(창 프로시저): 토글 키를 처리하고, 창이 열려 있으면 `imguiMutex()` 아래에서 `ImGui_ImplWin32_WndProcHandler`를 부른다. Win32의 캡처·키 상태 함수는 창을 가진 스레드에서 불러야 하기 때문이다. 게임에 넘길지는 직전 프레임의 `wantMouse`/`wantKeyboard`로 정한다.
+  - `imguiMutex()`는 재진입 잠금이다. 백엔드가 부르는 `ReleaseCapture`/`SetCapture`는 같은 스레드에 `WM_CAPTURECHANGED`를 보내 창 프로시저를 다시 부른다.
+  - 다른 스레드가 `SendMessage`로 보낸 메시지(`InSendMessage()`)는 ImGui에 넘기지 않는다. 보낸 쪽이 잠금을 쥔 채 기다리고 있으면 서로 멈추기 때문이다. 마우스·키 입력은 큐로 오므로 놓치는 것이 없다.
+  - ImGui에 넘기는 호출은 C++ 예외와 구조적 예외를 모두 잡는다(`input exception …`으로 오버레이를 끈다).
 - 작업 스레드: 후킹 설치, 파일 입출력. `App::mutex`만 잡는다.
-- 구조적 예외(접근 위반 등)가 나면 C++ 소멸자가 불리지 않아 잠금이 풀리지 않는다. `TrackedLock`이 잠금을 쥐고 있는지 적어 두고, 예외 처리기(`afterCrash`)가 직접 푼다.
+- 구조적 예외(접근 위반 등)가 나면 C++ 소멸자가 불리지 않아 잠금이 풀리지 않는다. `TrackedLock`이 잠금을 쥐고 있는지 적어 두고, 예외 처리기가 직접 푼다.
+- ImGui의 기본 IME 처리(`ImmSetCompositionWindow` 등)는 프레임을 그리는 스레드에서 창에 IME 함수를 부른다. 여기서는 그 스레드가 창을 가진 스레드가 아니므로 `IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS`로 끈다. 한글 입력 위치 맞추기는 계획 B에서 창 스레드 쪽에 만든다.
 
-- [ ] **Step 1: CMake에 `imgui`와 `mltoybox_overlay` 추가**
+- [ ] **Step 1: 창 프로시저의 실패하는 테스트 작성**
+
+<!-- file: native/tests/overlay_input_tests.cpp -->
+```cpp
+#include "test.h"
+#include "overlay/render/input.h"
+#include "overlay/ui/app.h"
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <windows.h>
+
+using namespace mlt::ov;
+
+// 창 프로시저 후킹을 실제 창에 걸고 메시지를 보내 본다(화면에 보이지 않는 창, 그래픽 장치 없음).
+// ImGui 의 win32 백엔드는 마우스 버튼을 뗄 때 ReleaseCapture 를 부른다. 그러면 Windows 가 같은 스레드에 WM_CAPTURECHANGED 를 보내
+// 우리 창 프로시저가 자기 안에서 다시 불린다. ImGui 잠금이 재진입을 견디지 못하면 그 안에서 예외가 나고,
+// 창 프로시저 안의 예외는 프로세스를 0xC000041D 로 끝낸다(2026-10-01 사전 검증에서 게임이 이렇게 튕겼다).
+TEST(overlay_input_survives_reentrant_window_messages) {
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(wc);
+    wc.lpfnWndProc = DefWindowProcW;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.lpszClassName = L"mltoybox_overlay_input_test";
+    RegisterClassExW(&wc);
+    HWND hwnd = CreateWindowExW(0, wc.lpszClassName, L"", WS_OVERLAPPEDWINDOW, 0, 0, 200, 200, nullptr, nullptr, wc.hInstance, nullptr);
+    CHECK(hwnd != nullptr);
+    ImGui::CreateContext();
+    CHECK(ImGui_ImplWin32_Init(hwnd));
+    CHECK(installWndProc(hwnd));
+
+    App& a = app();
+    a.state = OverlayState::Ready;
+    a.visible = true;
+    SendMessageW(hwnd, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(10, 10));
+    CHECK(GetCapture() == hwnd);                                  // 백엔드가 마우스를 잡았다
+    SendMessageW(hwnd, WM_LBUTTONUP, 0, MAKELPARAM(10, 10));      // ReleaseCapture -> WM_CAPTURECHANGED -> 창 프로시저 재진입
+    CHECK(GetCapture() == nullptr);
+
+    // 토글 키는 창을 여닫고, 누르고 있는 동안의 반복 입력은 무시한다
+    SendMessageW(hwnd, WM_KEYDOWN, VK_INSERT, 0x00000001);
+    CHECK(!a.visible.load());
+    SendMessageW(hwnd, WM_KEYDOWN, VK_INSERT, 0x40000001);        // 반복(이전에도 눌려 있었음)
+    CHECK(!a.visible.load());
+    SendMessageW(hwnd, WM_KEYUP, VK_INSERT, 0xC0000001);
+    SendMessageW(hwnd, WM_KEYDOWN, VK_INSERT, 0x00000001);
+    CHECK(a.visible.load());
+
+    // 오버레이가 꺼진 상태(Disabled)에서는 토글 키도 가로채지 않는다
+    a.state = OverlayState::Disabled;
+    SendMessageW(hwnd, WM_KEYDOWN, VK_INSERT, 0x00000001);
+    CHECK(a.visible.load());
+
+    a.visible = false;
+    a.state = OverlayState::Starting;
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+    DestroyWindow(hwnd);
+    UnregisterClassW(wc.lpszClassName, wc.hInstance);
+}
+```
+
+- [ ] **Step 2: CMake에 `imgui`, `mltoybox_overlay`, 테스트 추가**
 
 <!-- edit: native/CMakeLists.txt -->
-`native/CMakeLists.txt` — 찾을 부분:
+`native/CMakeLists.txt` (1/2) — 찾을 부분:
 
 ```cmake
 target_link_libraries(overlay_core PUBLIC mlt_core)
@@ -2664,6 +2745,8 @@ add_library(imgui STATIC
     third_party/imgui/backends/imgui_impl_dx12.cpp
     third_party/imgui/backends/imgui_impl_win32.cpp)
 target_include_directories(imgui PUBLIC third_party/imgui third_party/imgui/backends)
+# ImGui 의 기본 IME 처리는 프레임을 그리는 스레드에서 창에 IME 함수를 부른다. 우리는 그 스레드가 창을 가진 스레드가 아니므로 끈다
+target_compile_definitions(imgui PUBLIC IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS)
 
 # mltoybox_overlay: 렌더·입력·화면. 게임 안에서만 확인할 수 있다
 add_library(mltoybox_overlay SHARED
@@ -2679,7 +2762,29 @@ add_library(mltoybox_overlay SHARED
 target_link_libraries(mltoybox_overlay PRIVATE overlay_core imgui minhook d3d12 dxgi user32)
 ```
 
-- [ ] **Step 2: 나눠 쓰는 상태**
+<!-- edit: native/CMakeLists.txt -->
+`native/CMakeLists.txt` (2/2) — 찾을 부분:
+
+```cmake
+    tests/overlay_session_tests.cpp)
+target_link_libraries(native_tests PRIVATE mlt_core overlay_core)
+```
+
+바꿀 내용:
+
+```cmake
+    tests/overlay_session_tests.cpp
+    # 창 프로시저 후킹은 실제 창으로 시험한다(오버레이 DLL 의 소스 가운데 그래픽 장치가 필요 없는 것을 함께 컴파일한다)
+    tests/overlay_input_tests.cpp overlay/render/input.cpp overlay/render/guard.cpp overlay/ui/app.cpp)
+target_link_libraries(native_tests PRIVATE mlt_core overlay_core imgui)
+```
+
+- [ ] **Step 3: 빌드해서 실패 확인**
+
+Run: `pwsh E:/MLToybox/tools/build-native.ps1 -Test`
+Expected: `Cannot find source file: overlay/dllmain.cpp`
+
+- [ ] **Step 4: 나눠 쓰는 상태**
 
 <!-- file: native/overlay/ui/app.h -->
 ```cpp
@@ -2758,28 +2863,32 @@ void syncSettingsAtoms(App& a) {
 }
 ```
 
-- [ ] **Step 3: 예외 보호와 입력**
+- [ ] **Step 5: 예외 보호와 입력**
 
 <!-- file: native/overlay/render/guard.h -->
 ```cpp
 #pragma once
-#include <mutex>
+#include <string>
 
 namespace mlt::ov {
 
 // fn(arg) 를 구조적 예외(접근 위반 등)로 감싼다. 예외가 나면 false 를 돌려주고 code 에 예외 코드를 적는다
 bool runGuarded(void (*fn)(void*), void* arg, unsigned long* code);
 
+// 예외 코드를 "0xC0000005" 꼴로 적는다
+std::string hexCode(unsigned long code);
+
 // 구조적 예외가 나면 C++ 소멸자가 불리지 않아 잠금이 풀리지 않는다.
 // 잠금을 쥐고 있는지를 held 에 적어 두고, 예외 처리기가 held 가 참인 잠금을 직접 푼다
+template <class Mutex>
 class TrackedLock {
 public:
-    TrackedLock(std::mutex& m, bool& held) : m_(m), held_(held) { m_.lock(); held_ = true; }
+    TrackedLock(Mutex& m, bool& held) : m_(m), held_(held) { m_.lock(); held_ = true; }
     ~TrackedLock() { held_ = false; m_.unlock(); }
     TrackedLock(const TrackedLock&) = delete;
     TrackedLock& operator=(const TrackedLock&) = delete;
 private:
-    std::mutex& m_;
+    Mutex& m_;
     bool& held_;
 };
 }
@@ -2788,6 +2897,7 @@ private:
 <!-- file: native/overlay/render/guard.cpp -->
 ```cpp
 #include "guard.h"
+#include <cstdio>
 #include <windows.h>
 
 namespace mlt::ov {
@@ -2803,6 +2913,12 @@ bool runGuarded(void (*fn)(void*), void* arg, unsigned long* code) {
     }
 }
 
+std::string hexCode(unsigned long code) {
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "0x%08lX", code);
+    return buf;
+}
+
 }
 ```
 
@@ -2813,8 +2929,9 @@ bool runGuarded(void (*fn)(void*), void* arg, unsigned long* code) {
 #include <windows.h>
 
 namespace mlt::ov {
-// ImGui 는 스레드 안전하지 않다. 화면 스레드(프레임)와 창 스레드(입력)가 이 잠금 아래에서만 ImGui 를 부른다
-std::mutex& imguiMutex();
+// ImGui 는 스레드 안전하지 않다. 화면 스레드(프레임)와 창 스레드(입력)가 이 잠금 아래에서만 ImGui 를 부른다.
+// 재진입 잠금이어야 한다: 창 프로시저는 Win32 호출(ReleaseCapture 등) 안에서 같은 스레드로 다시 불린다.
+std::recursive_mutex& imguiMutex();
 // 게임 창의 창 프로시저를 바꿔 토글 키와 입력을 가로챈다. 이전 프로시저는 이어 부른다
 bool installWndProc(HWND hwnd);
 }
@@ -2823,21 +2940,45 @@ bool installWndProc(HWND hwnd);
 <!-- file: native/overlay/render/input.cpp -->
 ```cpp
 #include "input.h"
+#include "guard.h"
 #include "overlay/ui/app.h"
+#include <exception>
 #include <imgui.h>
 #include <imgui_impl_win32.h>
+#include <string>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace mlt::ov {
 
-std::mutex& imguiMutex() {
-    static std::mutex m;
+std::recursive_mutex& imguiMutex() {
+    static std::recursive_mutex m;
     return m;
 }
 
 namespace {
 WNDPROC g_original = nullptr;
+
+struct InputArgs {
+    HWND hwnd;
+    UINT msg;
+    WPARAM wParam;
+    LPARAM lParam;
+    bool locked = false;   // 구조적 예외가 났을 때 풀어야 하는 잠금(guard.h 의 TrackedLock)
+};
+
+// 창 프로시저 밖으로 예외가 나가면 Windows 가 게임을 끝낸다(0xC000041D). C++ 예외는 여기서 잡는다
+void feedImGui(void* p) {
+    auto* m = static_cast<InputArgs*>(p);
+    try {
+        TrackedLock lock(imguiMutex(), m->locked);
+        if (ImGui::GetCurrentContext()) ImGui_ImplWin32_WndProcHandler(m->hwnd, m->msg, m->wParam, m->lParam);
+    } catch (const std::exception& e) {
+        disableOverlay(std::string("input exception ") + e.what());
+    } catch (...) {
+        disableOverlay("input exception (unknown)");
+    }
+}
 
 LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     App& a = app();
@@ -2852,10 +2993,16 @@ LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
     if (toggleKey && (msg == WM_KEYUP || msg == WM_SYSKEYUP)) return 0;
 
     if (a.visible.load()) {
-        {
-            // Win32 의 캡처·키 상태 함수는 창을 가진 스레드에서 불러야 한다. 그래서 입력은 이 스레드에서 ImGui 에 넣는다
-            std::lock_guard<std::mutex> lock(imguiMutex());
-            if (ImGui::GetCurrentContext()) ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        // Win32 의 캡처·키 상태 함수는 창을 가진 스레드에서 불러야 한다. 그래서 입력은 이 스레드에서 ImGui 에 넣는다.
+        // 다른 스레드가 SendMessage 로 보낸 메시지는 넘기지 않는다: 보낸 쪽이 ImGui 잠금을 쥐고 기다리고 있으면 서로 멈춘다.
+        // 마우스·키 입력은 큐로 오는 메시지라 여기에 걸리지 않는다
+        if (!InSendMessage()) {
+            InputArgs args{ hwnd, msg, wParam, lParam };
+            unsigned long code = 0;
+            if (!runGuarded(feedImGui, &args, &code)) {
+                if (args.locked) imguiMutex().unlock();
+                disableOverlay("input exception " + hexCode(code));
+            }
         }
         const bool mouse = msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST;
         const bool key = msg >= WM_KEYFIRST && msg <= WM_KEYLAST;
@@ -2877,7 +3024,7 @@ bool installWndProc(HWND hwnd) {
 }
 ```
 
-- [ ] **Step 4: ImGui 초기화**
+- [ ] **Step 6: ImGui 초기화**
 
 Dear ImGui 1.92의 DX12 백엔드는 텍스처마다 SRV 서술자를 달라고 하므로 작은 자유 목록으로 내준다. 글꼴은 크기를 주지 않고 올리고(`AddFontFromFileTTF(path)`), 기본 크기는 `style.FontSizeBase`, 배율은 `style.FontScaleMain`으로 정한다(1.92의 방식).
 
@@ -3017,7 +3164,7 @@ ID3D12DescriptorHeap* imguiSrvHeap() {
 }
 ```
 
-- [ ] **Step 5: 화면 — 창, 상태 줄, 탭 막대, "상태" 탭**
+- [ ] **Step 7: 화면 — 창, 상태 줄, 탭 막대, "상태" 탭**
 
 <!-- file: native/overlay/ui/window.h -->
 ```cpp
@@ -3321,7 +3468,7 @@ void drawStatusTab(TabContext& ctx) {
 }
 ```
 
-- [ ] **Step 6: DX12 후킹**
+- [ ] **Step 8: DX12 후킹**
 
 스파이크에서 확인한 것: 이 게임에는 직접(DIRECT) 명령 큐가 둘 있고, 화면 출력용이 아닌 큐로 그리면 GPU 크래시가 난다. `ExecuteCommandLists` 후킹에서 큐마다 마지막으로 실행한 스레드를 적어 두고, `Present`를 부른 스레드와 같은 스레드의 큐를 쓴다. 가상 함수 표의 위치는 `IDXGISwapChain::Present` 8, `ResizeBuffers` 13, `ID3D12CommandQueue::ExecuteCommandLists` 10이다.
 
@@ -3347,7 +3494,6 @@ bool installRenderHooks(std::string& err);
 #include "overlay/ui/window.h"
 #include <MinHook.h>
 #include <atomic>
-#include <cstdio>
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <exception>
@@ -3400,12 +3546,6 @@ ULONGLONG g_firstPresentTick = 0;
 // 구조적 예외가 났을 때 처리기가 풀어야 하는 잠금(guard.h 의 TrackedLock)
 bool g_holdsImgui = false;
 bool g_holdsApp = false;
-
-std::string hex(unsigned long value) {
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "0x%08lX", value);
-    return buf;
-}
 
 // 이 프로세스의 보이는 최상위 창 가운데 가장 큰 것
 HWND mainWindow() {
@@ -3584,7 +3724,7 @@ void frame(IDXGISwapChain* swap) {
     if (swap != g_swap) return;
     const HRESULT removed = g_device->GetDeviceRemovedReason();
     if (removed != S_OK) {
-        disableOverlay("device removed " + hex(static_cast<unsigned long>(removed)));
+        disableOverlay("device removed " + hexCode(static_cast<unsigned long>(removed)));
         return;
     }
     bool wanted;
@@ -3616,7 +3756,7 @@ void frameThunk(void* swap) {
 void afterCrash(unsigned long code) {
     if (g_holdsApp) { g_holdsApp = false; app().mutex.unlock(); }
     if (g_holdsImgui) { g_holdsImgui = false; imguiMutex().unlock(); }
-    disableOverlay("frame exception " + hex(code));
+    disableOverlay("frame exception " + hexCode(code));
 }
 
 HRESULT WINAPI HookedPresent(IDXGISwapChain* swap, UINT sync, UINT flags) {
@@ -3778,7 +3918,7 @@ bool installRenderHooks(std::string& err) {
 }
 ```
 
-- [ ] **Step 7: 작업 스레드와 DLL 진입점**
+- [ ] **Step 9: 작업 스레드와 DLL 진입점**
 
 <!-- file: native/overlay/worker.h -->
 ```cpp
@@ -3950,12 +4090,17 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
 }
 ```
 
-- [ ] **Step 8: 빌드**
+- [ ] **Step 10: 빌드와 테스트**
 
 Run: `pwsh E:/MLToybox/tools/build-native.ps1 -Test`
 Expected: `100% tests passed, 0 tests failed out of 1`. `native/overlay/` 소스에서 경고가 없다. `E:/MLToybox/native/build/mltoybox_overlay.dll`이 생긴다(약 1 MB).
 
-- [ ] **Step 9: 게임 확인 준비**
+Run: `& E:\MLToybox\native\build\native_tests.exe | Select-Object -Last 1`
+Expected: `79 tests, 0 failed`
+
+`overlay_input_survives_reentrant_window_messages`가 지키는 것: `imguiMutex()`를 `std::mutex`로 바꾸면 이 테스트에서 테스트 프로세스가 죽는다(종료 코드 `0xC0000409`, 사전 검증 때 확인). 잠금의 종류를 바꾸지 않는다.
+
+- [ ] **Step 11: 게임 확인 준비**
 
 게임과 패널이 꺼져 있는지 본다. 켜져 있으면 끄지 말고 사용자에게 묻는다.
 
@@ -3978,7 +4123,7 @@ Expected: `mltoybox_native.dll`과 `mltoybox_overlay.dll`이 있다.
 @{ toggleKey = 'Insert'; scale = 1.0; window = @{ x = 80; y = 80; w = 640; h = 720 }; startOpen = $true; devTab = '상태' } | ConvertTo-Json | Set-Content "$mod\bridge\overlay.json" -Encoding utf8NoBOM
 ```
 
-- [ ] **Step 10: 게임을 켜고 상태 확인**
+- [ ] **Step 12: 게임을 켜고 상태 확인**
 
 ```powershell
 & E:\MLToybox\tools\lab-load.ps1 -Slot saveGame_8 -Start
@@ -3991,7 +4136,7 @@ Expected: `overlay`가 `loaded = True`, `state = ready`, `stale = False`. `overl
 
 게임 시작 때 DLL을 올리는 경로는 사전 검증에서 확인하지 못했다. `state`가 `ready`가 되지 않으면 `reason`과 `ue4ss/UE4SS.log`의 `overlay:` 줄을 읽고, 원인을 실측으로 확인해 고친다. 게임이 튕기면 `CrashReportClient.exe`를 끄고 크래시 덤프의 예외 주소를 확인한 뒤 멈춰 보고한다.
 
-- [ ] **Step 11: 화면 캡처**
+- [ ] **Step 13: 화면 캡처**
 
 ```powershell
 & E:\MLToybox\tools\capture-game.ps1 -Out "$shots\status.png"
@@ -3999,7 +4144,7 @@ Expected: `overlay`가 `loaded = True`, `state = ready`, `stale = False`. `overl
 
 `$shots\status.png`를 읽어 확인한다: 화면 (80, 80)에 제목 "MLToybox"인 창이 있고, 맨 위 줄이 "● 적용됨", 탭은 "상태" 하나다. 탭 안에 heartbeat, inGame, appliedSeq / sent, bridgeError, "기능"(7줄, 열이 맞아 있다), "네이티브"(4줄), "오버레이"(빌드 날짜, 글꼴: 맑은 고딕, 여닫는 키, 글자 배율)가 보인다. 한글이 깨지지 않는다.
 
-- [ ] **Step 12: 토글 키**
+- [ ] **Step 14: 토글 키와 마우스 버튼 메시지**
 
 ```powershell
 & E:\MLToybox\tools\capture-game.ps1 -Key Insert; Start-Sleep -Seconds 2; Get-Content "$mod\bridge\overlay_status.json"
@@ -4008,7 +4153,18 @@ Expected: `overlay`가 `loaded = True`, `state = ready`, `stale = False`. `overl
 
 Expected: 첫 번째는 `"visible":false`, 두 번째는 `"visible":true`.
 
-- [ ] **Step 13: 해상도 변경과 창 위치**
+창이 열린 상태에서 마우스 버튼 메시지를 창 프로시저로 보낸다. 사전 검증에서 게임이 튕긴 경로(버튼을 뗄 때의 창 프로시저 재진입)다. 좌표는 오버레이 창 안쪽이다. 게임에도 그 자리의 클릭으로 전달되지만 저장하지 않고 끌 세션이라 상관없다.
+
+```powershell
+1..5 | ForEach-Object { & E:\MLToybox\tools\capture-game.ps1 -Click 400, 500; Start-Sleep -Milliseconds 500 }
+Start-Sleep -Seconds 3
+Get-Process -Name 'ManorLords-Win64-Shipping' | Select-Object Name, Id
+Get-Content "$mod\bridge\overlay_status.json"
+```
+
+Expected: 게임 프로세스가 살아 있고, `"state":"ready"`이며 `frames`가 계속 는다. `"state":"disabled"`에 `reason`이 `input exception …`이면 입력 경로에서 예외가 난 것이다. 원인을 확인해 고친다.
+
+- [ ] **Step 15: 해상도 변경과 창 위치**
 
 창을 화면 오른쪽에 둔 뒤 해상도를 줄여, 계속 그려지고 창이 화면 안으로 들어오는지 본다. `overlay.json`을 밖에서 고치면 작업 스레드가 1초 안에 다시 읽는다.
 
@@ -4026,7 +4182,7 @@ Get-Content "$mod\bridge\overlay_status.json"
 
 Expected: 두 번 모두 `"state":"ready"`이고 `frames`가 계속 는다. `resized.png`에서 창 전체가 1280×720 화면 안에 있다(오른쪽이나 아래가 잘리지 않는다).
 
-- [ ] **Step 14: 게임을 끄고 안전장치 확인**
+- [ ] **Step 16: 게임을 끄고 안전장치 확인**
 
 저장하지 않고 끈다.
 
@@ -4065,7 +4221,7 @@ Expected: `overlay`가 `loaded = False`, `error = not deployed`. `native.loaded`
 Rename-Item "$mod\native\mltoybox_overlay.dll.off" 'mltoybox_overlay.dll'
 ```
 
-- [ ] **Step 15: 닫힌 채로 시작할 때의 안내**
+- [ ] **Step 17: 닫힌 채로 시작할 때의 안내**
 
 `startOpen`을 끄고 게임을 켠다. 오버레이가 준비되면 8초 동안 안내가 뜬다.
 
@@ -4088,7 +4244,7 @@ Expected: `hint.png`의 왼쪽 위에 "Insert: MLToybox"가 있고 `hint-gone.pn
 
 Steam 앱 번호 `1363080`은 `tools/common.ps1`의 `$script:MLAppId`와 같은 값이어야 한다. 다르면 그 값을 쓴다.
 
-- [ ] **Step 16: 커밋**
+- [ ] **Step 18: 커밋**
 
 ```bash
 git -C E:/MLToybox add native/overlay native/CMakeLists.txt
@@ -4375,7 +4531,7 @@ Expected: `100% tests passed, 0 tests failed out of 1`. `native/overlay/` 소스
 
 - [ ] **Step 6: 게임에서 탭 화면 확인**
 
-게임이 꺼져 있는지 보고 배포한 뒤 켠다(Task 6 Step 9의 `$mod`, `$shots`를 쓴다).
+게임이 꺼져 있는지 보고 배포한 뒤 켠다(Task 6 Step 11의 `$mod`, `$shots`를 쓴다).
 
 ```powershell
 pwsh E:\MLToybox\tools\deploy.ps1 -Mod MLToybox
