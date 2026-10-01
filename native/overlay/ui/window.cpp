@@ -18,6 +18,7 @@ struct Tab {
 };
 // 패널과 같은 이름·순서
 const Tab kTabs[] = {
+    { "자원", drawResourcesTab },
     { "영주", drawLordTab },
     { "건설", drawBuildTab },
     { "업그레이드", drawUpgradeTab },
