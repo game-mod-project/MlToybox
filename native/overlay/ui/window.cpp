@@ -23,6 +23,7 @@ const Tab kTabs[] = {
     { "건설", drawBuildTab },
     { "업그레이드", drawUpgradeTab },
     { "군사", drawMilitaryTab },
+    { "용병", drawMercenariesTab },
     { "인구", drawPopulationTab },
     { "상태", drawStatusTab },
 };

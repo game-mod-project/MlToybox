@@ -83,4 +83,35 @@ bool canEnableCompany(const std::vector<MercCompany>& all, int self) {
     return enabled < kMercMaxEnabled;
 }
 
+MercRegistration registerCompany(std::vector<MercCompany>& all, int editing, MercCompany draft) {
+    const bool isNew = editing < 0 || editing >= static_cast<int>(all.size());
+    if (isNew) editing = -1;
+    draft.name = trim(draft.name);
+    draft.banner = normalizeBanner(draft.banner);
+    draft.enabled = isNew ? canEnableCompany(all, -1) : all[static_cast<size_t>(editing)].enabled;
+    MercRegistration result;
+    if (auto reason = validateCompany(draft, all, editing)) {
+        result.message = *reason;
+        return result;
+    }
+    result.ok = true;
+    result.message = "등록했습니다.";
+    if (isNew) {
+        if (!draft.enabled) result.message = "사용 중인 용병단이 " + std::to_string(kMercMaxEnabled) + "개라 '사용'을 끈 채로 등록했습니다.";
+        all.push_back(std::move(draft));
+        result.index = static_cast<int>(all.size()) - 1;
+    } else {
+        all[static_cast<size_t>(editing)] = std::move(draft);
+        result.index = editing;
+    }
+    return result;
+}
+
+std::optional<std::string> setCompanyEnabled(std::vector<MercCompany>& all, int index, bool enabled) {
+    if (index < 0 || index >= static_cast<int>(all.size())) return "없는 용병단입니다.";
+    if (enabled && !canEnableCompany(all, index)) return "사용은 최대 " + std::to_string(kMercMaxEnabled) + "개입니다.";
+    all[static_cast<size_t>(index)].enabled = enabled;
+    return std::nullopt;
+}
+
 }

@@ -18,6 +18,7 @@ void drawUpgradeTab(TabContext& ctx);
 void drawMilitaryTab(TabContext& ctx);
 void drawPopulationTab(TabContext& ctx);
 void drawResourcesTab(TabContext& ctx);
+void drawMercenariesTab(TabContext& ctx);
 void drawStatusTab(TabContext& ctx);
 
 // 설정 문서를 바꿨다고 표시한다(작업 스레드가 0.2초 안에 저장한다)

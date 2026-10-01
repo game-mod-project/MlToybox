@@ -36,4 +36,16 @@ std::optional<std::string> validateCompany(const MercCompany& c, const std::vect
 std::string unitSummary(const std::vector<std::string>& units);
 // self 를 "사용"으로 바꿔도 되는가(self 를 뺀 사용 수가 3 미만). 새 용병단이면 self = -1
 bool canEnableCompany(const std::vector<MercCompany>& all, int self);
+
+struct MercRegistration {
+    bool ok = false;
+    int index = -1;         // 등록된 자리
+    std::string message;    // 사용자에게 보여 줄 결과(실패하면 이유)
+};
+// 편집한 내용(draft)을 등록한다. editing 이 -1 이면 새로 넣고, 아니면 그 자리를 고친다.
+// 이름은 앞뒤 공백을 떼고, 깃발은 표의 이름으로 맞춘다. 새 용병단은 사용 중인 것이 3개 미만일 때만 켠 채로 넣고,
+// 고칠 때는 "사용"을 그대로 둔다(draft.enabled 는 보지 않는다). 검증에 실패하면 all 을 바꾸지 않는다
+MercRegistration registerCompany(std::vector<MercCompany>& all, int editing, MercCompany draft);
+// "사용" 체크를 바꾼다. 켤 수 없으면(이미 3개가 사용 중) 바꾸지 않고 이유를 돌려준다
+std::optional<std::string> setCompanyEnabled(std::vector<MercCompany>& all, int index, bool enabled);
 }

@@ -66,6 +66,37 @@ TEST(overlay_merc_rules_at_most_three_enabled) {
     CHECK(canEnableCompany({}, -1));
 }
 
+TEST(overlay_merc_rules_register_adds_or_updates_and_reports) {
+    std::vector<MercCompany> all;
+    MercRegistration r = registerCompany(all, -1, { "  검사대  ", { "mercenary_infantry" }, 1000, "nus", "Battle_Brothers", false });
+    CHECK(r.ok && r.index == 0 && r.message == "등록했습니다." && all.size() == 1);
+    CHECK(all[0].name == "검사대" && all[0].banner == "battle_brothers" && all[0].enabled);   // 이름은 다듬고, 깃발은 표의 이름으로, 새 용병단은 켠 채로
+    all[0].enabled = false;
+    r = registerCompany(all, 0, { "검사대", { "mercenary_infantry", "mercenary_infantry" }, 2000, std::nullopt, "dragon", true });
+    CHECK(r.ok && r.index == 0 && all.size() == 1);                                           // 고치기: 자리와 "사용"은 그대로
+    CHECK(all[0].units.size() == 2 && all[0].cost == 2000 && !all[0].region && !all[0].banner && !all[0].enabled);
+    r = registerCompany(all, -1, { "검사대", { "mercenary_infantry" }, 1, std::nullopt, std::nullopt, true });
+    CHECK(!r.ok && r.message == "같은 이름의 용병단이 이미 있습니다." && all.size() == 1);    // 검증에 실패하면 바꾸지 않는다
+    r = registerCompany(all, 0, { "", {}, 0, std::nullopt, std::nullopt, true });
+    CHECK(!r.ok && all[0].name == "검사대" && all[0].units.size() == 2);
+}
+
+// R7: 등록 수에는 제한이 없고 "사용"은 최대 3개. 체크를 끄면 다른 것을 켤 수 있다
+TEST(overlay_merc_rules_any_number_can_be_registered_but_only_three_are_in_use) {
+    std::vector<MercCompany> all;
+    for (const char* name : { "1", "2", "3" }) CHECK(registerCompany(all, -1, company(name)).ok);
+    CHECK(all[0].enabled && all[1].enabled && all[2].enabled);
+    const MercRegistration fourth = registerCompany(all, -1, company("4"));
+    CHECK(fourth.ok && all.size() == 4 && !all[3].enabled);
+    CHECK(fourth.message == "사용 중인 용병단이 3개라 '사용'을 끈 채로 등록했습니다.");
+    CHECK(registerCompany(all, -1, company("5")).ok && all.size() == 5 && !all[4].enabled);
+    CHECK(setCompanyEnabled(all, 3, true) == "사용은 최대 3개입니다." && !all[3].enabled);       // 네 번째는 켜지지 않는다
+    CHECK(!setCompanyEnabled(all, 0, false).has_value() && !all[0].enabled);                  // 하나를 끄면
+    CHECK(!setCompanyEnabled(all, 3, true).has_value() && all[3].enabled);                    // 다른 것을 켤 수 있다
+    CHECK(!setCompanyEnabled(all, 1, true).has_value() && all[1].enabled);                    // 이미 켜진 것은 그대로
+    CHECK(setCompanyEnabled(all, 9, true).has_value());                                       // 없는 자리
+}
+
 TEST(overlay_merc_rules_vanilla_names_and_banners) {
     CHECK(vanillaMercNames().size() == 11);
     CHECK(isVanillaMercName("huntsmen") && isVanillaMercName("HILDEBOLTS_ARMY") && !isVanillaMercName("토이박스"));
