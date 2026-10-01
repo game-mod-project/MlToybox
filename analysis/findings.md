@@ -344,3 +344,25 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 | 일시정지 | 이 방법으로 연 화면에서는 `IsGamePaused=false`였다(용병 고용 창과 다르다) |
 
 - 화면의 무늬·색·이름 조작을 사람이 눌렀을 때의 동작은 확인하지 않았다.
+
+## 게임 안 오버레이 창 — DX12 후킹 + Dear ImGui (2026-10-01, 스파이크)
+질문: 패널 기능을 게임 화면 안의 창으로 옮길 수 있는가. 버리는 DLL(레포 밖)을 Lab의 `package.loadlib`로 게임에 올려 쟀다. 게임은 UE 5.5, D3D12(SM6), 전체 창 모드 1920×1080, GPU RTX 2080 Ti.
+
+### 방법
+- 더미 창·장치·스왑체인을 만들어 가상 함수 표 주소를 얻고(kiero 방식) MinHook으로 `IDXGISwapChain::Present`(8), `ResizeBuffers`(13), `ID3D12CommandQueue::ExecuteCommandLists`(10)를 후킹했다.
+- `Present` 안에서 Dear ImGui(1.93 WIP, win32 + dx12 백엔드)를 초기화하고, 백버퍼를 `PRESENT → RENDER_TARGET → PRESENT`로 전환하며 그 위에 그렸다. 창 프로시저는 `SetWindowLongPtr`로 바꿔 입력을 ImGui에 넘겼다.
+
+### 실측
+- **게임 화면 안에 창이 그려진다.** 게임 창만 캡처(`PrintWindow`, `PW_RENDERFULLCONTENT`)해 확인했다. 1만 프레임 넘게 그리는 동안 튕기지 않았다.
+- **직접(DIRECT) 명령 큐가 두 개다.** 처음 본 직접 큐로 그리면 첫 프레임 직후 게임이 `GPU Crash dump Triggered`로 종료된다(2회 재현). `swapchain->GetDevice(IID_ID3D12CommandQueue)`는 `E_NOINTERFACE`(0x80004002)였다. **`Present`를 부르는 스레드에서 `ExecuteCommandLists`가 불린 직접 큐**를 고르자 안정됐다.
+- 스왑체인: 백버퍼 3개, 형식 24(`DXGI_FORMAT_R10G10B10A2_UNORM`), `Present`와 그 큐의 실행은 같은 스레드에서 일어난다.
+- 한글: `C:\Windows\Fonts\malgun.ttf`를 `GetGlyphRangesKorean()`으로 올리면 한글이 표시된다.
+- 토글: 창 프로시저에서 `WM_KEYDOWN`/`VK_INSERT`를 가로채 열고 닫았다.
+- 해상도·창 모드 변경(`GameUserSettings:SetScreenResolution` + `ApplyResolutionSettings`, 1600×900 창 → 1920×1080 전체 창): `ResizeBuffers`가 불렸고(백버퍼·ImGui 장치 객체를 풀었다가 다시 만듦) 튕기지 않았으며 창이 계속 그려졌다.
+- 마우스·키보드: 사용자가 직접 확인했다 — 탭·체크박스·슬라이더·버튼 조작, 창 드래그, Insert 토글, 창 위 입력이 게임에 새지 않음. 이상 없음.
+- 게임 창이 뒤에 있을 때 `PostMessage`로 보낸 마우스 메시지는 ImGui에 먹히지 않는다(백엔드의 `TrackMouseEvent` → `WM_MOUSELEAVE`로 위치가 지워진다). 자동 검증은 키 메시지와 창 캡처까지만 된다.
+
+### 구현할 때 지킬 것
+- 그리는 큐는 `Present` 스레드의 직접 큐로 고른다. 큐를 못 찾으면 그리지 않는다.
+- 창 프로시저(게임 스레드)와 `Present`(RHI 스레드)는 다른 스레드다. 스파이크는 ImGui 입력을 창 프로시저에서 바로 넣었다(경합 가능). 구현은 입력 메시지를 큐에 모아 `Present` 스레드에서 넣어야 한다.
+- UE4SS의 자체 GUI는 별도 창으로 뜬다(게임 화면 안이 아니다).
