@@ -1,0 +1,27 @@
+#include "test.h"
+#include "overlay/core/hint.h"
+
+using namespace mlt::ov;
+
+TEST(overlay_hint_shows_for_eight_seconds_after_ready) {
+    HintTimer h;
+    CHECK(!h.active(0) && !h.active(5000));        // 준비되기 전에는 띄우지 않는다
+    h.onReady(1000);
+    CHECK(h.active(1000) && h.active(8999));
+    CHECK(!h.active(9000));
+}
+
+TEST(overlay_hint_shows_again_each_time_the_player_enters_a_map) {
+    HintTimer h;
+    h.onReady(0);
+    h.update(false, 20000);                        // 메인 메뉴
+    CHECK(!h.active(20000));
+    h.update(true, 30000);                         // 맵에 들어갔다
+    CHECK(h.active(30000) && h.active(37999) && !h.active(38000));
+    h.update(true, 36000);                         // 맵 안에 계속 있는 동안에는 늘리지 않는다
+    CHECK(!h.active(38000));
+    h.update(false, 50000);                        // 메뉴로 나갔다가
+    CHECK(!h.active(50000));
+    h.update(true, 60000);                         // 다시 들어가면 또 띄운다
+    CHECK(h.active(67999) && !h.active(68000));
+}

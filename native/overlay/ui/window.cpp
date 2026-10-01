@@ -1,4 +1,5 @@
 #include "window.h"
+#include "overlay/core/hint.h"
 #include "runtime.h"
 #include "tabs.h"
 #include <algorithm>
@@ -9,8 +10,7 @@
 namespace mlt::ov {
 
 namespace {
-constexpr ULONGLONG kHintMs = 8000;
-ULONGLONG g_readyTick = 0;
+HintTimer g_hint;   // 안내를 띄울 때(core/hint)
 
 struct Tab {
     const char* name;
@@ -30,7 +30,7 @@ const ImVec4 kBlue(0.45f, 0.65f, 0.95f, 1.0f);
 const ImVec4 kRed(0.95f, 0.40f, 0.35f, 1.0f);
 
 bool hintActive() {
-    return g_readyTick != 0 && GetTickCount64() - g_readyTick < kHintMs;
+    return g_hint.active(GetTickCount64());
 }
 
 void drawHint(App& a) {
@@ -113,10 +113,13 @@ void drawMainWindow(App& a) {
 }
 
 void notifyOverlayReady() {
-    g_readyTick = GetTickCount64();
+    g_hint.onReady(GetTickCount64());
 }
 
 bool overlayWantsFrame(App& a) {
+    // 게임(맵)에 들어간 순간에도 안내를 띄운다. 그리기 시작할 때의 안내는 검은 시작 화면에 떠서 보기 어렵다
+    const BridgeState state = Bridge::evaluate(a.status.get(), a.lastSentSeq, nowEpochSeconds());
+    g_hint.update(state == BridgeState::Applied || state == BridgeState::Pending, GetTickCount64());
     return a.visible.load() || hintActive();
 }
 

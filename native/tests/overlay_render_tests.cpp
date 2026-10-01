@@ -79,6 +79,9 @@ TEST(overlay_render_draws_and_never_blocks_the_games_resize) {
     for (int i = 0; i < 4; ++i) CHECK(SUCCEEDED(swap->Present(0, 0)));
     CHECK(a.state.load() == OverlayState::Ready);
     CHECK(a.frames.load() > before);                                                        // 안내를 그렸다
+    before = a.frames.load();
+    CHECK(SUCCEEDED(swap->Present(0, DXGI_PRESENT_TEST)));                                  // 화면에 내지 않는 확인용 호출
+    CHECK(a.frames.load() == before);                                                       // 거기에는 그리지 않는다
 
     waitForGpu(device, queue);
     CHECK(SUCCEEDED(swap->ResizeBuffers(2, 800, 600, DXGI_FORMAT_R8G8B8A8_UNORM, 0)));      // 정상일 때의 크기 변경

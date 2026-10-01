@@ -1,6 +1,7 @@
 #include "input.h"
 #include "guard.h"
 #include "overlay/ui/app.h"
+#include <atomic>
 #include <exception>
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -16,7 +17,9 @@ std::recursive_mutex& imguiMutex() {
 }
 
 namespace {
-WNDPROC g_original = nullptr;
+std::atomic<WNDPROC> g_original{nullptr};
+std::atomic<HWND> g_hooked{nullptr};
+bool g_wasVisible = false;   // 창 스레드만 쓴다
 
 struct InputArgs {
     HWND hwnd;
@@ -39,17 +42,56 @@ void feedImGui(void* p) {
     }
 }
 
+// 창이 닫힐 때: 버튼이나 키를 누른 채였다면 ImGui 와 백엔드에 눌린 상태가 남는다(다시 열면 창이 마우스에 붙어 끌린다).
+// 버튼을 뗀 것으로 알려 백엔드가 잡은 마우스를 놓게 하고, ImGui 의 입력 상태를 비운다
+void resetImGui(void* p) {
+    auto* m = static_cast<InputArgs*>(p);
+    try {
+        TrackedLock lock(imguiMutex(), m->locked);
+        if (!ImGui::GetCurrentContext()) return;
+        for (UINT up : { WM_LBUTTONUP, WM_RBUTTONUP, WM_MBUTTONUP }) ImGui_ImplWin32_WndProcHandler(m->hwnd, up, 0, 0);
+        ImGuiIO& io = ImGui::GetIO();
+        io.ClearInputKeys();
+        io.ClearInputMouse();
+    } catch (const std::exception& e) {
+        disableOverlay(std::string("input exception ") + e.what());
+    } catch (...) {
+        disableOverlay("input exception (unknown)");
+    }
+}
+
+void guarded(void (*fn)(void*), InputArgs& args) {
+    unsigned long code = 0;
+    if (!runGuarded(fn, &args, &code)) {
+        if (args.locked) imguiMutex().unlock();
+        disableOverlay("input exception " + hexCode(code));
+    }
+}
+
+// 창이 열려 있다가 닫혔으면(토글 키, 닫기 버튼, 꾸미기 열기) 입력 상태를 비운다. 창 스레드에서만 부른다
+void noteVisibility(HWND hwnd, App& a) {
+    const bool visible = a.visible.load();
+    if (g_wasVisible && !visible) {
+        InputArgs args{ hwnd, WM_NULL, 0, 0 };
+        guarded(resetImGui, args);
+    }
+    g_wasVisible = visible;
+}
+
 LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     App& a = app();
+    const WNDPROC original = g_original.load();
     // 오버레이가 그릴 수 없는 상태면 토글 키를 포함해 아무것도 가로채지 않는다
-    if (a.state.load() != OverlayState::Ready) return CallWindowProcW(g_original, hwnd, msg, wParam, lParam);
+    if (a.state.load() != OverlayState::Ready) return CallWindowProcW(original, hwnd, msg, wParam, lParam);
 
     const bool toggleKey = static_cast<int>(wParam) == a.toggleVk.load();
     if (toggleKey && (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)) {
         if (!(lParam & (1LL << 30))) a.visible = !a.visible.load();   // 누르고 있는 동안의 반복 입력은 무시
+        noteVisibility(hwnd, a);
         return 0;
     }
     if (toggleKey && (msg == WM_KEYUP || msg == WM_SYSKEYUP)) return 0;
+    noteVisibility(hwnd, a);
 
     if (a.visible.load()) {
         // Win32 의 캡처·키 상태 함수는 창을 가진 스레드에서 불러야 한다. 그래서 입력은 이 스레드에서 ImGui 에 넣는다.
@@ -57,27 +99,32 @@ LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         // 마우스·키 입력은 큐로 오는 메시지라 여기에 걸리지 않는다
         if (!InSendMessage()) {
             InputArgs args{ hwnd, msg, wParam, lParam };
-            unsigned long code = 0;
-            if (!runGuarded(feedImGui, &args, &code)) {
-                if (args.locked) imguiMutex().unlock();
-                disableOverlay("input exception " + hexCode(code));
-            }
+            guarded(feedImGui, args);
         }
         const bool mouse = msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST;
         const bool key = msg >= WM_KEYFIRST && msg <= WM_KEYLAST;
         if ((mouse && a.wantMouse.load()) || (key && a.wantKeyboard.load())) return 0;   // 창이 먹은 입력은 게임에 넘기지 않는다
     }
-    return CallWindowProcW(g_original, hwnd, msg, wParam, lParam);
+    return CallWindowProcW(original, hwnd, msg, wParam, lParam);
 }
 }
 
 bool installWndProc(HWND hwnd) {
-    if (g_original) return true;
+    const HWND hooked = g_hooked.load();
+    if (hooked == hwnd) return true;
+    if (hooked && IsWindow(hooked)) return true;   // 이미 다른(살아 있는) 창에 걸려 있다
+    const LONG_PTR current = GetWindowLongPtrW(hwnd, GWLP_WNDPROC);
+    if (!current) return false;
+    // 바꾸기 전에 넣는다. 바꾼 직후 창 스레드에 온 메시지가 이어 부를 곳이 있어야 한다
+    g_original = reinterpret_cast<WNDPROC>(current);
     SetLastError(0);
-    LONG_PTR previous = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(HookedWndProc));
-    if (!previous) return false;
-    g_original = reinterpret_cast<WNDPROC>(previous);
+    if (!SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(HookedWndProc)) && GetLastError() != 0) return false;
+    g_hooked = hwnd;
     return true;
+}
+
+void wakeWindowThread() {
+    if (const HWND hwnd = g_hooked.load()) PostMessageW(hwnd, WM_NULL, 0, 0);
 }
 
 }
