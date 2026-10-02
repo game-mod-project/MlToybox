@@ -97,12 +97,15 @@ end
 
 M.configure = M.tick
 
-function M.disable()
+-- 껐을 때는 게임이 준 값으로 되돌린다. 맵을 떠날 때(state.leaving)는 건물이 곧 사라지므로 게임 객체를 건드리지 않고 잊기만 한다
+function M.disable(state)
+  local kept = tracked
+  tracked = {}
+  if type(state) == "table" and state.leaving then return end
   forEachBuilding(function(b, addr)
-    local t = tracked[addr]
+    local t = kept[addr]
     if t and t.type == b:GetType() then restore(b, t) end
   end)
-  tracked = {}
 end
 
 function M.trackedCount()

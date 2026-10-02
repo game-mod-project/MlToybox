@@ -102,6 +102,15 @@ T.run({
     T.eq(limits(a), "2500/0/0", "storehouse"); T.eq(limits(camp), "0/28/0", "logging camp")
     T.eq(storage.trackedCount(), 0, "nothing remembered")
   end,
+  leaving_the_map_does_not_touch_the_buildings = function()
+    -- 다른 세이브를 불러오거나 메뉴로 나갈 때: 건물은 곧 사라지고 한도는 세이브에 저장되지 않는다. 게임 객체를 읽지도 쓰지도 않는다
+    local a = building(99, 2500, 0, 0)
+    setup({ a })
+    storage.tick({}, on({ ["99"] = { generic = 5000 } }))
+    game.playerRegions = function() error("must not look at the game while the map is going away") end
+    storage.disable({ leaving = true }, {})
+    T.eq(a.storageLimitGeneric, 5000, "left as it was"); T.eq(storage.trackedCount(), 0, "nothing remembered")
+  end,
   removing_a_setting_gives_that_types_limits_back = function()
     local a, granary = building(99, 2500, 0, 0), building(68, 0, 0, 2500)
     setup({ a, granary })
