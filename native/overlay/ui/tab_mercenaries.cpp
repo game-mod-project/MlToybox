@@ -47,7 +47,7 @@ struct Editor {
         units = c.units;
         cost = std::clamp(c.cost, 0, 10000000);
         region = c.region;
-        banner = c.banner;
+        banner = normalizeBanner(c.banner);   // 손으로 쓴 설정의 대소문자·공백을 선택지의 이름으로 맞춘다(안 맞추면 "칸의 것 그대로"로 보인다)
         group.clear();
         message.clear();
     }
@@ -105,7 +105,11 @@ bool drawList(MercSettings& m, const std::vector<ScopeOption>& regions) {
             }
             ImGui::TableNextColumn();
             ImGui::AlignTextToFramePadding();
-            if (ImGui::Selectable((c.name + "##name").c_str(), e.editing == i)) e.load(c, i);   // 줄을 누르면 편집 영역에 싣는다
+            // 줄 어디를 눌러도 편집 영역에 싣는다(앞 칸의 "사용" 체크는 먼저 그려서 그대로 눌린다).
+            // 이름은 따로 그린다: Selectable 의 글에 넣으면 이름 안의 "##" 뒤가 잘린다
+            if (ImGui::Selectable("##row", e.editing == i, ImGuiSelectableFlags_SpanAllColumns)) e.load(c, i);
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::TextUnformatted(c.name.c_str());
             ImGui::TableNextColumn();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(unitSummary(c.units).c_str());

@@ -34,14 +34,17 @@ T.run({
   mercenary_companies_pass_the_mods_own_validation = function()
     local m = load().features.mercenaries
     T.eq(m.enabled, true, "enabled"); T.eq(m.refund, true, "refund"); T.eq(m.lockFromAi, true, "lockFromAi")
-    T.eq(#m.companies, 2, "two companies")
+    T.eq(#m.companies, 3, "three companies")
     T.eq(m.companies[1].name, "토이박스 용병단", "korean name survives"); T.eq(m.companies[2].region, nil, "unset region is absent"); T.eq(m.companies[2].enabled, false, "disabled")
+    -- 오버레이가 받아 주는 가장 긴 이름(한글 40자, 120바이트)을 모드도 40자로 센다
+    T.eq(utf8.len(m.companies[3].name), 40, "forty characters"); T.eq(#m.companies[3].name, 120, "in 120 bytes")
     local ctx = { vanillaNames = { greencaps = true }, unitExists = function() return true end, regionKeys = { "nus", "gold" } }
     local valid, skipped = plan.validate(m.companies, ctx)
     T.eq(#skipped, 0, "nothing skipped")
-    T.eq(#valid, 1, "only the enabled company is used")
+    T.eq(#valid, 2, "the two companies in use")
     T.eq(valid[1].name, "토이박스 용병단", "name"); T.eq(#valid[1].units, 2, "units"); T.eq(valid[1].cost, 3000, "cost")
     T.eq(valid[1].region, "gold", "region"); T.eq(valid[1].banner, "greencaps", "banner")
+    T.eq(valid[2].name, m.companies[3].name, "the longest name passes the mod's validation")
   end,
   commands_keep_the_fields_the_handlers_read = function()
     local commands = load().commands
