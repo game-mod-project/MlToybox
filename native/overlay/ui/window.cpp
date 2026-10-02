@@ -122,6 +122,15 @@ std::vector<std::string> tabNames() {
     return names;
 }
 
+void configureOverlayInput() {
+    ImGuiIO& io = ImGui::GetIO();
+    // 창은 제목 줄을 끌어서만 옮긴다. 기본값대로면 창 안의 빈 곳이나 글 위를 눌러 끌어도 창이 옮겨져,
+    // 표의 열 경계(폭 8픽셀)를 잡으려다 조금만 빗나가도 창이 따라 움직인다
+    io.ConfigWindowsMoveFromTitleBarOnly = true;
+    // 게임이 자기 커서를 쓴다. ImGui 백엔드가 Windows 커서를 바꾸거나 숨기지 않게 한다(바꿔도 게임이 곧 되돌린다)
+    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+}
+
 void notifyOverlayReady() {
     g_hint.onReady(GetTickCount64());
 }
@@ -136,6 +145,11 @@ bool overlayWantsFrame(App& a) {
 void drawOverlay(App& a) {
     if (a.visible.load()) drawMainWindow(a);
     else if (hintActive()) drawHint(a);
+    // 열 경계나 창 가장자리처럼 끌어서 크기를 바꾸는 자리 위에서는 크기 조절 화살표를 직접 그린다.
+    // 게임의 커서는 모양이 바뀌지 않아, 이것이 없으면 잡을 수 있는 자리인지 알 수 없다
+    const ImGuiMouseCursor cursor = ImGui::GetMouseCursor();
+    ImGui::GetIO().MouseDrawCursor = a.visible.load() && (cursor == ImGuiMouseCursor_ResizeEW || cursor == ImGuiMouseCursor_ResizeNS
+        || cursor == ImGuiMouseCursor_ResizeNESW || cursor == ImGuiMouseCursor_ResizeNWSE);
 }
 
 }

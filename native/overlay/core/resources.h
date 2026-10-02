@@ -67,6 +67,22 @@ std::string resourceClassLabel(const ResourceRow& row);
 // 줄들에 있는 분류. 게임의 순서
 std::vector<std::string> resourceCategories(const std::vector<ResourceRow>& rows);
 
+// 공통 목표 대신 영지 목표를 따르는 영지 하나
+struct RegionOverride {
+    std::string key;
+    std::string name;   // 영지 이름. 모르면(게임 밖) 키
+    int target = 0;
+
+    bool operator==(const RegionOverride&) const = default;
+};
+// 자원마다, 영지 목표가 따로 있는 영지들. 영지 목표는 공통 목표보다 우선하므로 그 영지에서는 공통 목표가 쓰이지 않는다.
+// 지금 게임에 있는 영지만 본다(status.regions 의 순서). 게임 밖이면 설정에 있는 영지를 모두 본다
+std::map<std::string, std::vector<RegionOverride>> regionOverrides(const StatusDoc* status, const ResourcesSettings& settings);
+// 한 줄에 영지 하나: "Altbruch (sel): 1000"
+std::string regionOverrideText(const std::vector<RegionOverride>& overrides);
+// 보이는 줄(shown)의 목표를 지운 것. filtered 가 거짓이면(추리지 않았으면) 모두 지운다(표에 보이지 않는 옛 자원의 목표 포함)
+std::map<std::string, int> clearedTargets(std::map<std::string, int> targets, const std::vector<ResourceRow>& shown, bool filtered);
+
 // 표에 보일 줄을 고르는 조건
 struct ResourceFilter {
     std::string category;   // 비어 있으면 모든 분류

@@ -278,3 +278,31 @@ TEST(overlay_log_tab_copies_the_shown_lines) {
 TEST(overlay_tabs_include_the_log_tab) {
     CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "상태", "로그" }));
 }
+
+// "지우기"는 두 번 눌러야 지운다(한 번에 여러 목표가 사라진다). 검색으로 추린 동안에는 보이는 줄의 목표만 지운다
+TEST(overlay_resource_tab_clear_needs_a_second_click_and_follows_the_filter) {
+    Frames f;
+    ResourcesSettings r = f.a.control.resources();
+    r.targets = { { "Timber", 500 }, { "Beef", 1000 }, { "Pork", 20 } };
+    f.a.control.setResources(r);
+    for (int i = 0; i < 3; ++i) f.frame(drawResourcesTab);
+    CHECK(f.clickOn(drawResourcesTab, "##search"));
+    ImGui::GetIO().AddInputCharactersUTF8("고기");
+    f.frame(drawResourcesTab);
+    f.frame(drawResourcesTab);
+    CHECK(f.clickOn(drawResourcesTab, "###clear"));
+    CHECK(targets(f.a).size() == 3 && !f.a.dirty);          // 한 번으로는 지우지 않는다
+    ImVec2 at = ImGui::GetIO().MousePos;
+    for (int i = 0; i < 12; ++i) f.frame(drawResourcesTab);   // 6초 뒤(한 프레임이 0.5초다): 처음부터 다시 물어본다
+    f.click(drawResourcesTab, at.x, at.y);
+    CHECK(targets(f.a).size() == 3 && !f.a.dirty);
+    f.click(drawResourcesTab, at.x, at.y);                    // 곧바로 한 번 더
+    CHECK(targets(f.a) == (std::map<std::string, int>{ { "Timber", 500 } }));
+    CHECK(f.a.dirty);
+    // 추리지 않았으면 모두 지운다
+    CHECK(f.clickOn(drawResourcesTab, "지우기##search"));
+    CHECK(f.clickOn(drawResourcesTab, "###clear"));
+    at = ImGui::GetIO().MousePos;
+    f.click(drawResourcesTab, at.x, at.y);
+    CHECK(targets(f.a).empty());
+}
