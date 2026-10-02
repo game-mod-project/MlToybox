@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 // 화면(RHI 스레드), 창 프로시저(게임 스레드), 작업 스레드가 나눠 쓰는 상태.
 // 잠금 순서: imguiMutex(render/input) -> App::mutex. 작업 스레드는 App::mutex 만 잡는다.
@@ -23,20 +24,21 @@ struct App : Session {
     std::string reason;                        // state 가 Disabled 일 때의 이유
     std::string clipboardOut;                  // 화면에서 복사한 글. 작업 스레드가 Windows 클립보드에 쓴다
     bool clipboardPending = false;
+    std::vector<std::string> inputLines;       // 개발·검증용(inputLog): 창 스레드가 적어 둔 글쇠 메시지. 작업 스레드가 파일에 쓴다
 
     // --- 잠금 없이 읽고 쓴다 ---
     std::atomic<OverlayState> state{OverlayState::Starting};
     std::atomic<bool> visible{false};
     std::atomic<bool> wantMouse{false};        // 직전 프레임에 ImGui 가 마우스를 원했는가
     std::atomic<bool> wantKeyboard{false};
-    std::atomic<bool> wantText{false};         // 직전 프레임에 글자 입력 칸에 커서가 있었는가(창 스레드가 IME 를 켜고 끈다)
-    std::atomic<int> imeX{0};                  // 입력 커서의 위치(게임 창 안 좌표). 조합 중인 글자를 여기에 띄운다
-    std::atomic<int> imeY{0};
+    std::atomic<bool> wantText{false};         // 직전 프레임에 글자 입력 칸에 커서가 있었는가(그동안 한/영 글쇠는 오버레이의 것이다)
+    std::atomic<bool> inputLog{false};         // 개발·검증용: 글쇠 메시지를 적는가(settings.inputLog)
     std::atomic<int> toggleVk{0x2D};
     std::atomic<float> scale{1.0f};
     std::atomic<long long> frames{0};
     std::atomic<bool> koreanFont{false};
     std::atomic<bool> applyWindowRect{true};   // 설정의 창 위치·크기를 다음 프레임에 적용한다
+    std::atomic<unsigned> hangulKeys{0};       // 글자 칸에 커서가 있을 때 한/영 글쇠를 누른 횟수(창 스레드가 센다. 한글 조합기를 켜고 끈다)
     std::atomic<long long> workerErrors{0};    // 작업 스레드가 예외로 건너뛴 회차 수(0 이 아니면 상태 탭에 보인다)
 };
 

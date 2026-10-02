@@ -1,4 +1,6 @@
 #include "widgets.h"
+#include "app.h"
+#include "overlay/core/hangul.h"
 #include "overlay/core/number_input.h"
 #include "overlay/core/text.h"
 #include <algorithm>
@@ -81,14 +83,78 @@ bool comboOptions(const char* id, const std::vector<ScopeOption>& options, int& 
     return changed;
 }
 
+namespace {
+// 글자 칸의 한글 조합 상태. 글자 칸은 한 번에 하나만 편집하므로 하나면 된다
+struct HangulUi {
+    HangulField field;
+    bool on = false;          // 한글 모드(꺼져 있으면 친 글자가 그대로 들어간다)
+    unsigned seenKeys = 0;    // App::hangulKeys 에서 마지막으로 본 값
+    bool refocus = false;     // 단추로 한/영을 바꿨다. 다음 프레임에 글자 칸으로 커서를 돌려준다
+};
+HangulUi g_hangul;
+
+void toggleHangul() {
+    g_hangul.on = !g_hangul.on;
+    g_hangul.field.reset();   // 조합 중이던 글자는 그대로 두고 조합만 끝낸다
+}
+
+int hangulCallback(ImGuiInputTextCallbackData* data) {
+    HangulUi& h = g_hangul;
+    const ImGuiIO& io = ImGui::GetIO();
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter) {
+        if (!h.on) return 0;
+        // 붙여넣기(Ctrl+V, Shift+Insert)로 들어온 글자는 조합하지 않는다
+        if (io.KeyCtrl || io.KeyAlt || io.KeySuper || ImGui::IsKeyDown(ImGuiKey_Insert)) return 0;
+        h.field.push(data->EventChar, io.KeyShift);
+        return 1;   // 글자 칸에는 넣지 않는다. 아래에서 조합한 글자를 넣는다
+    }
+    // 프레임마다: 쌓인 글쇠를 조합해 넣고, 밖에서 글이나 커서가 바뀌었으면 조합을 끝낸다
+    std::string text(data->Buf, static_cast<size_t>(data->BufTextLen));
+    int cursor = data->CursorPos;
+    const bool backspace = ImGui::IsKeyPressed(ImGuiKey_Backspace, true);
+    if (h.field.apply(text, cursor, static_cast<size_t>(data->BufSize - 1), backspace, data->HasSelection())) {
+        data->DeleteChars(0, data->BufTextLen);
+        data->InsertChars(0, text.c_str(), text.c_str() + text.size());
+        data->CursorPos = cursor;
+        data->SelectionStart = data->SelectionEnd = cursor;
+    }
+    return 0;
+}
+}
+
 bool textField(const char* id, std::string& value, size_t maxBytes, float width) {
+    HangulUi& h = g_hangul;
+    // 한/영 글쇠는 창 스레드가 센다. 홀수 번 눌렸으면 바꾼다
+    const unsigned keys = app().hangulKeys.load();
+    if (keys != h.seenKeys) {
+        if ((keys - h.seenKeys) % 2 != 0) toggleHangul();
+        h.seenKeys = keys;
+    }
     char buf[256];
     const size_t capacity = std::min(maxBytes + 1, sizeof(buf));
     std::snprintf(buf, capacity, "%s", value.c_str());
     ImGui::SetNextItemWidth(width);
-    if (!ImGui::InputText(id, buf, capacity)) return false;
+    if (h.refocus) {
+        ImGui::SetKeyboardFocusHere();
+        h.refocus = false;
+    }
+    const bool changed = ImGui::InputText(id, buf, capacity, ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_CallbackAlways, hangulCallback);
+    if (ImGui::IsItemDeactivated()) h.field.reset();   // 글자 칸을 떠나면 조합을 끝낸다
+    if (!changed) return false;
     value = buf;
     return true;
+}
+
+bool hangulModeOn() {
+    return g_hangul.on;
+}
+
+void hangulModeButton() {
+    if (ImGui::Button(g_hangul.on ? "한##hangul" : "A##hangul", ImVec2(ImGui::GetFrameHeight() * 1.4f, 0.0f))) {
+        toggleHangul();
+        g_hangul.refocus = true;
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("한/영 (한/영 키로도 바꿉니다)");
 }
 
 void needGameText() {

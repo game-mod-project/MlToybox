@@ -80,7 +80,7 @@ add_library(overlay_impl STATIC
     overlay/ui/tab_resources.cpp
     overlay/ui/tab_mercenaries.cpp
     overlay/ui/tab_status.cpp)
-target_link_libraries(overlay_impl PUBLIC overlay_core imgui minhook d3d12 dxgi user32 imm32)
+target_link_libraries(overlay_impl PUBLIC overlay_core imgui minhook d3d12 dxgi user32)
 
 # mltoybox_overlay: 게임에 올리는 DLL
 add_library(mltoybox_overlay SHARED overlay/dllmain.cpp)
@@ -102,10 +102,11 @@ add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_t
     tests/overlay_merc_rules_tests.cpp
     tests/overlay_view_tests.cpp
     tests/overlay_hangul_tests.cpp
+    tests/overlay_widgets_tests.cpp
     # 창 프로시저 후킹은 실제 창으로, 화면 출력 후킹은 실제 D3D12 스왑체인으로 시험한다(게임 없이). 입력 테스트가 먼저다
     tests/overlay_input_tests.cpp
     tests/overlay_render_tests.cpp)
-target_link_libraries(native_tests PRIVATE mlt_core overlay_core overlay_impl)
+target_link_libraries(native_tests PRIVATE mlt_core overlay_core overlay_impl imm32)   # imm32: 오버레이가 게임의 IME 를 건드리지 않는지 보는 테스트
 # 테스트가 읽는 견본 파일의 위치
 target_compile_definitions(native_tests PRIVATE
     MLT_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures"

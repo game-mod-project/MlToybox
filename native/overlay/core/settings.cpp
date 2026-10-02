@@ -53,6 +53,7 @@ OverlaySettings parseSettings(std::string_view text) {
     }
     s.startOpen = boolOr(&root, "startOpen", false);
     if (auto tab = optString(&root, "devTab")) s.devTab = *tab;
+    s.inputLog = boolOr(&root, "inputLog", false);
     return s;
 }
 
@@ -69,6 +70,7 @@ std::string dumpSettings(const OverlaySettings& s) {
     root["startOpen"] = s.startOpen;
     if (s.devTab.empty()) root["devTab"] = nullptr;
     else root["devTab"] = s.devTab;
+    if (s.inputLog) root["inputLog"] = true;   // 켰을 때만 적는다
     return root.dump(2);
 }
 

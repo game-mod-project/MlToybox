@@ -174,6 +174,8 @@ bool drawEditor(MercSettings& m, const std::vector<ScopeOption>& regions) {
 
     field("이름");
     textField("##name", e.name, static_cast<size_t>(kMercNameMax) * 4, scaled(260.0f));   // 40자. 한 글자는 4바이트까지
+    ImGui::SameLine();
+    hangulModeButton();
 
     field("분대 추가");
     comboOptions("##unit", unitOptions, e.unit, scaled(180.0f));
