@@ -91,6 +91,28 @@ static void reloadSettingsIfChangedOutside(App& a, const Bridge& bridge, std::fi
     if (a.settings.startOpen) a.visible = true;
 }
 
+// 모드가 시작할 때 쓴 자원 이름 표(bridge/catalog.json)를 읽는다. 파일이 바뀌었을 때만 다시 읽는다.
+// 읽었는데 비어 있으면(모드가 쓰는 중이었다) 다음 회차에 다시 읽는다
+static void readCatalog(App& a, const Bridge& bridge, std::filesystem::file_time_type& known) {
+    std::error_code ec;
+    const auto written = std::filesystem::last_write_time(bridge.catalogPath(), ec);
+    if (ec || written == known) return;
+    auto text = readFileShared(bridge.catalogPath());
+    if (!text) return;
+    auto catalog = std::make_shared<const ResourceCatalog>(ResourceCatalog::parse(*text));
+    if (catalog->empty()) return;
+    known = written;
+    std::lock_guard<std::mutex> lock(a.mutex);
+    a.catalog = std::move(catalog);
+}
+
+// UE4SS.log 에 새로 붙은 줄을 읽어 [로그] 탭에 넘긴다. 파일 읽기는 잠금 밖에서 한다
+static void readLog(App& a, const Bridge& bridge, LogTail& tail) {
+    if (!tail.poll(bridge.ue4ssLogPath())) return;
+    std::lock_guard<std::mutex> lock(a.mutex);
+    a.logLines = tail.lines();
+}
+
 // 개발·검증용(overlay.json 의 inputLog): 창 스레드가 적어 둔 글쇠 메시지를 bridge/overlay_input.log 에 덧붙인다
 static void flushInputLog(App& a, const Bridge& bridge) {
     std::vector<std::string> lines;
@@ -147,6 +169,8 @@ void runOverlayWorker(void* selfModule) {
     }
 
     ClipboardSync clipboard(systemClipboard());   // 복사한 글을 쓰고, 붙여넣을 글을 읽어 둔다
+    std::filesystem::file_time_type catalogWritten{};
+    LogTail logTail;
     unsigned saveRetryAt = 0;
     for (unsigned tick = 0;; ++tick) {
         // 이 스레드가 예외로 끝나면 저장이 조용히 멈춘다. 그 회차만 건너뛰고 계속한다
@@ -158,6 +182,8 @@ void runOverlayWorker(void* selfModule) {
             }
             if (tick % 10 == 0) {                                  // 1초마다
                 readStatus(a, bridge);
+                readCatalog(a, bridge, catalogWritten);
+                readLog(a, bridge, logTail);
                 reloadControlIfChangedOutside(a, bridge);
                 saveSettingsIfDirty(a, bridge, settingsWritten);
                 reloadSettingsIfChangedOutside(a, bridge, settingsWritten);

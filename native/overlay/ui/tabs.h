@@ -21,6 +21,7 @@ void drawPopulationTab(TabContext& ctx);
 void drawResourcesTab(TabContext& ctx);
 void drawMercenariesTab(TabContext& ctx);
 void drawStatusTab(TabContext& ctx);
+void drawLogTab(TabContext& ctx);
 
 // 탭 막대의 이름들(왼쪽부터)
 std::vector<std::string> tabNames();
