@@ -91,7 +91,7 @@ static void reloadSettingsIfChangedOutside(App& a, const Bridge& bridge, std::fi
     if (a.settings.startOpen) a.visible = true;
 }
 
-// 모드가 시작할 때 쓴 자원 이름 표(bridge/catalog.json)를 읽는다. 파일이 바뀌었을 때만 다시 읽는다.
+// 모드가 시작할 때 쓴 자원 이름 표와 건물 목록(bridge/catalog.json)을 읽는다. 파일이 바뀌었을 때만 다시 읽는다.
 // 읽었는데 비어 있으면(모드가 쓰는 중이었다) 다음 회차에 다시 읽는다
 static void readCatalog(App& a, const Bridge& bridge, std::filesystem::file_time_type& known) {
     std::error_code ec;
@@ -101,9 +101,11 @@ static void readCatalog(App& a, const Bridge& bridge, std::filesystem::file_time
     if (!text) return;
     auto catalog = std::make_shared<const ResourceCatalog>(ResourceCatalog::parse(*text));
     if (catalog->empty()) return;
+    auto buildings = std::make_shared<const BuildingCatalog>(BuildingCatalog::parse(*text));
     known = written;
     std::lock_guard<std::mutex> lock(a.mutex);
     a.catalog = std::move(catalog);
+    a.buildings = buildings->empty() ? nullptr : std::move(buildings);   // 예전 판의 모드가 쓴 파일에는 건물 목록이 없다
 }
 
 // UE4SS.log 에 새로 붙은 줄을 읽어 [로그] 탭에 넘긴다. 파일 읽기는 잠금 밖에서 한다

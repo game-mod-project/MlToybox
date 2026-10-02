@@ -81,6 +81,7 @@ add_library(overlay_impl STATIC
     overlay/ui/tab_military.cpp
     overlay/ui/tab_population.cpp
     overlay/ui/tab_resources.cpp
+    overlay/ui/tab_storage.cpp
     overlay/ui/tab_mercenaries.cpp
     overlay/ui/tab_status.cpp
     overlay/ui/tab_log.cpp)
@@ -113,6 +114,7 @@ add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_t
     tests/overlay_clipboard_tests.cpp
     tests/overlay_tabs_tests.cpp
     tests/overlay_resource_tab_tests.cpp
+    tests/overlay_storage_tab_tests.cpp
     tests/overlay_window_tests.cpp
     # 창 프로시저 후킹은 실제 창으로, 화면 출력 후킹은 실제 D3D12 스왑체인으로 시험한다(게임 없이). 입력 테스트가 먼저다
     tests/overlay_input_tests.cpp
