@@ -34,7 +34,8 @@ LogLine parseLogLine(std::string_view raw) {
     LogLine line;
     size_t rest = 0;
     if (splitTime(raw, line.time, rest)) raw.remove_prefix(rest);
-    line.mine = raw.find("MLToybox") != std::string_view::npos;
+    // 모드가 남긴 줄("[MLToybox] …")과 UE4SS 가 모드를 가리켜 남긴 줄("… mod 'MLToybox'"). 이름이 같은 말로 시작하는 다른 모드는 아니다
+    line.mine = raw.find("[MLToybox]") != std::string_view::npos || raw.find("'MLToybox'") != std::string_view::npos;
     if (raw.substr(0, kModPrefix.size()) == kModPrefix) raw.remove_prefix(kModPrefix.size());
     line.text = std::string(raw);
     // 모드는 "ERROR …"로, UE4SS 는 "Error: …"로 적는다. 이름에 Error 가 들어간 줄(ArIsError)은 오류가 아니다

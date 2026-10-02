@@ -7,7 +7,7 @@ using namespace mlt::ov;
 namespace {
 // 모드가 시작할 때 bridge/catalog.json 에 쓰는 것과 같은 꼴
 const char* kCatalog = R"({"version":1,"resources":[
-    {"id":"RegionalWealth","name":"지역 재화","category":"영지"},
+    {"id":"RegionalWealth","name":"지역 자산","category":"영지"},
     {"id":"Timber","name":"목재","category":"건설","group":"목재 작업물"},
     {"id":"planks","name":"널빤지","category":"건설","group":"목재 작업물"},
     {"id":"Berries","name":"열매","category":"식량","group":"채집한 상품"},

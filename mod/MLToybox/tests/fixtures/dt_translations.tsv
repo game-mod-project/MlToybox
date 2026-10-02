@@ -1,0 +1,133 @@
+Items	itemID_-1	Nothing	없음
+Items	ItemId_1	Wheat Grain	밀 낱알
+Items	ItemId_2	Carcass	동물 사체
+Items	ItemId_3	Hides	생가죽
+Items	ItemId_4	Leather	가죽
+Items	ItemId_5	Wheat Flour	밀가루
+Items	ItemId_6	Tools	도구
+Items	ItemId_7	Wooden Parts	목제 부품
+Items	ItemId_8	Woolen Clothes	양모 의류
+Items	ItemId_9	Pelts	털가죽
+Items	ItemId_10	Shoes	신발
+Items	ItemId_11	Flax	아마
+Items	ItemId_12	Linen	리넨
+Items	ItemId_13	Charcoal	숯
+Items	ItemId_14	Iron ore	철광석
+Items	ItemId_15	Rubble Stone	잔해 돌
+Items	ItemId_16	Timber	목재
+Items	ItemId_17	Planks	판자
+Items	ItemId_18	Herbs	약초
+Items	ItemId_23	Wool	양모
+Items	ItemId_28	Ale	맥주
+Items	ItemId_27	Rough Stone	잡석
+Items	ItemId_29	Malt	맥아
+Items	ItemId_30	Carp	잉어
+Items	ItemId_32	Eel	장어
+Items	ItemId_33	Rye Flour	호밀 가루
+Items	ItemId_34	Linen Clothes	리넨 의류
+Items	ItemId_35	Iron Slab	철판
+Items	ItemId_42	Chickens	닭
+Items	ItemId_44	Hare Carcass	토끼 사체
+Items	ItemId_45	Pears	배
+Items	ItemId_46	Quinces	마르멜로
+Items	ItemId_72	Sheep	양
+Items	ItemId_98	Horses	말
+Items	ItemId_133	Spears	창
+Items	ItemId_141	Honey	꿀
+Items	ItemId_142	Wax	밀랍
+Items	ItemId_143	Honeycomb	벌집
+Items	ItemId_145	Salt	소금
+Items	ItemId_146	Clay	점토
+Items	ItemId_147	Meat	고기
+Items	ItemId_148	Yarn	실
+Items	ItemId_149	Clothes	의류
+Items	ItemId_153	Candles	양초
+Items	ItemId_163	Gambesons	갬비슨
+Items	ItemId_164	Mail Armor	사슬 갑옷
+Items	ItemId_165	Barley	보리
+Items	ItemId_170	Rye Bread	호밀빵
+Items	ItemId_171	Berries	열매
+Items	ItemId_172	Wheat Bread	밀빵
+Items	ItemId_176	Spices	향신료
+Items	ItemId_177	Sidearms	부무장
+Items	ItemId_178	Polearms	장창
+Items	ItemId_205	Warbows	전쟁용 활
+Items	ItemId_206	Crossbows	석궁
+Items	ItemId_216	Firewood	장작
+Items	ItemId_217	Wheat Sheaves	밀 다발
+Items	ItemId_220	Eggs	달걀
+Items	ItemId_221	Milk	우유
+Items	ItemId_222	Goats	염소
+Items	ItemId_228	Water	물
+Items	ItemId_230	Vegetables	채소
+Items	ItemId_232	Lambs	새끼 양
+Items	ItemId_233	A Dead Body	시체
+Items	ItemId_234	Oxen	황소
+Items	ItemId_257	Log Piece	통나무 토막
+Items	ItemId_261	Slag	슬래그
+Items	ItemId_269	Rooftiles	지붕 타일
+Items	ItemId_270	Small Shields	소형 방패
+Items	ItemId_271	Large Shields	대형 방패
+Items	ItemId_273	Helmets	헬멧
+Items	ItemId_279	Mushrooms	버섯
+Items	ItemId_283	Dressed Stone	다듬은 돌
+Items	ItemId_287	Greyhounds	그레이하운드
+Items	ItemId_293	Plate Armor	판금 갑옷
+Items	ItemId_296	Apples	사과
+Items	ItemId_298	Rye Sheaves	호밀 다발
+Items	ItemId_299	Rye Grain	호밀 낱알
+Items	ItemId_300	Dung	분뇨
+Items	ItemId_301	Fertilizer	비료
+Items	ItemId_302	Dyes	염료
+Items	ItemId_306	Mules	노새
+Items	transitionary	Transitionary Resource	중간 자원
+Items	ItemId_317	Iron Parts	철제 부품
+Items	ItemId_318	Wild Animals per Herd	무리 당 야생 동물 수
+Items	ItemId_319	Fish per Pond	연못 당 물고기 수
+Items	ItemId_320	Sausages	소시지
+Items	ItemId_322	Siege ladders	공성 사다리
+Items	ItemId_323	Smoked Fish	훈제 생선
+Items	ItemId_324	Zwieback	비스킷 빵
+Items	ItemId_325	Mead	벌꿀주
+Items	ItemId_326	Lebkuchen	렙쿠헨
+Items	ItemId_327	Cider	사이더
+Items	ItemId_329	Mortar	모르타르
+Items	ItemId_330	Small Game	소형 사냥감
+Items	ItemId_332	Mutton	양고기
+Items	ItemId_333	Chevon	염소고기
+Items	ItemId_334	Pork	돼지고기
+Items	ItemId_335	Beef	소고기
+Items	ItemId_336	Chicken	닭고기
+Items	ItemId_337	Carrots	당근
+Items	ItemId_338	Cabbages	양배추
+Items	ItemId_339	Beetroots	비트
+Items	ItemId_340	Church Access (Wood or Better)	교회 접근(목조 이상)
+Items	ItemId_341	Church Access (Stone or Better)	교회 접근(석조 이상)
+Items	ItemId_342	Church Access (Large Stone or Better)	교회 접근(대형 석조 이상)
+Items	ItemId_347	Cows	소
+Items	ItemId_348	Cheese	치즈
+Items	ItemId_349	Oats	귀리
+Items	ItemId_350	Oat Sheaves	귀리 다발
+Items	ItemId_351	Animal Feed	동물 사료
+Items	ItemId_352	Calves	송아지
+Items	ItemId_355	Beef Sausages	소고기 소시지
+Items	ItemId_356	Pork Sausages	돼지고기 소시지
+Items	Construction	Construction	건설
+Items	Food	Food	식량
+Items	Material	Material	재료
+Items	Commodity	Commodity	일용품
+Items	livestock	Livestock	가축
+Items	military	Military	군사
+Items	crop	Crop	작물
+Items	Special	Special	특별
+Items	Fuel	Fuel	연료
+Items	Siege	Siege	공성
+Items	Recipe	Recipe	제조법
+MainUI	resourceGroup_crop	Crops	작물
+MainUI	resourceGroup_construction	Construction	건설
+MainUI	resourceGroup_food	Food	식량
+MainUI	resourceGroup_fuel	Fuel	연료
+MainUI	resourceGroup_crafting	Crafting Materials	제작 재료
+MainUI	resourceGroup_commodities	Commodities	일용품
+MainUI	resourceGroup_military	Military	군사
+MainUI	regional_wealth	Regional Wealth	지역 자산

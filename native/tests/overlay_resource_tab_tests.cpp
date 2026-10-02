@@ -15,7 +15,7 @@ using namespace mlt::ov;
 // 자원 탭과 로그 탭을 실제 ImGui 프레임으로 그리고 마우스·글쇠를 넣어 본다(그래픽 장치 없음).
 namespace {
 const char* kCatalog = R"({"version":1,"resources":[
-    {"id":"RegionalWealth","name":"지역 재화","category":"영지"},
+    {"id":"RegionalWealth","name":"지역 자산","category":"영지"},
     {"id":"Timber","name":"목재","category":"건설","group":"목재 작업물"},
     {"id":"Berries","name":"열매","category":"식량","group":"채집한 상품"},
     {"id":"Beef","name":"소고기","category":"식량","group":"고기"},

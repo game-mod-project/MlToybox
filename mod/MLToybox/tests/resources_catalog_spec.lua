@@ -70,7 +70,7 @@ T.run({
   describe_lists_every_resource_in_the_region_panels_order = function()
     local d = catalog.describe()
     T.eq(#d, 79, "regional wealth and 78 goods")
-    T.eq(d[1].id, "RegionalWealth", "special first"); T.eq(d[1].name, "지역 재화", "its name"); T.eq(d[1].category, "영지", "its category")
+    T.eq(d[1].id, "RegionalWealth", "special first"); T.eq(d[1].name, "지역 자산", "its name"); T.eq(d[1].category, "영지", "its category")
     local ids = catalog.ids()
     local at = {}
     for i, entry in ipairs(d) do
@@ -92,6 +92,31 @@ T.run({
     -- 묶음 안에서는 품목 번호 순서(영지 창의 순서)
     T.eq(at.Timber + 1, at.planks, "timber then planks"); T.eq(at.fish + 1, at.Eel, "carp then eel"); T.eq(at.Eel + 1, at.smokedfish, "then smoked fish")
   end,
+  names_come_from_the_games_translation_table = function()
+    -- 게임의 번역 표를 적은 견본: tests/fixtures/dt_translations.tsv (tools/lab/translations.lua 로 만든다. 2026-10-02, Steam buildid 24905706).
+    -- 한 줄: 표 이름 \t 번역 키 \t 영어 \t 한국어. 품목의 키는 "ItemId_<품목 번호>"다
+    local text = fileio.read(SCRIPTS_DIR .. "\\..\\tests\\fixtures\\dt_translations.tsv")
+    T.truthy(text, "fixture exists")
+    local ko = {}
+    for line in text:gmatch("[^\r\n]+") do
+      local tbl, key, _, korean = line:match("^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)")
+      if tbl then ko[tbl .. "/" .. key] = korean end
+    end
+    local wrong = {}
+    for _, it in ipairs(catalog.items) do
+      local want = ko["Items/ItemId_" .. it.type]
+      T.truthy(want, "the table has a row for " .. it.id)
+      if it.name ~= want then wrong[#wrong + 1] = string.format("%s: %s (table: %s)", it.id, tostring(it.name), want) end
+    end
+    T.eq(table.concat(wrong, ", "), "", "names that differ from the game's table")
+    -- 분류의 이름은 영지 창의 머리글(resourceGroup_*), 지역 자산은 regional_wealth
+    T.eq(catalog.categories[1], ko["MainUI/resourceGroup_construction"], "construction")
+    T.eq(catalog.categories[2], ko["MainUI/resourceGroup_food"], "food")
+    T.eq(catalog.categories[3], ko["MainUI/resourceGroup_crafting"], "crafting materials")
+    T.eq(catalog.categories[4], ko["MainUI/resourceGroup_commodities"], "commodities")
+    T.eq(catalog.categories[6], ko["MainUI/resourceGroup_military"], "military")
+    T.eq(catalog.specialInfo.RegionalWealth.name, ko["MainUI/regional_wealth"], "regional wealth")
+  end,
   names_are_the_ones_the_region_panel_shows = function()
     -- 사용자가 올린 영지 창 캡처(2026-10-02)에서 읽은 이름. 묶음 안에서 품목 번호 순서로 놓여 있었다
     local by = {}
@@ -99,7 +124,7 @@ T.run({
     local shown = { Timber = "목재", planks = "판자", Rubble = "잔해 돌", DressedStone = "다듬은 돌", Mortar = "모르타르", Irontools = "도구",
       WoodenParts = "목제 부품", clayTILES = "지붕 타일", Berries = "열매", sausage = "소시지", SmallGame = "소형 사냥감", Chevon = "염소고기",
       fish = "잉어", smokedfish = "훈제 생선", Beetroots = "비트", Quinces = "마르멜로", RyeBread = "호밀빵", lebkuchen = "렙쿠헨", OatGrain = "귀리",
-      Eggs = "달걀", WheatFlour = "밀가루", WheatGrain = "밀 낟알", WheatSheaves = "밀 다발", RoughStone = "잡석", Hides = "생가죽", Pelts = "털가죽",
+      Eggs = "달걀", WheatFlour = "밀가루", WheatGrain = "밀 낱알", WheatSheaves = "밀 다발", RoughStone = "잡석", Hides = "생가죽", Pelts = "털가죽",
       Cloth_Linen = "리넨", Yarn = "실", IronSlabs = "철판", iron_parts = "철제 부품", Charcoal = "숯", Ale = "맥주", mead = "벌꿀주", AnimalFeed = "동물 사료" }
     for id, name in pairs(shown) do T.eq(by[id], name, id) end
   end,

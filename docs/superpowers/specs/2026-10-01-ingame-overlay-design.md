@@ -286,10 +286,10 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 ### 4.6 `bridge/catalog.json` (모드가 시작할 때 한 번 쓴다)
 ```json
 { "version": 1, "resources": [
-  { "id": "RegionalWealth", "name": "지역 재화", "category": "영지" },
+  { "id": "RegionalWealth", "name": "지역 자산", "category": "영지" },
   { "id": "Timber", "name": "목재", "category": "건설", "group": "목재 작업물" } ] }
 ```
-- 자원 79줄(지역 재화와 78종). 순서는 게임의 영지 창 순서이고, 오버레이는 이 순서를 "분류" 정렬에 쓴다.
+- 자원 79줄(지역 자산와 78종). 순서는 게임의 영지 창 순서이고, 오버레이는 이 순서를 "분류" 정렬에 쓴다.
 - 바뀌지 않는 값이라 1초마다 쓰는 `status.json`에 싣지 않는다. 오버레이의 작업 스레드는 파일이 바뀌었을 때만 읽는다. 읽은 것이 비어 있으면 다음 회차에 다시 읽는다.
 - 이름의 출처: 게임의 영지 창(사용자 캡처)과 번역 표 `DT_Translation_Items`의 `ko_KR`(`tools/lab/translations.lua`). `analysis/findings.md` "자원 이름과 번역 표".
 

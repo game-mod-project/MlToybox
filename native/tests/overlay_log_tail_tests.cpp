@@ -36,6 +36,10 @@ TEST(overlay_log_line_splits_the_time_and_marks_mod_lines) {
     CHECK(line.time == "17:28:08" && line.text == "UE4SS - v3.0.1 Beta #0 - Git SHA #f6d5f942" && !line.mine && !line.error);
     line = parseLogLine("[2026-10-02 17:28:16.8493190] Starting Lua mod 'MLToybox'");
     CHECK(line.mine && line.text == "Starting Lua mod 'MLToybox'");
+    // 이름이 MLToybox 로 시작하는 다른 모드(개발용 MLToyboxLab, MLToyboxDump)의 줄은 모드의 줄이 아니다
+    CHECK(!parseLogLine("[2026-10-02 18:19:09.0081828] [Lua] [MLToyboxLab] loaded, lab=E:\\x").mine);
+    CHECK(!parseLogLine("[2026-10-02 18:19:09.0056889] Starting Lua mod 'MLToyboxLab'").mine);
+    CHECK(parseLogLine("[2026-10-02 18:19:09.0055536] [Lua] [MLToybox] loaded (scripts=E:\\Mods\\MLToybox\\Scripts)").mine);
     line = parseLogLine("[2026-10-02 17:30:00.0000001] [Lua] Error: [string \"main.lua\"]:12: boom");
     CHECK(line.error && !line.mine);
     // 이름에 Error 가 들어갈 뿐인 줄은 오류가 아니다

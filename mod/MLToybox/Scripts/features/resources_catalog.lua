@@ -8,7 +8,7 @@
 local M = {}
 
 M.special = { "RegionalWealth" }   -- 국고·영향력은 features/lord.lua
-M.specialInfo = { RegionalWealth = { name = "지역 재화", category = "영지" } }
+M.specialInfo = { RegionalWealth = { name = "지역 자산", category = "영지" } }
 
 -- 분류(EItemCategory)의 이름
 M.categories = { [1] = "건설", [2] = "식량", [3] = "제작 재료", [4] = "일용품", [6] = "군사" }
@@ -38,7 +38,7 @@ M.items = {
   { id = "Eggs", type = 220, sub = 10, name = "달걀" }, { id = "Milk", type = 221, sub = 10, name = "우유" }, { id = "Cheese", type = 348, sub = 10, name = "치즈" },   -- 동물 생산물
   -- 제작 재료
   { id = "WheatFlour", type = 5, sub = 13, name = "밀가루" }, { id = "Herbs", type = 18, sub = 13, name = "약초" }, { id = "RyeFlour", type = 33, sub = 13, name = "호밀 가루" }, { id = "Honey", type = 141, sub = 13, name = "꿀" }, { id = "Wax", type = 142, sub = 13, name = "밀랍" }, { id = "Salt", type = 145, sub = 13, name = "소금" }, { id = "Spices", type = 176, sub = 13, name = "향신료" },   -- 원재료
-  { id = "WheatGrain", type = 1, sub = 18, name = "밀 낟알" }, { id = "Flax", type = 11, sub = 18, name = "아마" }, { id = "Malt", type = 29, sub = 18, name = "맥아" }, { id = "Barley", type = 165, sub = 18, name = "보리" }, { id = "WheatSheaves", type = 217, sub = 18, name = "밀 다발" }, { id = "RyeSheaves", type = 298, sub = 18, name = "호밀 다발" }, { id = "RyeGrain", type = 299, sub = 18, name = "호밀 낟알" }, { id = "OatSheaves", type = 350, sub = 18, name = "귀리 다발" },   -- 작물
+  { id = "WheatGrain", type = 1, sub = 18, name = "밀 낱알" }, { id = "Flax", type = 11, sub = 18, name = "아마" }, { id = "Malt", type = 29, sub = 18, name = "맥아" }, { id = "Barley", type = 165, sub = 18, name = "보리" }, { id = "WheatSheaves", type = 217, sub = 18, name = "밀 다발" }, { id = "RyeSheaves", type = 298, sub = 18, name = "호밀 다발" }, { id = "RyeGrain", type = 299, sub = 18, name = "호밀 낱알" }, { id = "OatSheaves", type = 350, sub = 18, name = "귀리 다발" },   -- 작물
   { id = "IronOre", type = 14, sub = 15, name = "철광석" }, { id = "RoughStone", type = 27, sub = 15, name = "잡석" }, { id = "Clay", type = 146, sub = 15, name = "점토" },   -- 광물
   { id = "Hides", type = 3, sub = 14, name = "생가죽" }, { id = "Leather", type = 4, sub = 14, name = "가죽" }, { id = "Pelts", type = 9, sub = 14, name = "털가죽" }, { id = "Cloth_Linen", type = 12, sub = 14, name = "리넨" }, { id = "Wool", type = 23, sub = 14, name = "양모" }, { id = "Yarn", type = 148, sub = 14, name = "실" },   -- 섬유
   { id = "IronSlabs", type = 35, sub = 16, name = "철판" }, { id = "iron_parts", type = 317, sub = 16, name = "철제 부품" },   -- 금속 작업물
@@ -49,10 +49,10 @@ M.items = {
   { id = "Ale", type = 28, sub = 21, name = "맥주" }, { id = "mead", type = 325, sub = 21, name = "벌꿀주" }, { id = "cider", type = 327, sub = 21, name = "사이더" },   -- 음료
   { id = "AnimalFeed", type = 351, sub = 28, name = "동물 사료" },   -- 사료
   -- 군사
-  { id = "spears", type = 133, sub = 22 }, { id = "weapons_sidearms", type = 177, sub = 22 }, { id = "weapons_polearms", type = 178, sub = 22 },   -- MeleeWeapons
-  { id = "warbows", type = 205, sub = 23 }, { id = "crossbows", type = 206, sub = 23 },   -- RangedWeapons
-  { id = "shields_small", type = 270, sub = 24 }, { id = "shields_large", type = 271, sub = 24 },   -- Shields
-  { id = "gambesons", type = 163, sub = 25 }, { id = "mail_armor", type = 164, sub = 25 }, { id = "militia_helmets_resource", type = 273, sub = 25 }, { id = "PlateArmor", type = 293, sub = 25 },   -- Armor
+  { id = "spears", type = 133, sub = 22, name = "창" }, { id = "weapons_sidearms", type = 177, sub = 22, name = "부무장" }, { id = "weapons_polearms", type = 178, sub = 22, name = "장창" },   -- MeleeWeapons
+  { id = "warbows", type = 205, sub = 23, name = "전쟁용 활" }, { id = "crossbows", type = 206, sub = 23, name = "석궁" },   -- RangedWeapons
+  { id = "shields_small", type = 270, sub = 24, name = "소형 방패" }, { id = "shields_large", type = 271, sub = 24, name = "대형 방패" },   -- Shields
+  { id = "gambesons", type = 163, sub = 25, name = "갬비슨" }, { id = "mail_armor", type = 164, sub = 25, name = "사슬 갑옷" }, { id = "militia_helmets_resource", type = 273, sub = 25, name = "헬멧" }, { id = "PlateArmor", type = 293, sub = 25, name = "판금 갑옷" },   -- Armor
 }
 
 function M.ids()
