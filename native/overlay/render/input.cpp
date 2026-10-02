@@ -128,6 +128,14 @@ void syncIme(HWND hwnd, App& a) {
     }
 }
 
+// 오버레이가 스스로 꺼진 뒤에는 아무것도 가로채지 않으므로 syncIme 도 돌지 않는다.
+// 켜 둔 IME 가 있으면 게임이 두었던 상태로 한 번 되돌린다. 창 스레드에서만 부른다
+void releaseIme(HWND hwnd) {
+    if (!g_imeOn) return;
+    g_imeOn = false;
+    if (g_imeWasOff) ImmAssociateContext(hwnd, nullptr);
+}
+
 // 조합의 시작·진행·끝과, 조합이 끝나 나온 글자
 bool isCompositionMessage(UINT msg) {
     return msg == WM_IME_STARTCOMPOSITION || msg == WM_IME_COMPOSITION || msg == WM_IME_ENDCOMPOSITION || msg == WM_IME_CHAR;
@@ -137,7 +145,10 @@ LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
     App& a = app();
     const WNDPROC original = g_original.load();
     // 오버레이가 그릴 수 없는 상태면 토글 키를 포함해 아무것도 가로채지 않는다
-    if (a.state.load() != OverlayState::Ready) return CallWindowProcW(original, hwnd, msg, wParam, lParam);
+    if (a.state.load() != OverlayState::Ready) {
+        releaseIme(hwnd);
+        return CallWindowProcW(original, hwnd, msg, wParam, lParam);
+    }
 
     const bool toggleKey = static_cast<int>(wParam) == a.toggleVk.load();
     if (toggleKey && (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)) {

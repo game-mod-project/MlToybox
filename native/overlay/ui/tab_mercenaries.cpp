@@ -24,6 +24,7 @@ int infantryIndex() {
 // 편집 영역. "등록"을 누르기 전에는 문서에 반영하지 않는다
 struct Editor {
     int editing = -1;                   // 고치고 있는 용병단의 자리. -1 = 새 용병단
+    MercCompany loaded;                 // 그 자리에 있던 내용. 밖에서 목록이 바뀌었는지 볼 때 쓴다(core/merc_rules 의 locateCompany)
     std::string name;
     std::vector<std::string> units;     // 분대마다 병종 id 하나
     int cost = 1000;
@@ -41,6 +42,7 @@ struct Editor {
     }
     void load(const MercCompany& c, int index) {
         editing = index;
+        loaded = c;
         name = c.name;
         units = c.units;
         cost = std::clamp(c.cost, 0, 10000000);
@@ -235,7 +237,12 @@ void drawMercenariesTab(TabContext& ctx) {
     App& a = ctx.app;
     Editor& e = g_editor;
     MercSettings m = a.control.mercenaries();
-    if (e.editing >= static_cast<int>(m.companies.size())) e.editing = -1;   // 패널 등 밖에서 목록이 줄었다
+    // 패널이나 손 편집으로 목록이 바뀌면 자리 번호가 다른 용병단을 가리킨다. 실었던 내용으로 다시 찾고,
+    // 없어졌거나 내용이 바뀌었으면 편집 대상에서 푼다(그대로 "삭제"·"등록"하면 엉뚱한 용병단이 지워지거나 덮인다)
+    if (e.editing >= 0) {
+        e.editing = locateCompany(m.companies, e.editing, e.loaded);
+        if (e.editing < 0) e.say("편집하던 용병단이 밖에서 바뀌었습니다. 표에서 다시 고르세요.", true);
+    }
     const StatusDoc* live = ctx.inGame ? ctx.status : nullptr;                // 게임 안일 때만 게임 상태를 쓴다
 
     bool changed = false;
@@ -258,6 +265,9 @@ void drawMercenariesTab(TabContext& ctx) {
     if (changed) {
         a.control.setMercenaries(m);
         markDirty(a);
+        // 방금 내가 바꾼 것은 밖에서 바뀐 것이 아니다. 문서에 들어간 모습으로 다시 기억한다
+        const std::vector<MercCompany> saved = a.control.mercenaries().companies;
+        if (e.editing >= 0 && e.editing < static_cast<int>(saved.size())) e.loaded = saved[static_cast<size_t>(e.editing)];
     }
 
     ImGui::Spacing();

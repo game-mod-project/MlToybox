@@ -119,3 +119,18 @@ TEST(overlay_merc_rules_region_options_keep_saved_keys_that_are_not_listed) {
     const std::vector<ScopeOption> offline = mercRegionOptions({}, { "nus" });
     CHECK(offline.size() == 2 && offline[1].key == "nus");
 }
+
+// 편집 영역은 고치던 용병단을 자리 번호로 기억한다. 패널이나 손 편집으로 목록이 바뀌면 그 번호가 다른 용병단을 가리킨다
+// (그대로 "삭제"나 "등록"을 누르면 엉뚱한 용병단이 지워지거나 덮인다). 실었던 내용으로 다시 찾는다
+TEST(overlay_merc_rules_editor_follows_its_company_when_the_list_changes_outside) {
+    std::vector<MercCompany> all = { company("가"), company("나"), company("다") };
+    const MercCompany loaded = all[1];                      // "나"를 편집 영역에 실었다
+    CHECK(locateCompany(all, 1, loaded) == 1);              // 그대로면 그 자리
+    all.erase(all.begin());                                 // 밖에서 "가"가 지워졌다: 1번은 이제 "다"다
+    CHECK(locateCompany(all, 1, loaded) == 0);              // "나"가 옮겨 간 자리를 따라간다
+    all[0].cost = 777;                                      // 밖에서 "나"의 내용이 바뀌었다
+    CHECK(locateCompany(all, 0, loaded) == -1);             // 실었던 것과 다르다: 편집 대상에서 푼다
+    all.clear();
+    CHECK(locateCompany(all, 1, loaded) == -1);             // 범위를 벗어났다
+    CHECK(locateCompany({ loaded }, -1, loaded) == -1);     // 새 용병단을 편집 중이면 아무것도 가리키지 않는다
+}

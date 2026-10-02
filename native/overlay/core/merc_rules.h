@@ -48,4 +48,8 @@ struct MercRegistration {
 MercRegistration registerCompany(std::vector<MercCompany>& all, int editing, MercCompany draft);
 // "사용" 체크를 바꾼다. 켤 수 없으면(이미 3개가 사용 중) 바꾸지 않고 이유를 돌려준다
 std::optional<std::string> setCompanyEnabled(std::vector<MercCompany>& all, int index, bool enabled);
+// 편집 영역에 실었던 용병단(loaded, 그때의 자리 index)이 지금 목록의 어디에 있는가.
+// 목록은 패널이나 손 편집으로 밖에서 바뀔 수 있다. 그 자리에 같은 내용이 있으면 그 자리, 다른 자리로 옮겨졌으면 그 자리,
+// 없어졌거나 내용이 바뀌었으면 -1. index 가 -1(새 용병단)이면 -1
+int locateCompany(const std::vector<MercCompany>& all, int index, const MercCompany& loaded);
 }

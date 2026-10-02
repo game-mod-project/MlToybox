@@ -190,3 +190,29 @@ TEST(overlay_input_keeps_korean_composition_away_from_the_game) {
     CHECK(g_reached[WM_IME_CHAR] == 0 && g_reached[WM_CHAR] == 0);
     f.a.wantText = false;
 }
+
+// 오버레이가 스스로 꺼지면(그리기·입력 예외, 장치 제거) 그 뒤로는 아무것도 가로채지 않는다.
+// 그때 글자 칸 때문에 켜 둔 IME 를 남기면 게임 창의 입력기가 세션 끝까지 켜진 채다. 꺼진 뒤 첫 메시지에서 되돌린다
+TEST(overlay_input_restores_the_ime_when_the_overlay_disables_itself) {
+    if (!GetSystemMetrics(SM_IMMENABLED)) {
+        std::printf("SKIP overlay_input ime: IMM is not enabled on this system\n");
+        return;
+    }
+    Fixture f;
+    auto imeOn = [&] {
+        const HIMC imc = ImmGetContext(f.hwnd);
+        if (imc) ImmReleaseContext(f.hwnd, imc);
+        return imc != nullptr;
+    };
+    ImmAssociateContext(f.hwnd, nullptr);          // 게임이 꺼 둔 상태
+    f.send(WM_NULL);                               // 앞 테스트의 창에서 남은 상태를 이 창에 맞춘다
+    CHECK(!imeOn());
+    f.a.wantText = true;
+    f.send(WM_NULL);
+    CHECK(imeOn());
+    f.a.state = OverlayState::Disabled;            // 글자 칸에 커서가 있는 채로 꺼졌다
+    f.send(WM_NULL);
+    CHECK(!imeOn());
+    CHECK(g_reached[WM_NULL] == 3);                // 메시지는 그대로 게임에 넘긴다
+    f.a.wantText = false;
+}

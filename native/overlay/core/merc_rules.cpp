@@ -107,6 +107,15 @@ MercRegistration registerCompany(std::vector<MercCompany>& all, int editing, Mer
     return result;
 }
 
+int locateCompany(const std::vector<MercCompany>& all, int index, const MercCompany& loaded) {
+    if (index < 0) return -1;
+    if (index < static_cast<int>(all.size()) && all[static_cast<size_t>(index)] == loaded) return index;
+    for (size_t i = 0; i < all.size(); ++i) {
+        if (all[i] == loaded) return static_cast<int>(i);
+    }
+    return -1;
+}
+
 std::optional<std::string> setCompanyEnabled(std::vector<MercCompany>& all, int index, bool enabled) {
     if (index < 0 || index >= static_cast<int>(all.size())) return "없는 용병단입니다.";
     if (enabled && !canEnableCompany(all, index)) return "사용은 최대 " + std::to_string(kMercMaxEnabled) + "개입니다.";
