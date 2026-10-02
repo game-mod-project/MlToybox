@@ -56,7 +56,10 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
 ## 기능 (탭별)
 
 ### 자원
-- 자원 55종과 지역 재화를 **영지마다** 목표값까지 채웁니다. 모자란 만큼만 채우고, 목표보다 많으면 그대로 둡니다.
+- 자원 78종과 지역 재화를 **영지마다** 목표값까지 채웁니다. 모자란 만큼만 채우고, 목표보다 많으면 그대로 둡니다.
+  - 78종은 게임의 품목 표가 건설, 식량, 제작 재료, 일용품, 군사로 분류한 것 전부입니다(영지 창에 보이는 품목). 가축은 넣지 않습니다.
+  - 표의 이름은 게임 내부 이름입니다(예: `Chevon` 염소고기, `SmallGame` 소형 사냥감, `iron_parts` 철제 부품).
+  - 게임이 더 쓰지 않는 품목(`meat`, `vegetables`, `Pastries`, `Hops`, `Beer`, `dyes`, `Candle`)은 목록에서 뺐습니다. 설정에 남은 그 목표는 게임 안 창의 표에 보이지 않고, 아무 일도 하지 않습니다.
 - "영지" 목록에서 영지를 고르면 그 영지의 재고가 보이고, 영지별 목표를 따로 줄 수 있습니다.
   - 빈칸이면 공통 목표를 따릅니다.
   - 0이면 그 영지는 채우지 않습니다.
@@ -163,13 +166,14 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
 ## 게임 업데이트 후 복구 절차
 1. `pwsh tools/deploy.ps1 -Mod MLToyboxDump`로 배포하고, 게임을 실행해 세이브를 불러옵니다.
 2. `pwsh tools/dump.ps1`을 실행하면 `analysis/dumps/<시각>/`이 생깁니다.
-3. 패널 [상태] 탭에서 비활성인 Lua 기능을 찾습니다. `findings.md`의 해당 항목을 새 덤프와 비교해 식별자를 고칩니다.
-4. 네이티브 기능이 `pattern not found`, `pattern ambiguous`, `layout check failed`이면 다음 순서로 고칩니다.
+3. 자원 목록을 맞춥니다: `pwsh tools/deploy.ps1 -Mod MLToyboxLab`로 실행기를 올리고 `pwsh tools/lab.ps1 -File tools/lab/items.lua`의 출력으로 `mod/MLToybox/tests/fixtures/dt_items.tsv`를 바꾼 뒤 테스트를 돌립니다. `resources_catalog_spec.lua`가 빠진 품목과 남는 품목을 알려 줍니다.
+4. 패널 [상태] 탭에서 비활성인 Lua 기능을 찾습니다. `findings.md`의 해당 항목을 새 덤프와 비교해 식별자를 고칩니다.
+5. 네이티브 기능이 `pattern not found`, `pattern ambiguous`, `layout check failed`이면 다음 순서로 고칩니다.
    1. `findings.md`에 적힌 UFunction 이름이나 문자열로 `exec`/`strings`를 실행해 대상 함수를 다시 찾습니다.
    2. `sig <VA>`로 새 패턴을 만들고, `count`로 1곳에서만 찾아지는지 확인합니다.
    3. `native/src/features/<기능>.h`의 `kPattern`과 오프셋, `.cpp`의 `bodyChecks`를 새 실행 파일에 맞춰 고친 뒤 빌드하고 배포합니다.
    - 배치 제한 무시는 UFunction이 없습니다. 개발용 메모리 프로브(`bridge/probe_request.txt`에 `seq 주소 크기`)로 배치 가능·불가 상태의 플레이어 폰 메모리를 비교해 다시 찾습니다(Plan 3 부록 A.3).
-5. `pwsh tools/deploy.ps1 -Mod MLToyboxDump -Remove`로 덤프 모드를 제거하고, `pwsh tools/deploy.ps1 -Mod MLToybox`로 다시 배포합니다.
+6. `pwsh tools/deploy.ps1 -Mod MLToyboxDump -Remove`로 덤프 모드를 제거하고, `pwsh tools/deploy.ps1 -Mod MLToybox`로 다시 배포합니다.
 
 ## 주의
 - 모드가 바꾼 값은 세이브에 저장됩니다. 테스트 전에는 항상 `backup-saves.ps1`을 실행하세요.
