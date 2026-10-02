@@ -31,6 +31,12 @@ T.run({
     T.eq(f.resources.enabled, true, "resources.enabled"); T.eq(f.resources.intervalSec, 2, "resources.intervalSec")
     T.eq(f.resources.targets.Timber, 500, "resources.targets"); T.eq(f.resources.regionTargets.gold.Timber, 2000, "resources.regionTargets")
   end,
+  storage_limits_are_keyed_by_building_type_and_kind = function()
+    local s = load().features.storage
+    T.eq(s.enabled, true, "enabled"); T.eq(s.intervalSec, 5, "intervalSec")
+    T.eq(s.limits["99"].generic, 5000, "large storehouse"); T.eq(s.limits["99"].pantry, nil, "a kind without a value is absent")
+    T.eq(s.limits["69"].generic, 3000, "farmhouse generic"); T.eq(s.limits["69"].pantry, 6000, "farmhouse pantry")
+  end,
   mercenary_companies_pass_the_mods_own_validation = function()
     local m = load().features.mercenaries
     T.eq(m.enabled, true, "enabled"); T.eq(m.refund, true, "refund"); T.eq(m.lockFromAi, true, "lockFromAi")

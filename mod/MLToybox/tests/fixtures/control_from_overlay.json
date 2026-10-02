@@ -79,6 +79,19 @@
           "enabled": true
         }
       ]
+    },
+    "storage": {
+      "enabled": true,
+      "intervalSec": 5,
+      "limits": {
+        "69": {
+          "generic": 3000,
+          "pantry": 6000
+        },
+        "99": {
+          "generic": 5000
+        }
+      }
     }
   },
   "commands": [

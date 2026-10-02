@@ -102,6 +102,14 @@
 
 **업그레이드**(건설 탭 안, "업그레이드" 구분선 아래): "업그레이드 조건·비용·해금 무시". "건설 기능 사용"과 따로 켜고 끈다.
 
+**저장 용량**(건설 탭 안, "저장 용량" 구분선 아래. 2026-10-02 사용자 요청. 패널에는 없다): 설정은 `features.storage`이고 "건설 기능 사용"과 따로 켜고 끈다.
+- 첫 줄: "건물 저장 용량 변경" 체크, 검색 칸(한글 입력 가능)과 "지우기", "보이는 줄 / 전체 줄".
+- 둘째 줄: 배수 칸(1~1000, 기본 2), "모두 기본값의 이 배수로"(검색으로 추렸으면 "보이는 N줄을 기본값의 이 배수로"), "값 모두 지우기"(추렸으면 "보이는 N줄의 값 지우기". 두 번 눌러야 지운다).
+- 안내 한 줄: 내 영지의 건물에만 적용, 빈칸은 게임의 값 그대로, "-"는 그 저장실이 없는 건물, 용량을 줄이거나 끄면 넘치는 자원이 날씨 피해로 사라질 수 있다.
+- 표: 건물 / 일반 / 목재 / 식량. 줄은 모드가 `catalog.json`의 `buildings`에 적은 건물 종류와 순서(저장 건물이 먼저)다. 칸이 비어 있으면 게임의 기본값을 흐리게 보여 주고, 값이 있으면 마우스를 올렸을 때 기본값을 알려 준다. 그 저장실이 없는 건물(기본값 0)의 칸은 "-"이고 고칠 수 없다. 값은 1~1,000,000.
+- 머리줄을 누르면 정렬한다(이름은 가나다순, 숫자 열은 기본 한도 순. 그 저장실이 없는 건물은 항상 뒤). 값이 아니라 기본 한도로 정렬하므로 값을 고치는 동안 줄이 자리를 옮기지 않는다. 세 번째 누르면 정렬이 풀려 모드가 적은 순서로 돌아간다. 열 경계를 끌어 너비를 바꿀 수 있지만 저장하지 않는다.
+- 건물 목록을 읽지 못했으면(예전 판의 모드) 표 대신 안내를 보인다. 목록에 없는 건물의 설정값은 줄로 보이지 않을 뿐 설정에는 남는다("값 모두 지우기"는 그것도 지운다).
+
 **군사**
 - "군사 기능 사용", "민병대 장비 요구 무시", "징집 조건(집 레벨·훈련) 무시 — …", "민병대 모집비 0", "부대 수 상한 해제".
 - 병력 생성: 병종(13종), 개수(1~5), 위치(`status.playerRegions`. 없으면 "내 첫 영지"), "분대 생성" → `spawnSquads`.
@@ -206,7 +214,7 @@ native/overlay/ui/
   tabs.h                 탭 함수 선언과 탭에 넘기는 문맥
   widgets.h/.cpp         숫자 칸, 빈칸을 허용하는 숫자 칸, 목록 선택, 글자 칸(한글 조합), 한/영 단추
   clipboard_sync.h/.cpp  ImGui 의 복사·붙여넣기를 App 의 글로 돌리고, 작업 스레드가 시스템 클립보드와 맞춘다
-  tab_resources.cpp, tab_lord.cpp, tab_build.cpp(건설·업그레이드), tab_military.cpp,
+  tab_resources.cpp, tab_lord.cpp, tab_build.cpp(건설·업그레이드), tab_storage.cpp(건설 탭의 저장 용량 표), tab_military.cpp,
   tab_mercenaries.cpp, tab_population.cpp, tab_status.cpp, tab_log.cpp
 native/overlay/worker.h/.cpp        작업 스레드
 native/overlay/dllmain.cpp
@@ -286,13 +294,26 @@ native/tests/overlay_*_tests.cpp, native/tests/fixtures/
 - `main.lua`: 네이티브 DLL 다음에 오버레이 DLL을 올리고, 상태에 `overlay`를 넣는다.
 - `main.lua`: DLL을 올리기 전에 `bridge/catalog.json`을 쓴다(4.6). 기능이 켜지고 꺼질 때(`registry.onChange`)와 명령을 처리했을 때(`commands`의 알림 함수) 로그에 한 줄을 남긴다.
 - `features/resources_catalog.lua`: 품목마다 묶음 번호(`sub`, `EItemSubcategory`)와 한글 이름(`name`)을 두고, 영지 창의 순서로 놓는다. `describe()`가 이름 표를 만든다.
+- `features/storage.lua`(기능 `storage`)와 `features/storage_catalog.lua`(저장 한도가 있는 건물 목록. `describe()`가 `catalog.json`의 `buildings`를 만든다). 동작과 근거는 `analysis/findings.md` "저장 용량".
+- `core/registry.lua`: 맵을 떠나며 기능을 끌 때 `state.leaving`을 세운다. `storage`는 이때 게임 객체를 건드리지 않는다.
+
+### 4.5.1 `control.json`의 `features.storage`
+```json
+{ "enabled": true, "intervalSec": 5, "limits": { "99": { "generic": 5000 }, "69": { "generic": 3000, "pantry": 6000 } } }
+```
+- `limits`의 키는 건물 종류 번호, 값은 저장실별 한도다. 없는 키는 게임의 값 그대로다. 값이 하나도 없는 건물은 쓰지 않는다.
+- 패널(`Panel.Core`의 `StorageControl`)은 화면 없이 이 설정을 읽고 그대로 다시 쓴다.
 
 ### 4.6 `bridge/catalog.json` (모드가 시작할 때 한 번 쓴다)
 ```json
 { "version": 1, "resources": [
   { "id": "RegionalWealth", "name": "지역 자산", "category": "영지" },
-  { "id": "Timber", "name": "목재", "category": "건설", "group": "목재 작업물" } ] }
+  { "id": "Timber", "name": "목재", "category": "건설", "group": "목재 작업물" } ],
+  "buildings": [
+  { "id": "72", "name": "창고", "generic": 250, "large": 0, "pantry": 0 },
+  { "id": "69", "name": "농가", "generic": 1200, "large": 0, "pantry": 1200 } ] }
 ```
+- 건물 52줄: 게임의 건물 표(`buildingStats`)에서 저장 한도가 있고 번역 표(`BuildingNames`)에 한글 이름이 있는 행. `id`는 건물 종류 번호(설정 `features.storage.limits`의 키), `generic`·`large`·`pantry`는 일반·목재·식량 저장실의 기본 한도(0 = 그 저장실이 없다). 저장 건물 넷이 먼저, 나머지는 번호 순서다.
 - 자원 79줄(지역 자산와 78종). 순서는 게임의 영지 창 순서이고, 오버레이는 이 순서를 "분류" 정렬에 쓴다.
 - 바뀌지 않는 값이라 1초마다 쓰는 `status.json`에 싣지 않는다. 오버레이의 작업 스레드는 파일이 바뀌었을 때만 읽는다. 읽은 것이 비어 있으면 다음 회차에 다시 읽는다.
 - 이름의 출처: 게임의 영지 창(사용자 캡처)과 번역 표 `DT_Translation_Items`의 `ko_KR`(`tools/lab/translations.lua`). `analysis/findings.md` "자원 이름과 번역 표".

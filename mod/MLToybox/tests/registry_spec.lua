@@ -41,6 +41,19 @@ T.run({
     T.eq(count(a, "disable") + count(b, "disable"), 2, "both disabled")
     T.eq(r.active.a or r.active.b, false, "none active")
   end,
+  -- 맵을 떠날 때의 disable 은 state.leaving 으로 알 수 있다: 사라질 게임 객체를 되돌려 놓을 필요가 없다(features/storage.lua)
+  disable_can_tell_leaving_the_map_from_being_turned_off = function()
+    local r = registry.new()
+    local seen = {}
+    local a = { name = "a", enable = function() end, disable = function(state) seen[#seen + 1] = state.leaving == true end }
+    r:add(a); r:setInGame(true)
+    r:apply({ a = { enabled = true } }); r:apply({ a = { enabled = false } })
+    r:apply({ a = { enabled = true } }); r:setInGame(false)
+    T.eq(#seen, 2, "disabled twice"); T.eq(seen[1], false, "turned off by the user"); T.eq(seen[2], true, "the map is going away")
+    T.eq(r.state.leaving, nil, "cleared with the rest of the state")
+    r:setInGame(true); r:apply({ a = { enabled = false } })
+    T.eq(seen[3], false, "not leaving in the next map")
+  end,
   reentering_game_reenables = function()
     local r = registry.new(); local a = fake("a"); r:add(a)
     r:apply({ a = { enabled = true } }); r:setInGame(true); r:setInGame(false); r:setInGame(true)

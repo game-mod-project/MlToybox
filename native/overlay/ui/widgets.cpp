@@ -41,10 +41,11 @@ bool numberField(const char* id, int& value, int min, int max, float width) {
     return changed;
 }
 
-bool optionalNumberField(const char* id, std::optional<int>& value, int min, int max, float width) {
+bool optionalNumberField(const char* id, std::optional<int>& value, int min, int max, float width, const char* hint) {
     auto& buf = numberBuffer(id);
     ImGui::SetNextItemWidth(width);
-    ImGui::InputText(id, buf.data(), buf.size(), ImGuiInputTextFlags_AutoSelectAll);
+    if (hint) ImGui::InputTextWithHint(id, hint, buf.data(), buf.size(), ImGuiInputTextFlags_AutoSelectAll);
+    else ImGui::InputText(id, buf.data(), buf.size(), ImGuiInputTextFlags_AutoSelectAll);
     bool changed = false;
     if (ImGui::IsItemDeactivatedAfterEdit()) {
         if (trim(buf.data()).empty()) {

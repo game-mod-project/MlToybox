@@ -85,6 +85,8 @@ function M.new()
 
   function r:setInGame(inGame)
     if not inGame then
+      -- 맵을 떠나는 중이다. disable 이 이 표시를 보고, 곧 사라질 게임 객체를 건드리지 않을 수 있다
+      self.state.leaving = true
       for _, name in ipairs(self.order) do self:_deactivate(name) end
       -- 이전 맵의 오브젝트 캐시·자원 표시가 남지 않도록 비운다. 기능이 참조를 쥐고 있을 수 있어 테이블은 유지한다.
       for key in pairs(self.state) do self.state[key] = nil end

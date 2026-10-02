@@ -43,6 +43,33 @@ public class BridgeClientTests
         Assert.True(root.GetProperty("features").GetProperty("military").GetProperty("unlimitedSquads").GetBoolean());
     }
 
+    // 저장 용량은 게임 안 창에서만 고친다. 패널에는 화면이 없지만, 패널이 저장해도 그 설정이 사라지지 않아야 한다
+    [Fact]
+    public void SaveControl_KeepsTheStorageLimitsSetInTheOverlay()
+    {
+        var c = NewClient(out var dir);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(c.ControlPath, "{\"version\":1,\"seq\":3,\"features\":{\"storage\":{\"enabled\":true,\"intervalSec\":5,"
+            + "\"limits\":{\"99\":{\"generic\":5000},\"69\":{\"generic\":3000,\"pantry\":6000}}}},\"commands\":[]}");
+        var doc = c.LoadControl();
+        Assert.True(doc.Features.Storage.Enabled);
+        Assert.Equal(5000, doc.Features.Storage.Limits["99"].Generic);
+        doc.Features.Build.Enabled = true;
+        c.SaveControl(doc);
+        using var json = JsonDocument.Parse(File.ReadAllText(c.ControlPath));
+        var storage = json.RootElement.GetProperty("features").GetProperty("storage");
+        Assert.True(storage.GetProperty("enabled").GetBoolean());
+        Assert.Equal(5, storage.GetProperty("intervalSec").GetInt32());
+        Assert.Equal(5000, storage.GetProperty("limits").GetProperty("99").GetProperty("generic").GetInt32());
+        Assert.False(storage.GetProperty("limits").GetProperty("99").TryGetProperty("pantry", out _));   // 값이 없는 분류는 쓰지 않는다
+        Assert.Equal(6000, storage.GetProperty("limits").GetProperty("69").GetProperty("pantry").GetInt32());
+        // 설정이 없던 파일에는 꺼진 기본값이 쓰인다
+        var fresh = new ControlDocument();
+        Assert.False(fresh.Features.Storage.Enabled);
+        Assert.Equal(5, fresh.Features.Storage.IntervalSec);
+        Assert.Empty(fresh.Features.Storage.Limits);
+    }
+
     [Fact]
     public void LoadControl_CorruptFile_ReturnsDefault()
     {
