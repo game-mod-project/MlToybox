@@ -22,10 +22,10 @@ void drawBuildTab(TabContext& ctx) {
         a.control.setBuild(b);
         markDirty(a);
     }
-}
 
-void drawUpgradeTab(TabContext& ctx) {
-    App& a = ctx.app;
+    // 업그레이드: 건물 업그레이드 표(DT_Upgrades)와 주거지 레벨 조건을 고치는 기능이라 건설 탭에 둔다.
+    // 설정은 따로다(features.upgrade). 위의 "건설 기능 사용"과 무관하게 켜고 끈다. 패널에는 따로 탭이 있다
+    ImGui::SeparatorText("업그레이드");
     UpgradeSettings u = a.control.upgrade();
     if (ImGui::Checkbox("업그레이드 조건·비용·해금 무시", &u.enabled)) {
         a.control.setUpgrade(u);
