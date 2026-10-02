@@ -64,4 +64,14 @@ T.run({
     T.eq(d.heartbeat, 123, "heartbeat")
     T.eq(d.inGame, false, "inGame")
   end,
+  -- 오버레이가 자원 표에 쓸 이름 표. 모드가 시작할 때 한 번 쓴다(bridge/catalog.json)
+  write_catalog_for_the_overlay = function()
+    local b = fresh()
+    T.eq(b:writeCatalog({ { id = "Timber", name = "목재", category = "건설", group = "목재 작업물" }, { id = "RegionalWealth", name = "지역 재화", category = "영지" } }), true, "written")
+    local f = assert(io.open(b.dir .. "\\catalog.json", "rb")); local s = f:read("a"); f:close()
+    local d = json.decode(s)
+    T.eq(d.version, 1, "version"); T.eq(#d.resources, 2, "two resources")
+    T.eq(d.resources[1].id, "Timber", "id"); T.eq(d.resources[1].name, "목재", "korean name survives"); T.eq(d.resources[1].group, "목재 작업물", "group")
+    T.eq(d.resources[2].group, nil, "no group")
+  end,
 })

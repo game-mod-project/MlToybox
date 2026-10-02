@@ -56,6 +56,53 @@ T.run({
       RyeBread = 170, fish = 30, Eggs = 220, apples = 296, Ale = 28, Irontools = 6, Cloth_Linen = 12, spears = 133, PlateArmor = 293 }
     for id, type in pairs(saved) do T.eq(by[id], type, id) end
   end,
+  every_item_sits_in_the_games_group = function()
+    local known = rows()
+    for _, it in ipairs(catalog.items) do
+      T.eq(it.sub, known[it.type].sub, "subcategory of " .. it.id)
+      local g = catalog.groups[it.sub]
+      T.truthy(g, "group of " .. it.id)
+      T.truthy(catalog.categories[g.category], "category of group " .. tostring(it.sub))
+      -- 묶음이 놓이는 분류는 품목의 분류와 같다. 목제 부품만 다르다: 표에서는 제작 재료(3)인데 영지 창은 유지보수 묶음을 건설 아래에 보여 준다
+      if it.id ~= "WoodenParts" then T.eq(g.category, known[it.type].cat, "category of " .. it.id) end
+    end
+  end,
+  describe_lists_every_resource_in_the_region_panels_order = function()
+    local d = catalog.describe()
+    T.eq(#d, 79, "regional wealth and 78 goods")
+    T.eq(d[1].id, "RegionalWealth", "special first"); T.eq(d[1].name, "지역 재화", "its name"); T.eq(d[1].category, "영지", "its category")
+    local ids = catalog.ids()
+    local at = {}
+    for i, entry in ipairs(d) do
+      T.eq(entry.id, ids[i], "same order as ids()")
+      T.truthy(type(entry.name) == "string" and #entry.name > 0, "name of " .. entry.id)
+      T.truthy(type(entry.category) == "string" and #entry.category > 0, "category of " .. entry.id)
+      at[entry.id] = i
+    end
+    -- 건설의 유지보수 묶음에 도구와 목제 부품이 나란히 있다
+    T.eq(at.WoodenParts, at.Irontools + 1, "wooden parts next to tools")
+    T.eq(d[at.WoodenParts].category, "건설", "shown under construction"); T.eq(d[at.WoodenParts].group, "유지보수", "maintenance")
+    T.eq(d[at.Beef].category, "식량", "beef category"); T.eq(d[at.Beef].group, "고기", "beef group")
+    -- 분류는 건설, 식량, 제작 재료, 일용품, 군사 순서로 이어지고, 한 분류의 품목은 흩어지지 않는다
+    local order = {}
+    for i = 2, #d do
+      if d[i].category ~= order[#order] then order[#order + 1] = d[i].category end
+    end
+    T.eq(table.concat(order, ","), "건설,식량,제작 재료,일용품,군사", "category order")
+    -- 묶음 안에서는 품목 번호 순서(영지 창의 순서)
+    T.eq(at.Timber + 1, at.planks, "timber then planks"); T.eq(at.fish + 1, at.Eel, "carp then eel"); T.eq(at.Eel + 1, at.smokedfish, "then smoked fish")
+  end,
+  names_are_the_ones_the_region_panel_shows = function()
+    -- 사용자가 올린 영지 창 캡처(2026-10-02)에서 읽은 이름. 묶음 안에서 품목 번호 순서로 놓여 있었다
+    local by = {}
+    for _, entry in ipairs(catalog.describe()) do by[entry.id] = entry.name end
+    local shown = { Timber = "목재", planks = "판자", Rubble = "잔해 돌", DressedStone = "다듬은 돌", Mortar = "모르타르", Irontools = "도구",
+      WoodenParts = "목제 부품", clayTILES = "지붕 타일", Berries = "열매", sausage = "소시지", SmallGame = "소형 사냥감", Chevon = "염소고기",
+      fish = "잉어", smokedfish = "훈제 생선", Beetroots = "비트", Quinces = "마르멜로", RyeBread = "호밀빵", lebkuchen = "렙쿠헨", OatGrain = "귀리",
+      Eggs = "달걀", WheatFlour = "밀가루", WheatGrain = "밀 낟알", WheatSheaves = "밀 다발", RoughStone = "잡석", Hides = "생가죽", Pelts = "털가죽",
+      Cloth_Linen = "리넨", Yarn = "실", IronSlabs = "철판", iron_parts = "철제 부품", Charcoal = "숯", Ale = "맥주", mead = "벌꿀주", AnimalFeed = "동물 사료" }
+    for id, name in pairs(shown) do T.eq(by[id], name, id) end
+  end,
   new_goods_use_the_games_own_names = function()
     local by = {}
     for _, it in ipairs(catalog.items) do by[it.id] = it.type end
