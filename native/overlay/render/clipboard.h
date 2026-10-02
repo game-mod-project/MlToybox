@@ -1,0 +1,9 @@
+#pragma once
+#include <string>
+
+namespace mlt::ov {
+// 글(UTF-8)을 Windows 클립보드에 쓴다. 작업 스레드에서 부른다.
+// ImGui 의 기본 처리는 프레임을 그리는 스레드에서 잠금을 쥔 채 클립보드를 비운다. 클립보드 주인이 게임 창이면
+// Windows 가 그 창에 메시지를 보내고, 창 스레드가 그때 ImGui 잠금을 기다리고 있으면 서로 멈춘다.
+bool writeClipboardText(const std::string& utf8);
+}

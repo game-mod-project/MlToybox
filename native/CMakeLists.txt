@@ -40,7 +40,12 @@ add_library(overlay_core STATIC
     overlay/core/settings.cpp
     overlay/core/status_file.cpp
     overlay/core/session.cpp
-    overlay/core/frame_gate.cpp)
+    overlay/core/frame_gate.cpp
+    overlay/core/hint.cpp
+    overlay/core/units.cpp
+    overlay/core/merc_rules.cpp
+    overlay/core/resources.cpp
+    overlay/core/view.cpp)
 target_include_directories(overlay_core PUBLIC . third_party)
 target_link_libraries(overlay_core PUBLIC mlt_core)
 
@@ -62,14 +67,19 @@ add_library(overlay_impl STATIC
     overlay/render/dx12_hook.cpp
     overlay/render/imgui_layer.cpp
     overlay/render/input.cpp
+    overlay/render/clipboard.cpp
     overlay/render/guard.cpp
     overlay/ui/app.cpp
     overlay/ui/window.cpp
     overlay/ui/widgets.cpp
     overlay/ui/tab_build.cpp
     overlay/ui/tab_lord.cpp
+    overlay/ui/tab_military.cpp
+    overlay/ui/tab_population.cpp
+    overlay/ui/tab_resources.cpp
+    overlay/ui/tab_mercenaries.cpp
     overlay/ui/tab_status.cpp)
-target_link_libraries(overlay_impl PUBLIC overlay_core imgui minhook d3d12 dxgi user32)
+target_link_libraries(overlay_impl PUBLIC overlay_core imgui minhook d3d12 dxgi user32 imm32)
 
 # mltoybox_overlay: 게임에 올리는 DLL
 add_library(mltoybox_overlay SHARED overlay/dllmain.cpp)
@@ -85,6 +95,11 @@ add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_t
     tests/overlay_settings_tests.cpp
     tests/overlay_session_tests.cpp
     tests/overlay_frame_gate_tests.cpp
+    tests/overlay_hint_tests.cpp
+    tests/overlay_features_tests.cpp
+    tests/overlay_status_tabs_tests.cpp
+    tests/overlay_merc_rules_tests.cpp
+    tests/overlay_view_tests.cpp
     # 창 프로시저 후킹은 실제 창으로, 화면 출력 후킹은 실제 D3D12 스왑체인으로 시험한다(게임 없이). 입력 테스트가 먼저다
     tests/overlay_input_tests.cpp
     tests/overlay_render_tests.cpp)

@@ -88,6 +88,7 @@ void drawOverlaySettings(App& a) {
     ImGui::SeparatorText("오버레이");
     ImGui::Text("빌드: %s", __DATE__);
     ImGui::Text("글꼴: %s", a.koreanFont.load() ? "맑은 고딕" : "기본 글꼴(한글이 표시되지 않습니다)");
+    if (const long long errors = a.workerErrors.load()) ImGui::Text("작업 스레드 오류: %lld회 (저장이 늦어질 수 있습니다)", errors);
 
     const float width = 160.0f * ImGui::GetStyle().FontScaleMain;
     ImGui::SetNextItemWidth(width);

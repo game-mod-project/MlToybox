@@ -4,17 +4,49 @@
 #include <chrono>
 #include <system_error>
 #include <thread>
+#include <windows.h>
 
 namespace mlt::ov {
 
+std::optional<std::string> readFileShared(const std::filesystem::path& path) {
+    const HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return std::nullopt;
+    std::string out;
+    char buf[16384];
+    for (;;) {
+        DWORD got = 0;
+        if (!ReadFile(file, buf, sizeof(buf), &got, nullptr)) {
+            CloseHandle(file);
+            return std::nullopt;
+        }
+        if (got == 0) break;
+        out.append(buf, got);
+    }
+    CloseHandle(file);
+    return out;
+}
+
 ControlDoc Bridge::loadControl() const {
-    auto text = readFileUtf8(controlPath());
-    if (!text) return ControlDoc();
-    return ControlDoc::parse(*text);
+    return loadControlChecked().doc;
+}
+
+LoadedControl Bridge::loadControlChecked() const {
+    LoadedControl loaded;
+    auto text = readFileShared(controlPath());
+    if (!text) return loaded;
+    if (auto doc = ControlDoc::tryParse(*text)) loaded.doc = std::move(*doc);
+    else loaded.unreadable = true;
+    return loaded;
+}
+
+bool Bridge::backupControl() const {
+    std::error_code ec;
+    return std::filesystem::copy_file(controlPath(), controlBackupPath(), std::filesystem::copy_options::overwrite_existing, ec);
 }
 
 std::optional<long long> Bridge::peekSeq() const {
-    auto text = readFileUtf8(controlPath());
+    auto text = readFileShared(controlPath());
     if (!text) return std::nullopt;
     Json root = Json::parse(text->begin(), text->end(), nullptr, false);
     if (root.is_discarded() || !root.is_object()) return std::nullopt;
@@ -40,7 +72,7 @@ std::optional<long long> Bridge::saveControl(ControlDoc& doc) const {
 }
 
 std::optional<StatusDoc> Bridge::readStatus() const {
-    auto text = readFileUtf8(statusPath());
+    auto text = readFileShared(statusPath());
     if (!text) return std::nullopt;
     return parseStatus(*text);
 }

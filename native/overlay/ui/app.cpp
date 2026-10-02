@@ -13,6 +13,7 @@ void disableOverlay(const std::string& reason) {
     a.visible = false;
     a.wantMouse = false;
     a.wantKeyboard = false;
+    a.wantText = false;
     std::lock_guard<std::mutex> lock(a.mutex);
     a.reason = reason;
 }

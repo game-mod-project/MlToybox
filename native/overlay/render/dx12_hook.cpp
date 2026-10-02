@@ -36,10 +36,12 @@ ExecuteFn g_origExecute = nullptr;
 struct SeenQueue {
     ID3D12CommandQueue* queue;
     DWORD thread;
+    unsigned long long order;   // 몇 번째 실행이었는가(클수록 최근)
 };
 std::mutex g_seenMutex;
 SeenQueue g_seen[8] = {};
 int g_seenCount = 0;
+unsigned long long g_seenOrder = 0;
 std::atomic<bool> g_recordQueues{true};
 
 IDXGISwapChain* g_swap = nullptr;   // 우리가 그리는 스왑체인
@@ -59,8 +61,9 @@ bool g_initialized = false;
 ULONGLONG g_firstPresentTick = 0;
 
 // 구조적 예외가 났을 때 처리기가 풀어야 하는 잠금(guard.h 의 TrackedLock)
-bool g_holdsImgui = false;
-bool g_holdsApp = false;
+// Present 와 ResizeBuffers 가 다른 스레드에서 불려도 남의 잠금을 풀지 않게 스레드마다 둔다
+thread_local bool g_holdsImgui = false;
+thread_local bool g_holdsApp = false;
 
 // 이 프로세스의 보이는 최상위 창 가운데 가장 큰 것
 HWND mainWindow() {
@@ -125,10 +128,12 @@ bool createFrameObjects(std::string& err) {
 ID3D12CommandQueue* queueForThisThread() {
     const DWORD tid = GetCurrentThreadId();
     std::lock_guard<std::mutex> lock(g_seenMutex);
+    // 이 스레드에서 실행된 큐가 둘 이상이면 가장 최근에 실행된 것
+    const SeenQueue* latest = nullptr;
     for (int i = 0; i < g_seenCount; ++i) {
-        if (g_seen[i].thread == tid) return g_seen[i].queue;
+        if (g_seen[i].thread == tid && (!latest || g_seen[i].order > latest->order)) latest = &g_seen[i];
     }
-    return nullptr;
+    return latest ? latest->queue : nullptr;
 }
 
 void tryInit(IDXGISwapChain* swap) {
@@ -160,15 +165,15 @@ void tryInit(IDXGISwapChain* swap) {
     g_initialized = true;
     g_recordQueues = false;
     notifyOverlayReady();
-    OverlayState expected = OverlayState::Waiting;
-    if (!app().state.compare_exchange_strong(expected, OverlayState::Ready)) {
-        expected = OverlayState::Starting;
-        app().state.compare_exchange_strong(expected, OverlayState::Ready);
+    // 꺼진 상태가 아니면 Ready 로 둔다(작업 스레드가 Starting 을 Waiting 으로 바꾸는 것과 겹쳐도 Ready 로 끝난다)
+    OverlayState current = app().state.load();
+    while (current != OverlayState::Disabled && !app().state.compare_exchange_weak(current, OverlayState::Ready)) {
     }
 }
 
 void renderFrame(IDXGISwapChain* swap) {
     App& a = app();
+    const bool openAtStart = a.visible.load();
     {
         TrackedLock imguiLock(imguiMutex(), g_holdsImgui);
         TrackedLock appLock(a.mutex, g_holdsApp);
@@ -182,6 +187,9 @@ void renderFrame(IDXGISwapChain* swap) {
         const bool visible = a.visible.load();
         a.wantMouse = visible && io.WantCaptureMouse;
         a.wantKeyboard = visible && (io.WantCaptureKeyboard || io.WantTextInput);
+        const bool text = visible && io.WantTextInput;
+        // 화면에서 닫았거나 글자 칸에 커서가 들어오고 나갔다. 창 스레드가 눌린 입력을 정리하고 IME 를 켜고 끈다
+        if ((openAtStart && !visible) || a.wantText.exchange(text) != text) wakeWindowThread();
     }
 
     UINT index = 0;
@@ -261,6 +269,7 @@ void frame(IDXGISwapChain* swap) {
     if (!wanted) {
         a.wantMouse = false;
         a.wantKeyboard = false;
+        if (a.wantText.exchange(false)) wakeWindowThread();
         return;
     }
     renderFrame(swap);
@@ -285,7 +294,8 @@ void afterCrash(unsigned long code) {
 }
 
 HRESULT WINAPI HookedPresent(IDXGISwapChain* swap, UINT sync, UINT flags) {
-    if (app().state.load() != OverlayState::Disabled) {
+    // DXGI_PRESENT_TEST 는 화면에 내지 않는 확인용 호출이다. 그리지 않는다
+    if (!(flags & DXGI_PRESENT_TEST) && app().state.load() != OverlayState::Disabled) {
         unsigned long code = 0;
         if (!runGuarded(frameThunk, swap, &code)) afterCrash(code);
         dropFrameBuffer();   // 프레임이 예외로 끊겼어도 백버퍼 참조는 남기지 않는다
@@ -344,7 +354,8 @@ HRESULT WINAPI HookedResizeBuffers(IDXGISwapChain* swap, UINT count, UINT width,
 }
 
 void WINAPI HookedExecute(ID3D12CommandQueue* queue, UINT count, ID3D12CommandList* const* lists) {
-    if (g_recordQueues.load() && queue->GetDesc().Type == D3D12_COMMAND_LIST_TYPE_DIRECT) {
+    // 큐를 고른 뒤나 오버레이가 꺼진 뒤에는 기록하지 않는다(게임의 모든 실행이 이 후킹을 지나간다)
+    if (g_recordQueues.load() && app().state.load() != OverlayState::Disabled && queue->GetDesc().Type == D3D12_COMMAND_LIST_TYPE_DIRECT) {
         const DWORD tid = GetCurrentThreadId();
         std::lock_guard<std::mutex> lock(g_seenMutex);
         int slot = -1;
@@ -355,7 +366,10 @@ void WINAPI HookedExecute(ID3D12CommandQueue* queue, UINT count, ID3D12CommandLi
             slot = g_seenCount++;
             g_seen[slot].queue = queue;
         }
-        if (slot >= 0) g_seen[slot].thread = tid;
+        if (slot >= 0) {
+            g_seen[slot].thread = tid;
+            g_seen[slot].order = ++g_seenOrder;
+        }
     }
     g_origExecute(queue, count, lists);
 }

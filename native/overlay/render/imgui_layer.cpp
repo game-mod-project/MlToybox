@@ -1,4 +1,5 @@
 #include "imgui_layer.h"
+#include "input.h"
 #include "overlay/ui/app.h"
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
@@ -65,6 +66,21 @@ bool initImGuiContext(HWND hwnd, std::string& err) {
         err = "ImGui_ImplWin32_Init";
         return false;
     }
+
+    // 둘 다 프레임 안에서(화면 스레드가 ImGui 잠금과 App::mutex 를 쥔 채) 불린다. 여기서는 적어 두기만 하고,
+    // Windows 의 IME·클립보드 함수는 창 스레드와 작업 스레드가 부른다
+    ImGuiPlatformIO& platform = ImGui::GetPlatformIO();
+    platform.Platform_SetImeDataFn = [](ImGuiContext*, ImGuiViewport*, ImGuiPlatformImeData* data) {
+        App& a = app();
+        a.imeX = static_cast<int>(data->InputPos.x);
+        a.imeY = static_cast<int>(data->InputPos.y + data->InputLineHeight);   // 입력 줄 바로 아래
+        wakeWindowThread();
+    };
+    platform.Platform_SetClipboardTextFn = [](ImGuiContext*, const char* text) {
+        App& a = app();
+        a.clipboardOut = text ? text : "";
+        a.clipboardPending = true;
+    };
     return true;
 }
 
