@@ -121,5 +121,33 @@ Test-Case 'lab.ps1 replaces __KEY__ tokens from -Vars' {
     Assert-Equal (Get-Content -Raw (Join-Path $lab.FullName 'run.lua')) 'print("토이박스", 3)' 'substituted'
 }
 
+Test-Case 'package.ps1 makes an installable zip that carries no settings' {
+    $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $made = @()
+    foreach ($name in 'mltoybox_native.dll', 'mltoybox_overlay.dll') {
+        $dll = Join-Path $repo "native\build\$name"
+        if (-not (Test-Path $dll)) { New-Item -ItemType Directory -Force (Split-Path $dll) | Out-Null; Set-Content $dll 'fake'; $made += $dll }
+    }
+    $out = Join-Path $env:TEMP "mltb-pkg-$(Get-Random)"
+    try {
+        $zip = & "$PSScriptRoot\..\package.ps1" -Version '0.0.0-test' -OutDir $out -NoPanel
+        Assert-Equal (Split-Path $zip -Leaf) 'MLToybox-0.0.0-test.zip' 'zip name'
+        $x = Join-Path $out 'x'
+        Expand-Archive $zip $x
+        foreach ($rel in 'MLToybox\Scripts\main.lua', 'MLToybox\Scripts\config.lua', 'MLToybox\Scripts\features\spawn_squads.lua',
+                'MLToybox\native\mltoybox_native.dll', 'MLToybox\native\mltoybox_overlay.dll', 'MLToybox\bridge\README.txt',
+                'licenses\imgui-LICENSE.txt', 'licenses\minhook-LICENSE.txt', 'licenses\nlohmann-json-LICENSE.MIT', 'INSTALL.txt') {
+            Assert-True (Test-Path (Join-Path $x $rel)) "has $rel"
+        }
+        Assert-Equal (Get-FileHash "$x\MLToybox\Scripts\main.lua").Hash (Get-FileHash "$repo\mod\MLToybox\Scripts\main.lua").Hash 'main.lua is the repo file'
+        # 설정·상태 파일, 테스트, 개발용 모드는 넣지 않는다
+        $names = (Get-ChildItem $x -Recurse -File).Name
+        foreach ($bad in 'control.json', 'status.json', 'overlay.json', 'overlay_status.json') { Assert-True ($names -notcontains $bad) "no $bad" }
+        Assert-True (-not (Test-Path "$x\MLToybox\tests")) 'no tests folder'
+        Assert-True (-not (Test-Path "$x\MLToyboxLab")) 'no lab mod'
+        Assert-True ((Get-Content "$x\INSTALL.txt" -Raw) -match 'MLToybox : 1') 'install notes name the mods.txt line'
+    } finally { $made | ForEach-Object { Remove-Item $_ } }
+}
+
 if ($script:failed -gt 0) { throw "$script:failed test(s) failed" }
 Write-Host 'ALL PASS'

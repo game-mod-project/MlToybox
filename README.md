@@ -112,6 +112,12 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
 데이터 표(업그레이드·건물·유닛) 변경은 메모리에만 적용되고, 게임을 다시 켜면 원래대로 돌아갑니다. 기능을 꺼도 이미 적용된 값은 되돌리지 않습니다.
 
 ## 설치
+### 릴리스 압축 파일로 (빌드 도구 없이)
+[GitHub 릴리스](https://github.com/game-mod-project/MlToybox/releases)의 `MLToybox-<판>.zip`을 받아 안의 `INSTALL.txt`대로 합니다. 요약하면:
+1. 압축 파일의 `MLToybox` 폴더를 게임 폴더의 `ManorLords/Binaries/Win64/ue4ss/Mods/`에 복사합니다.
+2. 같은 폴더의 `mods.txt`에서 `; Built-in keybinds` 줄 위에 `MLToybox : 1`을 넣습니다(`mods.json`이 있으면 거기에도 항목을 넣습니다).
+
+### 소스에서
     pwsh tools/backup-saves.ps1
     pwsh tools/build-native.ps1
     pwsh tools/deploy.ps1 -Mod MLToybox
@@ -139,6 +145,7 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
   3. 개발이 끝나면 `-Remove`로 제거합니다.
   4. `& tools/lab-load.ps1 -Slot saveGame_8 -Start`는 게임을 켜고 그 세이브를 불러옵니다(화면 조작 불필요). `tools/lab/`에는 용병 상태 읽기(`merc_state.lua`), 고용 창 열기·닫기(`merc_screen.lua`), 카드 고용(`merc_hire.lua`) 스크립트가 있습니다. `lab.ps1 -Vars @{ NAME = '...' }`는 스크립트의 `__NAME__`을 바꿔 넣습니다.
 - **Lua 파일 작성**: 백슬래시가 깨지지 않도록 셸 heredoc이 아닌 편집기로 작성합니다.
+- **릴리스 묶음**: `pwsh tools/build-native.ps1 -Test` 뒤에 `pwsh tools/package.ps1 -Version v1.0.0`을 실행하면 `dist/MLToybox-v1.0.0.zip`이 만들어집니다. 모드 폴더(Lua, DLL 두 개), 비상용 패널, 서드파티 라이선스, 설치 안내가 들어가고 설정·상태 파일은 들어가지 않습니다.
 - **크래시 분석**: `%LOCALAPPDATA%\ManorLords\Saved\Crashes\*\UEMinidump.dmp`의 예외 주소를 `tools/re`의 `disasm`으로 역추적합니다(`analysis/findings.md` 크래시 절 참고).
 - **게임 창 캡처**: `pwsh tools/capture-game.ps1 -Out shot.png`는 게임 창만 찍습니다(가려져 있어도 됩니다). `-Key Insert`는 키 메시지를 보냅니다. `bridge/overlay.json`의 `startOpen`(열린 채 시작)과 `devTab`(열 탭 이름)을 쓰면 마우스 없이 오버레이 화면을 확인할 수 있습니다. `tools/lab/resize.lua`는 해상도를 바꿉니다.
 
