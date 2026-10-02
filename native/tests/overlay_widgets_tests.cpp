@@ -103,4 +103,15 @@ TEST(overlay_widgets_text_field_composes_hangul_inside_imgui) {
     CHECK(!hangulModeOn());
     f.type("x 1");
     CHECK(f.value == "ab안ㄴ까x 1가");
+
+    f.hangulKey();                                     // 한글 모드에서 전체를 고르고(Ctrl+A) 치면 고른 글이 바뀐다
+    ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl, true);
+    ImGui::GetIO().AddKeyEvent(ImGuiKey_A, true);
+    f.frame();
+    ImGui::GetIO().AddKeyEvent(ImGuiKey_A, false);
+    ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl, false);
+    f.frame();
+    f.type("rk");
+    CHECK(f.value == "가");
+    f.hangulKey();
 }

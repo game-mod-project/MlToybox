@@ -52,6 +52,8 @@ public:
     // 조합을 끝내고 쌓인 글자를 버린다(글자 칸을 떠났거나 한/영을 바꿨을 때)
     void reset();
     bool composing() const { return composer_.composing(); }
+    // 아직 적용하지 않은 글자가 쌓여 있는가
+    bool pending() const { return !keys_.empty(); }
 
 private:
     struct Key {

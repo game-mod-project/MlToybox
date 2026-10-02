@@ -108,6 +108,14 @@ int hangulCallback(ImGuiInputTextCallbackData* data) {
         h.field.push(data->EventChar, io.KeyShift);
         return 1;   // 글자 칸에는 넣지 않는다. 아래에서 조합한 글자를 넣는다
     }
+    // 범위를 골라 둔 채 쳤으면 고른 글을 먼저 지운다(글자를 위에서 걸러 냈으므로 글자 칸이 대신 지워 주지 않는다)
+    if (h.field.pending() && data->HasSelection()) {
+        const int from = std::min(data->SelectionStart, data->SelectionEnd);
+        const int to = std::max(data->SelectionStart, data->SelectionEnd);
+        data->DeleteChars(from, to - from);
+        data->CursorPos = from;
+        data->SelectionStart = data->SelectionEnd = from;
+    }
     // 프레임마다: 쌓인 글쇠를 조합해 넣고, 밖에서 글이나 커서가 바뀌었으면 조합을 끝낸다
     std::string text(data->Buf, static_cast<size_t>(data->BufTextLen));
     int cursor = data->CursorPos;
@@ -139,7 +147,8 @@ bool textField(const char* id, std::string& value, size_t maxBytes, float width)
         h.refocus = false;
     }
     const bool changed = ImGui::InputText(id, buf, capacity, ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_CallbackAlways, hangulCallback);
-    if (ImGui::IsItemDeactivated()) h.field.reset();   // 글자 칸을 떠나면 조합을 끝낸다
+    // 글자 칸을 떠나면 조합을 끝낸다. 들어올 때도 비운다(창을 닫아 떠난 경우에는 떠나는 것을 보지 못한다)
+    if (ImGui::IsItemDeactivated() || ImGui::IsItemActivated()) h.field.reset();
     if (!changed) return false;
     value = buf;
     return true;
