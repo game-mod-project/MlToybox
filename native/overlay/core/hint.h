@@ -11,8 +11,10 @@ public:
 
     // 오버레이가 그릴 준비를 마쳤다
     void onReady(unsigned long long nowMs);
-    // 모드가 알린 게임 상태(맵 안인가). 프레임마다 불러도 된다. 밖에서 안으로 바뀔 때만 다시 띄운다
-    void update(bool inGame, unsigned long long nowMs);
+    // 모드가 알린 게임 상태. connected = 모드와 연결돼 있는가, inGame = 맵 안인가. 프레임마다 불러도 된다.
+    // 메뉴에서 맵으로 들어갈 때만 다시 띄운다. 연결이 끊긴 동안에는 상태를 모르므로 끊기기 전의 것을 기억해 둔다
+    // (맵 안에서 heartbeat 가 끊겼다 돌아온 것은 맵에 들어간 것이 아니다)
+    void update(bool connected, bool inGame, unsigned long long nowMs);
     bool active(unsigned long long nowMs) const;
 
 private:

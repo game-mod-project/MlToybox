@@ -40,7 +40,8 @@ public:
     bool backupControl() const;
     // 파일에 적힌 seq. 파일이 없거나 깨졌으면 값 없음
     std::optional<long long> peekSeq() const;
-    // seq = max(파일의 seq, 문서의 seq) + 1 로 저장하고 그 seq 를 돌려준다. 문서의 seq 도 바꾼다. 실패하면 값 없음(문서는 그대로)
+    // seq = max(파일의 seq, 문서의 seq) + 1 로 저장하고 그 seq 를 돌려준다. 문서의 seq 도 바꾼다. 실패하면 값 없음(문서는 그대로).
+    // 파일이 읽을 수 없는 상태면 control.json.bak 으로 사본을 남긴 뒤에 덮는다. 사본을 못 남기면 저장하지 않는다
     std::optional<long long> saveControl(ControlDoc& doc) const;
     std::optional<StatusDoc> readStatus() const;
 

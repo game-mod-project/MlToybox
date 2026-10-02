@@ -69,6 +69,14 @@
           ],
           "cost": 0,
           "enabled": false
+        },
+        {
+          "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+          "units": [
+            "militia"
+          ],
+          "cost": 10,
+          "enabled": true
         }
       ]
     }

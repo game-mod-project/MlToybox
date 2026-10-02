@@ -2,6 +2,7 @@
 #include "overlay/ui/app.h"
 #include "overlay/ui/widgets.h"
 #include <imgui.h>
+#include <optional>
 #include <string>
 
 using namespace mlt::ov;
@@ -114,4 +115,93 @@ TEST(overlay_widgets_text_field_composes_hangul_inside_imgui) {
     f.type("rk");
     CHECK(f.value == "가");
     f.hangulKey();
+}
+
+// 숫자 칸: Enter 를 누르거나 다른 곳으로 옮기면 반영한다(스펙 2.3). 해석할 수 없는 입력은 버리고, 범위를 벗어나면 끝값으로 맞춘다
+namespace {
+struct NumberFrames {
+    int number = 5;
+    std::optional<int> blankable = 30;
+    bool numberChanged = false;
+    bool blankableChanged = false;
+
+    NumberFrames() {
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = nullptr;
+        io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+    }
+    ~NumberFrames() {
+        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
+            tex->SetTexID(ImTextureID_Invalid);
+            tex->SetStatus(ImTextureStatus_Destroyed);
+        }
+        ImGui::DestroyContext();
+    }
+    // focus: 1 = 첫 칸, 2 = 둘째 칸에 커서를 둔다
+    void frame(int focus = 0) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2(800.0f, 600.0f);
+        io.DeltaTime = 1.0f / 60.0f;
+        ImGui::NewFrame();
+        ImGui::Begin("test");
+        if (focus == 1) ImGui::SetKeyboardFocusHere();
+        numberChanged |= numberField("##number", number, 0, 100, 80.0f);
+        if (focus == 2) ImGui::SetKeyboardFocusHere();
+        blankableChanged |= optionalNumberField("##blankable", blankable, 0, 1000, 80.0f);
+        ImGui::End();
+        ImGui::Render();
+        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
+            if (tex->Status == ImTextureStatus_WantCreate) tex->SetTexID(static_cast<ImTextureID>(1));
+            if (tex->Status == ImTextureStatus_WantCreate || tex->Status == ImTextureStatus_WantUpdates) tex->SetStatus(ImTextureStatus_OK);
+        }
+    }
+    void type(const char* keys) {
+        for (const char* k = keys; *k; ++k) ImGui::GetIO().AddInputCharacter(static_cast<unsigned>(*k));
+        frame();
+    }
+    void press(ImGuiKey key) {
+        ImGui::GetIO().AddKeyEvent(key, true);
+        frame();
+        ImGui::GetIO().AddKeyEvent(key, false);
+        frame();
+    }
+    void focus(int which) {
+        frame(which);
+        frame();
+        frame();
+    }
+};
+}
+
+TEST(overlay_widgets_number_fields_apply_on_enter_or_when_the_cursor_leaves) {
+    NumberFrames f;
+    f.focus(1);                                        // 칸에 들어가면 전체가 골라진다. 치면 바뀐다
+    f.type("42");
+    CHECK(f.number == 5 && !f.numberChanged);          // 치는 동안에는 반영하지 않는다
+    f.press(ImGuiKey_Enter);
+    CHECK(f.number == 42 && f.numberChanged);
+
+    f.focus(1);
+    f.type("77");
+    f.focus(2);                                        // Enter 없이 다른 칸으로 옮겨도 반영한다
+    CHECK(f.number == 77);
+
+    f.type("5000");                                    // 범위를 벗어나면 끝값
+    f.press(ImGuiKey_Enter);
+    CHECK(f.blankable == 1000 && f.blankableChanged);
+
+    f.focus(1);
+    f.type("abc");                                     // 해석할 수 없으면 버리고 원래 값을 둔다
+    f.press(ImGuiKey_Enter);
+    CHECK(f.number == 77);
+
+    f.focus(2);                                        // 빈칸으로 두고 끝내면 값 없음(자원 목표: 관리하지 않음)
+    f.press(ImGuiKey_Delete);
+    f.press(ImGuiKey_Enter);
+    CHECK(!f.blankable.has_value());
+    f.focus(2);
+    f.type("12");
+    f.focus(1);
+    CHECK(f.blankable == 12);
 }

@@ -33,6 +33,8 @@ struct Fixture {
         RegisterClassExW(&wc);
         hwnd = CreateWindowExW(0, wc.lpszClassName, L"", WS_OVERLAPPEDWINDOW, 0, 0, 200, 200, nullptr, nullptr, wc.hInstance, nullptr);
         ImGui::CreateContext();
+        ImGui::GetIO().IniFilename = nullptr;                                   // 테스트가 imgui.ini 를 남기지 않게
+        ImGui::GetIO().BackendFlags |= ImGuiBackendFlags_RendererHasTextures;   // 그래픽 장치 없이 프레임을 돌린다(frame)
         ImGui_ImplWin32_Init(hwnd);
         installWndProc(hwnd);
         a.state = OverlayState::Ready;
@@ -46,12 +48,22 @@ struct Fixture {
         a.wantMouse = false;
         a.wantKeyboard = false;
         a.state = OverlayState::Starting;
+        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
+            tex->SetTexID(ImTextureID_Invalid);
+            tex->SetStatus(ImTextureStatus_Destroyed);
+        }
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
         DestroyWindow(hwnd);
         UnregisterClassW(wc.lpszClassName, wc.hInstance);
     }
     void send(UINT msg, WPARAM wParam = 0, LPARAM lParam = 0) { SendMessageW(hwnd, msg, wParam, lParam); }
+    // ImGui 프레임 하나(쌓인 입력을 반영한다). 그리지는 않는다
+    void frame() {
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
+        ImGui::EndFrame();
+    }
 };
 }
 
@@ -127,6 +139,49 @@ TEST(overlay_input_releases_held_buttons_when_the_window_closes) {
     f.a.visible = false;                                          // 닫기 버튼이나 다른 스레드가 닫은 경우: 다음 메시지에서 정리한다
     f.send(WM_NULL);
     CHECK(GetCapture() == nullptr);
+}
+
+TEST(overlay_input_releases_the_side_buttons_too_when_the_window_closes) {
+    Fixture f;
+    f.send(WM_XBUTTONDOWN, MAKEWPARAM(MK_XBUTTON1, XBUTTON1), MAKELPARAM(10, 10));
+    CHECK(GetCapture() == f.hwnd);
+    f.send(WM_KEYDOWN, VK_INSERT, 0x00000001);
+    CHECK(!f.a.visible.load() && GetCapture() == nullptr);
+}
+
+// 닫을 때 ImGui 의 마우스 위치를 비운다. 닫혀 있는 동안의 마우스 이동은 ImGui 에 넣지 않으므로, 다시 열 때 지금 위치를
+// 알려 주지 않으면 마우스를 움직이기 전의 첫 클릭은 창 위에서 눌러도 ImGui 가 모른다(게임으로 간다)
+namespace {
+POINT g_cursor{};
+BOOL WINAPI fakeCursor(POINT* p) {
+    *p = g_cursor;
+    return TRUE;
+}
+}
+
+TEST(overlay_input_knows_where_the_mouse_is_right_after_reopening) {
+    Fixture f;
+    setCursorSource(fakeCursor);
+    f.send(WM_MOUSEMOVE, 0, MAKELPARAM(10, 10));
+    f.frame();
+    CHECK(ImGui::GetIO().MousePos.x == 10.0f && ImGui::GetIO().MousePos.y == 10.0f);
+    f.send(WM_KEYDOWN, VK_INSERT, 0x00000001);                    // 닫는다
+    f.send(WM_KEYUP, VK_INSERT, 0xC0000001);
+    g_cursor = { 40, 50 };                                        // 닫혀 있는 동안 마우스가 여기로 갔다(창 안 좌표를 화면 좌표로)
+    ClientToScreen(f.hwnd, &g_cursor);
+    f.send(WM_KEYDOWN, VK_INSERT, 0x00000001);                    // 다시 연다. 마우스는 움직이지 않았다
+    f.frame();
+    CHECK(ImGui::GetIO().MousePos.x == 40.0f && ImGui::GetIO().MousePos.y == 50.0f);
+
+    f.send(WM_KEYUP, VK_INSERT, 0xC0000001);
+    f.send(WM_KEYDOWN, VK_INSERT, 0x00000001);                    // 닫고
+    f.send(WM_KEYUP, VK_INSERT, 0xC0000001);
+    g_cursor = { 5000, 5000 };                                    // 마우스가 게임 창 밖에 있다
+    ClientToScreen(f.hwnd, &g_cursor);
+    f.send(WM_KEYDOWN, VK_INSERT, 0x00000001);                    // 연다: 창 밖의 위치는 넣지 않는다
+    f.frame();
+    CHECK(!ImGui::IsMousePosValid());
+    setCursorSource(nullptr);
 }
 
 // 게임 창은 IME 가 꺼져 있다(2026-10-02 실측). 오버레이는 그 상태를 건드리지 않는다.

@@ -20,6 +20,7 @@ std::recursive_mutex& imguiMutex() {
 namespace {
 std::atomic<WNDPROC> g_original{nullptr};
 std::atomic<HWND> g_hooked{nullptr};
+std::atomic<BOOL(WINAPI*)(POINT*)> g_cursorSource{nullptr};   // 테스트가 바꿔 끼운다. 없으면 GetCursorPos
 
 // --- 아래는 창 스레드만 쓴다
 bool g_wasVisible = false;
@@ -54,9 +55,31 @@ void resetImGui(void* p) {
         TrackedLock lock(imguiMutex(), m->locked);
         if (!ImGui::GetCurrentContext()) return;
         for (UINT up : { WM_LBUTTONUP, WM_RBUTTONUP, WM_MBUTTONUP }) ImGui_ImplWin32_WndProcHandler(m->hwnd, up, 0, 0);
+        for (int side : { XBUTTON1, XBUTTON2 }) ImGui_ImplWin32_WndProcHandler(m->hwnd, WM_XBUTTONUP, MAKEWPARAM(0, side), 0);
         ImGuiIO& io = ImGui::GetIO();
         io.ClearInputKeys();
         io.ClearInputMouse();
+    } catch (const std::exception& e) {
+        disableOverlay(std::string("input exception ") + e.what());
+    } catch (...) {
+        disableOverlay("input exception (unknown)");
+    }
+}
+
+// 창이 열릴 때: 닫으면서 ImGui 의 마우스 위치를 비웠고, 닫혀 있는 동안의 마우스 이동은 ImGui 에 넣지 않았다.
+// 지금 커서가 게임 창 안에 있으면 그 위치를 알려 준다. 그러지 않으면 마우스를 움직이기 전의 첫 클릭은
+// 창 위에서 눌러도 ImGui 가 몰라서 게임으로 간다
+void primeMouse(void* p) {
+    auto* m = static_cast<InputArgs*>(p);
+    try {
+        POINT at{};
+        const auto source = g_cursorSource.load();
+        if (!(source ? source(&at) : GetCursorPos(&at))) return;
+        RECT client{};
+        if (!ScreenToClient(m->hwnd, &at) || !GetClientRect(m->hwnd, &client) || !PtInRect(&client, at)) return;
+        TrackedLock lock(imguiMutex(), m->locked);
+        if (!ImGui::GetCurrentContext()) return;
+        ImGui_ImplWin32_WndProcHandler(m->hwnd, WM_MOUSEMOVE, 0, MAKELPARAM(at.x, at.y));
     } catch (const std::exception& e) {
         disableOverlay(std::string("input exception ") + e.what());
     } catch (...) {
@@ -72,12 +95,13 @@ void guarded(void (*fn)(void*), InputArgs& args) {
     }
 }
 
-// 창이 열려 있다가 닫혔으면(토글 키, 닫기 버튼, 꾸미기 열기) 입력 상태를 비운다. 창 스레드에서만 부른다
+// 창이 열려 있다가 닫혔으면(토글 키, 닫기 버튼, 꾸미기 열기) 입력 상태를 비우고, 닫혀 있다가 열렸으면
+// 지금의 마우스 위치를 알려 준다. 창 스레드에서만 부른다
 void noteVisibility(HWND hwnd, App& a) {
     const bool visible = a.visible.load();
-    if (g_wasVisible && !visible) {
+    if (g_wasVisible != visible) {
         InputArgs args{ hwnd, WM_NULL, 0, 0 };
-        guarded(resetImGui, args);
+        guarded(visible ? primeMouse : resetImGui, args);
     }
     g_wasVisible = visible;
 }
@@ -148,9 +172,16 @@ bool installWndProc(HWND hwnd) {
     // 바꾸기 전에 넣는다. 바꾼 직후 창 스레드에 온 메시지가 이어 부를 곳이 있어야 한다
     g_original = reinterpret_cast<WNDPROC>(current);
     SetLastError(0);
-    if (!SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(HookedWndProc)) && GetLastError() != 0) return false;
+    const LONG_PTR replaced = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(HookedWndProc));
+    if (!replaced && GetLastError() != 0) return false;
+    // 읽은 뒤 바꾸기 전에 다른 프로그램이 프로시저를 바꿨다면, 우리가 실제로 갈아 끼운 것은 그쪽 것이다. 그것을 이어 부른다
+    if (replaced != current) g_original = reinterpret_cast<WNDPROC>(replaced);
     g_hooked = hwnd;
     return true;
+}
+
+void setCursorSource(BOOL(WINAPI* source)(POINT*)) {
+    g_cursorSource = source;
 }
 
 void wakeWindowThread() {

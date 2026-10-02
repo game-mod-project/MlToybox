@@ -309,9 +309,18 @@ void ControlDoc::setMercenaries(const MercSettings& v) {
     f["enabled"] = v.enabled;
     f["refund"] = v.refund;
     f["lockFromAi"] = v.lockFromAi;
+    // 항목 안의 모르는 키(다음 판의 패널이나 손 편집이 넣은 것)를 남긴다: 같은 이름의 예전 항목에서 시작한다
+    std::map<std::string, Json> previous;
+    if (const Json* old = arrayAt(&f, "companies")) {
+        for (const Json& item : *old) {
+            if (!item.is_object()) continue;
+            if (auto name = optString(&item, "name")) previous.emplace(*name, item);
+        }
+    }
     Json companies = Json::array();
     for (const MercCompany& c : v.companies) {
-        Json company = Json::object();
+        const auto kept = previous.find(c.name);
+        Json company = kept != previous.end() ? kept->second : Json::object();
         company["name"] = c.name;
         company["units"] = c.units;
         company["cost"] = c.cost;

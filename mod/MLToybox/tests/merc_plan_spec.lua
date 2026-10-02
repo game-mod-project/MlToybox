@@ -173,6 +173,15 @@ T.run({
     T.eq(#valid, 3, "three"); T.eq(#skipped, 1, "only the fourth is reported"); T.eq(skipped[1].name, "4", "which one")
     T.truthy(skipped[1].reason:find("more than 3", 1, true), "reason")
   end,
+  validate_treats_a_missing_enabled_key_as_in_use = function()
+    -- 패널과 오버레이는 enabled 키가 없는 정의(손으로 쓴 설정)를 "사용"으로 보여 주고 3개 제한에도 센다.
+    -- 모드만 그것을 쓰지 않으면 화면에는 사용 중인데 고용 창에는 없다
+    local bare = def({ name = "bare" }); bare.enabled = nil
+    local off = def({ name = "off" }); off.enabled = false
+    local valid, skipped = plan.validate({ bare, off }, ctx())
+    T.eq(#valid, 1, "the definition without the key is used"); T.eq(valid[1].name, "bare", "which one")
+    T.eq(#skipped, 0, "an explicit false is simply not in use")
+  end,
   validate_without_a_player_region_skips_everything = function()
     local valid, skipped = plan.validate({ def() }, ctx({ regionKeys = {} }))
     T.eq(#valid, 0, "none"); T.eq(skipped[1].reason, "no player region", "reason")
