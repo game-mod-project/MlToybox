@@ -81,6 +81,27 @@ T.run({
     T.eq(r.active.bad, true, "retry after apply")
     safe.setThreshold(5)
   end,
+  -- 기능이 켜지고 꺼질 때를 알린다(main.lua 가 로그에 한 줄 남긴다). 자동으로 꺼졌으면 이유도 준다
+  activation_changes_are_reported = function()
+    safe.setThreshold(1)
+    local seen = {}
+    local r = registry.new(); local a, bad = fake("a"), fake("bad", { fail = "tick" }); r:add(a); r:add(bad)
+    r.onChange = function(name, active, reason) seen[#seen + 1] = name .. (active and " on" or " off") .. (reason and (" " .. reason) or "") end
+    r:apply({ a = { enabled = true }, bad = { enabled = true } })
+    T.eq(#seen, 0, "nothing in the menu")
+    r:setInGame(true)
+    T.eq(table.concat(seen, "|"), "a on|bad on", "both on")
+    r:tick(1)
+    T.eq(#seen, 3, "the failing one went off"); T.truthy(seen[3]:find("^bad off auto%-disabled"), "with the reason: " .. seen[3])
+    r:apply({ a = { enabled = false } })
+    T.eq(seen[4], "a off", "turned off by the user")
+    r:setInGame(false)
+    T.eq(#seen, 4, "already off: nothing more to report")
+    r.onChange = function() error("reporter broke") end
+    r:apply({ a = { enabled = true } }); r:setInGame(true)
+    T.eq(r.active.a, true, "a failing reporter does not stop the feature")
+    safe.setThreshold(5)
+  end,
   enable_failure_reports_error_and_stays_off = function()
     local r = registry.new(); local a = fake("a", { fail = "enable" }); r:add(a); r:setInGame(true)
     r:apply({ a = { enabled = true } })

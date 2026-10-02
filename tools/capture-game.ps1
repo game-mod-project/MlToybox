@@ -6,7 +6,7 @@
 #   -Key <이름>     보낼 키: Insert, Home, End, F7, F8, F9
 #   -Click <x>,<y>  창 안 좌표에 왼쪽 버튼을 눌렀다 떼는 메시지를 보낸다
 #   -WaitMs <n>     메시지를 보낸 뒤 캡처하기 전에 기다릴 시간
-param([string]$Out, [ValidateSet('Insert', 'Home', 'End', 'F7', 'F8', 'F9')][string]$Key, [int[]]$Click, [int]$WaitMs = 700)
+param([string]$Out, [ValidateSet('Insert', 'Home', 'End', 'F7', 'F8', 'F9')][string]$Key, [int[]]$Click, [switch]$Move, [int]$WaitMs = 700)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 if (-not ('MLToyboxCapture' -as [type])) {
@@ -56,6 +56,10 @@ if ($Key) {
 if ($Click) {
     if ($Click.Count -ne 2) { throw '-Click needs x,y' }
     $pos = [IntPtr](($Click[1] -shl 16) -bor ($Click[0] -band 0xFFFF))
+    if ($Move) {
+        [void][MLToyboxCapture]::PostMessage($hwnd, 0x200, [IntPtr]0, $pos)   # WM_MOUSEMOVE
+        Start-Sleep -Milliseconds 250
+    }
     [void][MLToyboxCapture]::PostMessage($hwnd, 0x201, [IntPtr]1, $pos)   # WM_LBUTTONDOWN (MK_LBUTTON)
     Start-Sleep -Milliseconds 60
     [void][MLToyboxCapture]::PostMessage($hwnd, 0x202, [IntPtr]0, $pos)   # WM_LBUTTONUP

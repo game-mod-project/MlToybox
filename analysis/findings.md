@@ -589,3 +589,35 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 오버레이 자원 탭에 AnimalFeed, Beef, Beetroots, Cabbages, Carrots, Cheese, Chevon, Chicken, Eel, Herbs 등이 150 / 50으로 보였다.
 - 사용자의 설정에는 옛 품목의 목표가 남아 있다. 줄을 숨기기 전 빌드의 캡처에는 `Beer`, `Candle` 줄이 "현재: -"로 보였고, 숨긴 뒤 빌드의 캡처에는 없었다. 확인 뒤 `control.json`은 사본으로 되돌렸다.
 - 확인하지 못한 것: 사용자의 세이브에서 영지 창의 값이 목표대로 바뀌는지, 채운 품목을 게임이 정상으로 소비·거래하는지(다발, 우유처럼 거래 불가로 표시된 품목 포함).
+
+## 자원 이름과 번역 표, 자원 표·로그 탭 (2026-10-02, Steam buildid 24905706)
+사용자 요청: 자원 탭에 한글 이름, 열 너비 조정, 헤더 클릭 정렬, 이름 검색, 분류 구분. 로그 탭 추가. 설계는 `docs/superpowers/specs/2026-10-01-ingame-overlay-design.md` 2.4절(자원, 로그)과 4.6절.
+
+### 이름의 출처를 찾은 과정
+- `FItem.Name`(품목 표의 이름)은 영어 내부 이름이다(`Iron tools`, `Wood`). 한글 이름은 거기에 없다.
+- 게임의 pak에서 직접 읽는 길은 막혀 있다: `Content/Paks/*.pak`의 꼬리 정보를 읽어 보니 pak 버전 11이고 색인이 암호화돼 있다(`bEncryptedIndex = 1`). 키를 구하는 일은 하지 않았다.
+- 객체 덤프(`UE4SS_ObjectDump.txt`)에 번역 표가 있다: `/Game/Translation/HoodedHorse/DT_Translation_<이름>`. 행 구조는 `FLocalizedText`(`en_US`, `zh_CN`, `zh_TW`, `ja_JA`, `ko_KR`, `de_DE`, `es_ES`, `fr_FR`, `pt_BR`, `pl_PL`, `ru_RU` — 모두 `FString`).
+- `tools/lab/translations.lua`로 saveGame_8에서 18개 표를 파일에 적었다(행 수): Items 125, MainUI 649, Military 89, Menus 524, Wiki 93, Upgrades 101, Tutorials 128, BuildingNames 88, BuildingDescriptions 75, Weather_and_Seasons 22, LogEntries 70, UnitTemplates 14, MercenaryCompanies 20, Diplomacy 51, DevelopmentBranches 50, QuestRelated 15, Events_Common 37, Approval 54.
+
+### 측정값
+- **품목 이름**: `DT_Translation_Items`의 행 이름이 `ItemId_<품목 번호>`다(`EItemType` 값. 예: `ItemId_16` = Timber / 목재). 자원 78종 모두 행이 있다.
+- **영지 창 캡처와의 대조**: 사용자가 올린 영지 창 캡처 4장(건설, 식량, 제작 재료, 일용품)에서 67종의 이름을 읽어 두었다(묶음 안에서 품목 번호 순서로 놓여 있었다). 번역 표와 65종이 같았고, 두 종은 캡처를 잘못 읽은 것이었다(표: `밀 낱알`, `호밀 낱알`). 화면의 묶음별 품목 수와 순서가 품목 표의 하위 분류·번호와 모두 맞았다.
+- **군사 11종**(캡처에 없던 것): 창(133), 부무장(177), 장창(178), 전쟁용 활(205), 석궁(206), 소형 방패(270), 대형 방패(271), 갬비슨(163), 사슬 갑옷(164), 헬멧(273), 판금 갑옷(293).
+- **분류 이름**: `DT_Translation_MainUI`의 `resourceGroup_construction` 건설, `resourceGroup_food` 식량, `resourceGroup_crafting` 제작 재료, `resourceGroup_commodities` 일용품, `resourceGroup_military` 군사. 영지 창의 머리글과 같다. `DT_Translation_Items`에도 분류 행(`Material` = 재료 등)이 있는데 영지 창의 글과 다르다(제작 재료가 아니라 재료).
+- **지역 자산**: `MainUI/regional_wealth` = Regional Wealth / 지역 자산. 그동안 문서와 화면에 "지역 재화"라고 적은 것은 게임의 말이 아니었다.
+- **묶음(하위 분류) 이름은 번역 표에 없다**: 목재 작업물, 채집한 상품 같은 글은 위 18개 표 어디에도 없었다(적지 않은 표는 Events_RestoringThePeace, Events_Introduction 둘). 영지 창 캡처에서 읽은 21개를 쓴다. 군사의 묶음 넷은 캡처가 없어 재지 못했다. 열거형 이름(`MeleeWeapons`, `RangedWeapons`, `Shields`, `Armor`)을 게임이 다른 곳에서 쓰는 낱말(근거리, 원거리, 방패, 방어구)로 옮겨 "근거리 무기", "원거리 무기", "방패", "방어구"로 적었다. 게임 화면의 글과 다를 수 있다.
+- 목제 부품(7)은 품목 표의 분류가 제작 재료(3), 하위 분류가 유지보수(3)이고 영지 창에서는 건설의 유지보수 아래에 도구와 나란히 보인다. 이름 표는 영지 창을 따른다(묶음이 놓이는 분류를 묶음마다 적어 둔다).
+
+### 게임 확인 (saveGame_8, 두 번 실행, 매번 저장 없이 종료)
+`feat/resource-table-log-tab`의 빌드를 `deploy.ps1`로 배포하고 18:19와 18:25에 켰다. 화면은 `tools/capture-game.ps1`로 게임 창만 찍었다. 두 번 모두 이벤트 로그에 게임의 Application Error가 없었고, 끝난 뒤 `control.json`과 `overlay.json`은 시작 전과 같았다(해시 비교).
+- 모드가 `bridge/catalog.json`을 썼다: `version = 1`, 79줄, id의 순서가 `status.resourceIds`와 같았다. 두 번째 실행의 파일에서 군사 11종의 이름과 `밀 낱알`, `호밀 낱알`, `지역 자산`을 확인했다.
+- 자원 탭(캡처): 탭 막대에 "로그"가 있고, 표가 자원 / 분류 / 현재 / 목표로 그려졌다. 첫 줄 "지역 자산 · 영지", 이어서 목재·판자(건설 · 목재 작업물), 잔해 돌·다듬은 돌·모르타르(건설 · 석재 작업물), 도구·목제 부품(건설 · 유지보수) … 영지 창의 순서였다. "분류" 헤더에 오름차순 표시, 분류 "전체", "79 / 79".
+- 열 너비: 두 번째 실행은 `overlay.json`에 `resourceColumns = [38, 22, 14, 26]`을 적어 두고 켰다. 캡처에서 첫 열 경계가 첫 실행(기본 30%)보다 오른쪽에 있었고, 실행 뒤에도 파일의 값은 그대로였다(끌지 않으면 다시 적지 않는다).
+- 로그 탭(캡처): `Starting Lua mod 'MLToybox'`, `native: loaded`, `overlay: loaded`, `GameState: …`, `feature resources: on` 등 여섯 기능, 그리고 없는 명령(`logTabCheck`)을 `control.json`으로 보내자 `ERROR command logTabCheck: unknown command: logTabCheck`가 빨간색으로 보였다. "13 / 683줄".
+  - 첫 실행에서는 개발용 `MLToyboxLab`의 줄 둘도 "MLToybox 줄"로 보였다(이름에 MLToybox가 들어 있어서). `[MLToybox]`와 `'MLToybox'`만 모드의 줄로 보도록 고쳤고, 두 번째 실행의 캡처에서는 보이지 않았다.
+- **창 메시지로는 헤더를 누를 수 없었다**: 마우스 이동(`WM_MOUSEMOVE`) 뒤에 버튼 누름·뗌 메시지를 "분류"와 "현재" 헤더 자리에 보냈지만 정렬이 바뀌지 않았다(캡처 두 장이 누르기 전과 같다). 게임 창이 앞에 없을 때 ImGui가 마우스 위치를 받지 않는다는 앞선 측정과 같다. 그래서 군사 줄(표의 맨 아래)은 캡처로 보지 못했다.
+- 확인하지 못한 것(실제 마우스·글쇠가 필요하다): 헤더를 눌러 정렬하기, 열 경계를 끌어 너비 바꾸기와 저장, 분류 고르기, 검색 칸에 한글 치기, 로그 탭의 검색·복사·따라가기, 표를 내려 군사 줄 보기. 이 동작들은 게임 없이 ImGui 프레임을 돌리는 테스트(`overlay_resource_tab_tests.cpp`)로는 확인했다: 헤더 클릭 정렬, 열 끌기 뒤 저장, 저장된 너비로 열기, 검색 뒤 "이 값으로"가 보이는 줄에만 적용, 로그 복사.
+
+### 테스트
+네이티브 178개, .NET·Lua 104개 통과.
+

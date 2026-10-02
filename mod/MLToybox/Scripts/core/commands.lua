@@ -2,7 +2,8 @@
 -- 같은 id 는 한 번만 실행하고, 게임 재시작 후 남아 있던 명령이 다시 실행되지 않도록 오래된 명령(issuedAt)은 무시한다.
 local M = { MAX_RESULTS = 10, MAX_AGE_SEC = 60 }
 
-function M.new(handlers)
+-- onResult(command, result): 명령 하나를 처리할 때마다 한 번 불린다(로그용). 없어도 된다
+function M.new(handlers, onResult)
   local c = { handlers = handlers, done = {}, results = {}, order = {} }
 
   function c:_record(id, result)
@@ -31,6 +32,7 @@ function M.new(handlers)
           result = ok and r or { ok = false, error = tostring(r) }
         end
         self:_record(command.id, result)
+        if onResult then pcall(onResult, command, result) end
       end
     end
   end

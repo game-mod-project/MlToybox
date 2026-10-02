@@ -30,11 +30,17 @@ function M.new()
     return ok
   end
 
+  -- 기능이 켜지거나 꺼졌다고 알린다(r.onChange(name, active, reason). 로그용이고 없어도 된다)
+  function r:_changed(name, active, reason)
+    if self.onChange then pcall(self.onChange, name, active, reason) end
+  end
+
   function r:_activate(name)
     if self:_invoke(name, "enable") then
       self.active[name] = true
       self.errors[name] = nil
       self.lastTick[name] = nil
+      self:_changed(name, true)
     end
   end
 
@@ -43,6 +49,7 @@ function M.new()
       self.active[name] = false
       local fn = self.features[name].disable
       if fn then pcall(fn, self.state, self.settings[name]) end
+      self:_changed(name, false, reason)
     end
     if reason then self.errors[name] = reason end
   end
