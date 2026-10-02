@@ -1,5 +1,7 @@
 #pragma once
 #include "app.h"
+#include <string>
+#include <vector>
 
 // 탭 하나가 파일 하나다. 모두 ImGui 프레임 안에서, App::mutex 를 잡은 채로 불린다.
 // status 는 최신 status.json(없으면 nullptr), inGame 은 게임 안이고 모드가 응답 중일 때 참
@@ -14,12 +16,14 @@ struct TabContext {
 
 void drawLordTab(TabContext& ctx);
 void drawBuildTab(TabContext& ctx);
-void drawUpgradeTab(TabContext& ctx);
 void drawMilitaryTab(TabContext& ctx);
 void drawPopulationTab(TabContext& ctx);
 void drawResourcesTab(TabContext& ctx);
 void drawMercenariesTab(TabContext& ctx);
 void drawStatusTab(TabContext& ctx);
+
+// 탭 막대의 이름들(왼쪽부터)
+std::vector<std::string> tabNames();
 
 // 설정 문서를 바꿨다고 표시한다(작업 스레드가 0.2초 안에 저장한다)
 inline void markDirty(App& a) { a.dirty = true; }
