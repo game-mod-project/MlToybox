@@ -14,6 +14,8 @@ enum class BridgeState { Disconnected, MainMenu, Pending, Applied };
 // 모드는 status.json 을 "지우고 이름 바꾸기"로 쓴다. 삭제 공유 없이 열고 있으면 그 순간 모드의 지우기가 실패한다.
 // (읽는 동안 파일을 잡는 시간은 아주 짧다. 이 성질은 단위 테스트로 재현하지 못해 테스트가 없다)
 std::optional<std::string> readFileShared(const std::filesystem::path& path);
+// 같은 방식으로 열어 offset 부터 끝까지(가장 많이 maxBytes) 읽는다. 자라는 로그 파일을 따라 읽을 때 쓴다
+std::optional<std::string> readFileFrom(const std::filesystem::path& path, unsigned long long offset, size_t maxBytes);
 
 struct LoadedControl {
     ControlDoc doc;
@@ -31,6 +33,10 @@ public:
     std::filesystem::path statusPath() const { return dir_ / L"status.json"; }
     std::filesystem::path settingsPath() const { return dir_ / L"overlay.json"; }
     std::filesystem::path overlayStatusPath() const { return dir_ / L"overlay_status.json"; }
+    // 모드가 시작할 때 쓰는 자원 이름 표(core/resources 의 ResourceCatalog)
+    std::filesystem::path catalogPath() const { return dir_ / L"catalog.json"; }
+    // UE4SS 폴더(Mods 의 위)의 UE4SS.log. bridge 는 <UE4SS>/Mods/MLToybox/bridge 다
+    std::filesystem::path ue4ssLogPath() const { return dir_.parent_path().parent_path().parent_path() / L"UE4SS.log"; }
 
     // 파일이 없거나 깨졌으면 빈 문서
     ControlDoc loadControl() const;

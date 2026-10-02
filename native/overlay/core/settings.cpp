@@ -54,6 +54,13 @@ OverlaySettings parseSettings(std::string_view text) {
     s.startOpen = boolOr(&root, "startOpen", false);
     if (auto tab = optString(&root, "devTab")) s.devTab = *tab;
     s.inputLog = boolOr(&root, "inputLog", false);
+    if (const Json* columns = arrayAt(&root, "resourceColumns"); columns && columns->size() == kResourceColumnCount) {
+        for (const Json& v : *columns) {
+            if (!v.is_number() || !(v.get<double>() > 0.0) || !std::isfinite(v.get<double>())) break;
+            s.resourceColumns.push_back(static_cast<float>(v.get<double>()));
+        }
+        if (s.resourceColumns.size() != kResourceColumnCount) s.resourceColumns.clear();
+    }
     return s;
 }
 
@@ -71,6 +78,11 @@ std::string dumpSettings(const OverlaySettings& s) {
     if (s.devTab.empty()) root["devTab"] = nullptr;
     else root["devTab"] = s.devTab;
     if (s.inputLog) root["inputLog"] = true;   // 켰을 때만 적는다
+    if (s.resourceColumns.size() == kResourceColumnCount) {   // 사용자가 열 너비를 바꿨을 때만 적는다
+        Json columns = Json::array();
+        for (float share : s.resourceColumns) columns.push_back(std::round(static_cast<double>(share) * 10.0) / 10.0);
+        root["resourceColumns"] = std::move(columns);
+    }
     return root.dump(2);
 }
 

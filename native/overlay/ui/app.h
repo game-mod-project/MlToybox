@@ -1,8 +1,11 @@
 #pragma once
 #include "overlay/core/bridge.h"
+#include "overlay/core/log_tail.h"
+#include "overlay/core/resources.h"
 #include "overlay/core/session.h"
 #include "overlay/core/settings.h"
 #include "overlay/core/status_file.h"
+#include "overlay/core/storage.h"
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -25,6 +28,9 @@ struct App : Session {
     std::string clipboardOut;                  // 화면에서 복사한 글. 작업 스레드가 Windows 클립보드에 쓴다
     bool clipboardPending = false;
     std::string clipboardIn;                   // 붙여넣을 글. 작업 스레드가 시스템 클립보드에서 읽어 둔다(글자 칸에 커서가 있는 동안)
+    std::shared_ptr<const ResourceCatalog> catalog;   // 자원 이름 표(bridge/catalog.json). 아직 읽지 못했으면 비어 있다
+    std::shared_ptr<const BuildingCatalog> buildings;   // 저장 용량 표의 건물 목록(같은 파일의 buildings). 없으면 비어 있다
+    std::vector<LogLine> logLines;             // UE4SS.log 의 끝부분(작업 스레드가 1초마다 이어 읽는다)
     std::vector<std::string> inputLines;       // 개발·검증용(inputLog): 창 스레드가 적어 둔 글쇠 메시지. 작업 스레드가 파일에 쓴다
 
     // --- 잠금 없이 읽고 쓴다 ---

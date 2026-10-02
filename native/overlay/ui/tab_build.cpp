@@ -31,6 +31,9 @@ void drawBuildTab(TabContext& ctx) {
         a.control.setUpgrade(u);
         markDirty(a);
     }
+
+    // 저장 용량: 건물의 저장 한도를 바꾸는 기능이라 건설 탭에 둔다. 설정은 따로다(features.storage)
+    drawStorageSection(ctx);
 }
 
 }

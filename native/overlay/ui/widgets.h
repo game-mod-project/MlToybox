@@ -15,7 +15,8 @@ float scaled(float px);
 bool numberField(const char* id, int& value, int min, int max, float width);
 
 // 빈칸을 허용하는 숫자 칸. 빈칸으로 두고 편집을 끝내면 값 없음이 된다(자원 목표: 빈칸 = 관리하지 않음)
-bool optionalNumberField(const char* id, std::optional<int>& value, int min, int max, float width);
+// hint 가 있으면 빈칸일 때 그 글을 흐리게 보여 준다(저장 용량: 게임의 기본값)
+bool optionalNumberField(const char* id, std::optional<int>& value, int min, int max, float width, const char* hint = nullptr);
 
 // 선택지에서 하나 고르기. 고른 줄이 바뀌면 true. index 가 범위를 벗어나 있으면 첫 줄로 맞춘다
 bool comboOptions(const char* id, const std::vector<ScopeOption>& options, int& index, float width);

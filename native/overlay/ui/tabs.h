@@ -21,6 +21,9 @@ void drawPopulationTab(TabContext& ctx);
 void drawResourcesTab(TabContext& ctx);
 void drawMercenariesTab(TabContext& ctx);
 void drawStatusTab(TabContext& ctx);
+void drawLogTab(TabContext& ctx);
+// 건설 탭의 아래쪽: 건물 종류별 저장 용량 표
+void drawStorageSection(TabContext& ctx);
 
 // 탭 막대의 이름들(왼쪽부터)
 std::vector<std::string> tabNames();

@@ -64,4 +64,23 @@ T.run({
     T.eq(d.heartbeat, 123, "heartbeat")
     T.eq(d.inGame, false, "inGame")
   end,
+  -- 오버레이가 자원 표에 쓸 이름 표. 모드가 시작할 때 한 번 쓴다(bridge/catalog.json)
+  write_catalog_for_the_overlay = function()
+    local b = fresh()
+    T.eq(b:writeCatalog({ { id = "Timber", name = "목재", category = "건설", group = "목재 작업물" }, { id = "RegionalWealth", name = "지역 자산", category = "영지" } }), true, "written")
+    local f = assert(io.open(b.dir .. "\\catalog.json", "rb")); local s = f:read("a"); f:close()
+    local d = json.decode(s)
+    T.eq(d.version, 1, "version"); T.eq(#d.resources, 2, "two resources")
+    T.eq(d.resources[1].id, "Timber", "id"); T.eq(d.resources[1].name, "목재", "korean name survives"); T.eq(d.resources[1].group, "목재 작업물", "group")
+    T.eq(d.resources[2].group, nil, "no group")
+  end,
+  -- 저장 용량 표에 쓸 건물 목록도 같은 파일에 쓴다
+  write_catalog_lists_the_buildings_too = function()
+    local b = fresh()
+    T.eq(b:writeCatalog({ { id = "Timber", name = "목재", category = "건설" } }, { { id = "99", name = "대형 창고", generic = 2500, large = 0, pantry = 0 } }), true, "written")
+    local f = assert(io.open(b.dir .. "\\catalog.json", "rb")); local s = f:read("a"); f:close()
+    local d = json.decode(s)
+    T.eq(#d.resources, 1, "resources"); T.eq(#d.buildings, 1, "one building")
+    T.eq(d.buildings[1].id, "99", "id"); T.eq(d.buildings[1].name, "대형 창고", "name"); T.eq(d.buildings[1].generic, 2500, "generic"); T.eq(d.buildings[1].pantry, 0, "pantry")
+  end,
 })

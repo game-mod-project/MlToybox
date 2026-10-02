@@ -19,6 +19,23 @@ public sealed class FeaturesControl
     public MilitaryControl Military { get; set; } = new();
     public MercenariesControl Mercenaries { get; set; } = new();
     public PopulationControl Population { get; set; } = new();
+    public StorageControl Storage { get; set; } = new();
+}
+
+// 건물의 저장 용량(건물 종류별 한도). 게임 안 창의 건설 탭에서 고친다. 패널에는 화면이 없고, 저장할 때 설정을 그대로 남긴다
+public sealed class StorageControl
+{
+    public bool Enabled { get; set; }
+    public int IntervalSec { get; set; } = 5;
+    public Dictionary<string, StorageLimits> Limits { get; set; } = new();   // 키 = 건물 종류 번호
+}
+
+// null = 게임의 값 그대로(키를 쓰지 않음)
+public sealed class StorageLimits
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Generic { get; set; }   // 일반 저장실
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Large { get; set; }     // 목재 저장실
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Pantry { get; set; }    // 식량 저장실
 }
 
 public sealed class PopulationControl

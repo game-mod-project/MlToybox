@@ -41,6 +41,19 @@ T.run({
     T.eq(count(a, "disable") + count(b, "disable"), 2, "both disabled")
     T.eq(r.active.a or r.active.b, false, "none active")
   end,
+  -- 맵을 떠날 때의 disable 은 state.leaving 으로 알 수 있다: 사라질 게임 객체를 되돌려 놓을 필요가 없다(features/storage.lua)
+  disable_can_tell_leaving_the_map_from_being_turned_off = function()
+    local r = registry.new()
+    local seen = {}
+    local a = { name = "a", enable = function() end, disable = function(state) seen[#seen + 1] = state.leaving == true end }
+    r:add(a); r:setInGame(true)
+    r:apply({ a = { enabled = true } }); r:apply({ a = { enabled = false } })
+    r:apply({ a = { enabled = true } }); r:setInGame(false)
+    T.eq(#seen, 2, "disabled twice"); T.eq(seen[1], false, "turned off by the user"); T.eq(seen[2], true, "the map is going away")
+    T.eq(r.state.leaving, nil, "cleared with the rest of the state")
+    r:setInGame(true); r:apply({ a = { enabled = false } })
+    T.eq(seen[3], false, "not leaving in the next map")
+  end,
   reentering_game_reenables = function()
     local r = registry.new(); local a = fake("a"); r:add(a)
     r:apply({ a = { enabled = true } }); r:setInGame(true); r:setInGame(false); r:setInGame(true)
@@ -79,6 +92,27 @@ T.run({
     T.eq(r.active.bad, false, "stays off across maps")
     r:apply({ bad = { enabled = true } })
     T.eq(r.active.bad, true, "retry after apply")
+    safe.setThreshold(5)
+  end,
+  -- 기능이 켜지고 꺼질 때를 알린다(main.lua 가 로그에 한 줄 남긴다). 자동으로 꺼졌으면 이유도 준다
+  activation_changes_are_reported = function()
+    safe.setThreshold(1)
+    local seen = {}
+    local r = registry.new(); local a, bad = fake("a"), fake("bad", { fail = "tick" }); r:add(a); r:add(bad)
+    r.onChange = function(name, active, reason) seen[#seen + 1] = name .. (active and " on" or " off") .. (reason and (" " .. reason) or "") end
+    r:apply({ a = { enabled = true }, bad = { enabled = true } })
+    T.eq(#seen, 0, "nothing in the menu")
+    r:setInGame(true)
+    T.eq(table.concat(seen, "|"), "a on|bad on", "both on")
+    r:tick(1)
+    T.eq(#seen, 3, "the failing one went off"); T.truthy(seen[3]:find("^bad off auto%-disabled"), "with the reason: " .. seen[3])
+    r:apply({ a = { enabled = false } })
+    T.eq(seen[4], "a off", "turned off by the user")
+    r:setInGame(false)
+    T.eq(#seen, 4, "already off: nothing more to report")
+    r.onChange = function() error("reporter broke") end
+    r:apply({ a = { enabled = true } }); r:setInGame(true)
+    T.eq(r.active.a, true, "a failing reporter does not stop the feature")
     safe.setThreshold(5)
   end,
   enable_failure_reports_error_and_stays_off = function()

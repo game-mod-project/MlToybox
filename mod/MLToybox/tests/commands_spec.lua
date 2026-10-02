@@ -61,4 +61,22 @@ T.run({
   status_is_nil_when_empty = function()
     T.eq(runner():status(), nil, "nil avoids [] encoding")
   end,
+  -- 명령을 실행할 때마다 결과를 알린다(main.lua 가 로그에 한 줄 남긴다). 같은 명령은 한 번만 알린다
+  each_result_is_reported_once = function()
+    local seen = {}
+    local c = commands.new({
+      echo = function() return { ok = true } end,
+      boom = function() error("kaboom") end,
+    }, function(command, result) seen[#seen + 1] = command.type .. ":" .. tostring(result.ok) .. ":" .. tostring(result.error ~= nil and result.error:find("kaboom", 1, true) ~= nil) end)
+    local list = { cmd("a"), cmd("e", { type = "boom" }), cmd("old", { issuedAt = 1 }) }
+    c:run(list, { now = 1000 })
+    c:run(list, { now = 1001 })
+    T.eq(#seen, 3, "three results, once each")
+    T.eq(seen[1], "echo:true:false", "ok"); T.eq(seen[2], "boom:false:true", "error text"); T.eq(seen[3], "echo:false:false", "stale")
+  end,
+  a_failing_reporter_does_not_stop_the_commands = function()
+    local c = commands.new({ echo = function() return { ok = true } end }, function() error("reporter broke") end)
+    c:run({ cmd("a"), cmd("b") }, { now = 1000 })
+    T.eq(c:status().a.ok, true, "a ran"); T.eq(c:status().b.ok, true, "b ran")
+  end,
 })
