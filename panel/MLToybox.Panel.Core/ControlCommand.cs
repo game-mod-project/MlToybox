@@ -42,6 +42,16 @@ public sealed class ControlCommand
         IssuedAt = now.ToUnixTimeSeconds(),
     };
 
+    // 모드가 만든 수행원 분대(value = 분대 ID)에 게임의 수행원 꾸미기 화면을 연다. region 은 화면을 열 영주 저택의 영지(없으면 내 첫 영지)
+    public static ControlCommand CustomizeRetinue(int squadId, DateTimeOffset now, string? region = null) => new()
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Type = "customizeRetinue",
+        Value = squadId,
+        Region = region,
+        IssuedAt = now.ToUnixTimeSeconds(),
+    };
+
     // region 이 없으면 빈 자리가 많은 영지부터 들인다
     public static ControlCommand AddFamilies(int count, DateTimeOffset now, string? region = null) => new()
     {
@@ -61,6 +71,30 @@ public sealed class CommandResult
     public int? Reformed { get; set; }
     public int? Requested { get; set; }
     public int? Added { get; set; }
+}
+
+// 모드가 만든 수행원 분대 목록과 지금 꾸미기 화면이 열려 있는 분대
+public sealed class RetinueStatus
+{
+    public List<RetinueSquad>? Squads { get; set; }
+    public int? Editing { get; set; }
+}
+
+public sealed class RetinueSquad
+{
+    public int Id { get; set; }
+    public string Unit { get; set; } = "";
+    public int Count { get; set; }
+    public string Kind { get; set; } = "";   // spawned(병력 생성) | mercenary(커스텀 용병 고용)
+
+    public override string ToString() => Label(this);   // 콤보박스 표시용
+
+    public static string Label(RetinueSquad s)
+    {
+        var unit = UnitCatalog.Units.FirstOrDefault(u => u.Id == s.Unit)?.Label ?? s.Unit;
+        var kind = s.Kind switch { "spawned" => "생성", "mercenary" => "용병", _ => s.Kind };
+        return $"#{s.Id} {unit} ×{s.Count} ({kind})";
+    }
 }
 
 public sealed class SpawnStatus

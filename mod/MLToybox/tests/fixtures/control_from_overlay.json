@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "seq": 7,
+  "features": {
+    "build": {
+      "enabled": true,
+      "ignorePlacement": true,
+      "instantBuild": true,
+      "instantRepair": false,
+      "noMaterials": true,
+      "noRegionLimit": true
+    },
+    "upgrade": {
+      "enabled": true
+    },
+    "lord": {
+      "enabled": true,
+      "intervalSec": 2,
+      "treasury": 150000,
+      "kingsFavour": 0
+    },
+    "military": {
+      "enabled": true,
+      "ignoreEquipment": true,
+      "ignorePopulation": true,
+      "zeroUpkeep": false,
+      "unlimitedSquads": true
+    },
+    "population": {
+      "enabled": true,
+      "multiplier": 3,
+      "targetFamilies": 12,
+      "regionTargets": {
+        "nus": 30
+      }
+    },
+    "resources": {
+      "enabled": true,
+      "intervalSec": 2,
+      "targets": {
+        "Timber": 500
+      },
+      "regionTargets": {
+        "gold": {
+          "Timber": 2000
+        }
+      }
+    },
+    "mercenaries": {
+      "enabled": true,
+      "refund": true,
+      "lockFromAi": true,
+      "companies": [
+        {
+          "name": "토이박스 용병단",
+          "units": [
+            "mercenary_infantry",
+            "mercenary_crossbowmen"
+          ],
+          "cost": 3000,
+          "region": "gold",
+          "banner": "greencaps",
+          "enabled": true
+        },
+        {
+          "name": "예비대",
+          "units": [
+            "militia"
+          ],
+          "cost": 0,
+          "enabled": false
+        }
+      ]
+    }
+  },
+  "commands": [
+    {
+      "id": "0123456789abcdef0123456789abcdef",
+      "type": "setLord",
+      "issuedAt": 1790000000,
+      "key": "influence",
+      "value": 20000
+    },
+    {
+      "id": "fedcba9876543210fedcba9876543210",
+      "type": "spawnSquads",
+      "issuedAt": 1790000000,
+      "unit": "spearMilitia",
+      "count": 2,
+      "region": "nus"
+    }
+  ]
+}

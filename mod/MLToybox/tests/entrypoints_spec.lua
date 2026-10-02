@@ -8,7 +8,7 @@ end
 T.run({
   feature_modules_load_and_follow_contract = function()
     local cfg = dofile(SCRIPTS_DIR .. "/config.lua")
-    T.eq(#cfg.featureModules, 6, "six features")
+    T.eq(#cfg.featureModules, 7, "seven features")
     for _, name in ipairs(cfg.featureModules) do
       local mod = require("features." .. name)
       T.eq(mod.name, name, "name matches module " .. name)
@@ -26,5 +26,6 @@ T.run({
     local cfg = dofile(scriptsPath("config.lua"))
     T.eq(cfg.menuGameModePattern, "MenuGameMode_ML_C", "menu pattern")
     T.eq(type(cfg.featureModules), "table", "featureModules")
+    T.eq(cfg.overlay, true, "overlay on by default")
   end,
 })

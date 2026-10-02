@@ -69,6 +69,11 @@ function M.reform(command, ctx)
   if not ctx.inGame then return { ok = false, error = "not in game" } end
   local pawn, engine = game.pawn(), game.engine()
   if not pawn or not engine then return { ok = false, error = "game objects not ready" } end
+  -- 앞선 재구성의 유령이 아직 배열에 남아 있으면(제거 대기 중이거나, 제거를 요청했지만 게임이 배열을 줄이기 전)
+  -- 그 유령을 다시 세어 같은 분대를 또 만들게 된다. 연달아 온 명령은 거절한다
+  if #reform.pending > 0 or (reform.awaitBelow and #engine.squads >= reform.awaitBelow) then
+    return { ok = false, error = "reform already in progress" }
+  end
   local ghosts = M.ghosts(pawn, engine)
   if #ghosts == 0 then return { ok = false, error = "no disbanded spawned squads" } end
   local loc = game.anchorLocation(command.region)

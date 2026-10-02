@@ -206,6 +206,20 @@ T.run({
     spawn.tick(true)
     T.eq(removed[2], 40, "second reform removes its ghost"); T.eq(spawn.pendingRemovals(), 0, "done")
   end,
+  reform_is_refused_while_earlier_ghosts_are_still_being_removed = function()
+    -- "재구성"을 연달아 누르면 명령이 여러 개 온다. 유령은 틱마다 하나씩 지워지므로 다음 명령 때도 배열에 남아 있고,
+    -- 그것을 다시 세면 누른 횟수만큼 새 분대가 생긴다(2026-10-02 사용자 확인에서 발견)
+    local calls, pawn, removed, engine = reformSetup(function(p) return { squad(40, p, { unit = "retinue_tier1" }) } end)
+    T.eq(spawn.reform({}, IN_GAME).ok, true, "first")
+    local again = spawn.reform({}, IN_GAME)                                         -- 같은 틱에 온 두 번째 명령
+    T.eq(again.ok, false, "second refused"); T.eq(again.error, "reform already in progress", "reason")
+    T.eq(#calls, 1, "spawned once"); T.eq(spawn.pendingRemovals(), 1, "still one removal queued")
+
+    engine.squads[#engine.squads + 1] = squad(41, pawn, { unit = "retinue_tier1", units = { 1 }, recruits = { 1 } })
+    spawn.tick(true)                                                                -- 제거를 요청했지만 게임이 아직 배열을 줄이지 않았다
+    T.eq(removed[1], 40, "removal requested"); T.eq(spawn.pendingRemovals(), 0, "queue empty")
+    T.eq(spawn.reform({}, IN_GAME).ok, false, "refused until the game drops the ghost"); T.eq(#calls, 1, "still once")
+  end,
   tick_clears_pending_when_leaving_game = function()
     reformSetup(function(p) return { squad(40, p, { unit = "retinue_tier1" }) } end)
     spawn.reform({}, IN_GAME)
