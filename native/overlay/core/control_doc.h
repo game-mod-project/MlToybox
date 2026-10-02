@@ -68,6 +68,23 @@ struct MercCompany {
     bool operator==(const MercCompany&) const = default;
 };
 
+// 건물 종류 하나의 저장 한도. 값이 없는 분류는 게임의 값을 그대로 둔다
+struct StorageLimits {
+    std::optional<int> generic;   // 일반 저장실
+    std::optional<int> large;     // 목재 저장실
+    std::optional<int> pantry;    // 식량 저장실
+
+    bool empty() const { return !generic && !large && !pantry; }
+    bool operator==(const StorageLimits&) const = default;
+};
+
+// 건물의 저장 용량. 패널에는 화면이 없고 설정만 보존한다(Panel.Core 의 StorageControl)
+struct StorageSettings {
+    bool enabled = false;
+    int intervalSec = 5;
+    std::map<std::string, StorageLimits> limits;   // 키 = 건물 종류 번호(게임의 건물 표의 행 이름)
+};
+
 struct MercSettings {
     bool enabled = false;
     bool refund = true;       // 내 용병단 고용비 환급 + 유지비 0
@@ -101,6 +118,8 @@ public:
     void setResources(const ResourcesSettings& v);
     MercSettings mercenaries() const;
     void setMercenaries(const MercSettings& v);
+    StorageSettings storage() const;
+    void setStorage(const StorageSettings& v);
 
     void setCommands(const std::vector<Json>& commands);
 

@@ -213,6 +213,12 @@ TEST(overlay_fixture_for_the_lua_spec_matches_core_output) {
         { longest, { "militia" }, 10, std::nullopt, std::nullopt, true },
     };
     doc.setMercenaries(mercenaries);
+    StorageSettings storage;
+    storage.enabled = true;
+    storage.limits["99"].generic = 5000;
+    storage.limits["69"].generic = 3000;
+    storage.limits["69"].pantry = 6000;
+    doc.setStorage(storage);
     Json command = makeSetLord("influence", 20000, 1790000000);
     command["id"] = "0123456789abcdef0123456789abcdef";
     Json spawn = makeSpawnSquads("spearMilitia", 2, 1790000000, "nus");

@@ -332,6 +332,41 @@ void ControlDoc::setMercenaries(const MercSettings& v) {
     f["companies"] = std::move(companies);
 }
 
+StorageSettings ControlDoc::storage() const {
+    const Json* f = findFeature("storage");
+    StorageSettings v;
+    v.enabled = boolOr(f, "enabled", false);
+    v.intervalSec = intOr(f, "intervalSec", 5);
+    if (const Json* limits = objectAt(f, "limits")) {
+        for (auto it = limits->begin(); it != limits->end(); ++it) {
+            if (!it.value().is_object()) continue;   // 손으로 고친 설정의 이상한 항목은 건너뛴다
+            const std::map<std::string, int> values = readIntMap(&it.value());
+            StorageLimits entry;
+            if (auto found = values.find("generic"); found != values.end()) entry.generic = found->second;
+            if (auto found = values.find("large"); found != values.end()) entry.large = found->second;
+            if (auto found = values.find("pantry"); found != values.end()) entry.pantry = found->second;
+            if (!entry.empty()) v.limits[it.key()] = entry;
+        }
+    }
+    return v;
+}
+
+void ControlDoc::setStorage(const StorageSettings& v) {
+    Json& f = feature("storage");
+    f["enabled"] = v.enabled;
+    f["intervalSec"] = v.intervalSec;
+    Json limits = Json::object();
+    for (const auto& [id, entry] : v.limits) {
+        if (entry.empty()) continue;   // 값이 하나도 없으면 그 건물은 쓰지 않는다
+        Json item = Json::object();
+        setOptional(item, "generic", entry.generic);
+        setOptional(item, "large", entry.large);
+        setOptional(item, "pantry", entry.pantry);
+        limits[id] = std::move(item);
+    }
+    f["limits"] = std::move(limits);
+}
+
 void ControlDoc::setCommands(const std::vector<Json>& commands) {
     Json list = Json::array();
     for (const auto& c : commands) list.push_back(c);
