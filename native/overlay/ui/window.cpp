@@ -16,12 +16,11 @@ struct Tab {
     const char* name;
     void (*draw)(TabContext&);
 };
-// 패널과 같은 이름·순서
+// 패널과 같은 이름·순서. 다만 패널의 "업그레이드" 탭은 건설 탭 안에 있다(건물 기능이라 합쳤다)
 const Tab kTabs[] = {
     { "자원", drawResourcesTab },
     { "영주", drawLordTab },
     { "건설", drawBuildTab },
-    { "업그레이드", drawUpgradeTab },
     { "군사", drawMilitaryTab },
     { "용병", drawMercenariesTab },
     { "인구", drawPopulationTab },
@@ -114,6 +113,12 @@ void drawMainWindow(App& a) {
     ImGui::End();
     if (!open) a.visible = false;
 }
+}
+
+std::vector<std::string> tabNames() {
+    std::vector<std::string> names;
+    for (const Tab& tab : kTabs) names.emplace_back(tab.name);
+    return names;
 }
 
 void notifyOverlayReady() {
