@@ -185,3 +185,35 @@ TEST(overlay_resource_column_shares_are_percentages_of_the_table_width) {
     CHECK(columnSharesDiffer({ 30.0f, 20.0f, 10.0f, 40.0f }, columnShares({ 400.0f, 100.0f, 100.0f, 400.0f })));
     CHECK(columnSharesDiffer({ 30.0f, 70.0f }, { 30.0f, 20.0f, 50.0f }));
 }
+
+// 영지 목표는 공통 목표보다 우선한다. 공통 범위의 표에서는 그 사실이 보이지 않아, 공통 목표를 바꿔도 왜 그대로인지 알 수 없었다
+// (사용자 확인 2026-10-02: 지역 자산의 공통 목표를 5000 으로 올려도 그대로. 그 영지에 영지 목표 1000 이 있었다)
+TEST(overlay_resource_region_overrides_name_the_regions_that_ignore_the_common_target) {
+    auto s = parseStatus(R"({"heartbeat":1,"inGame":true,"resourceIds":["RegionalWealth","Timber"],
+        "regions":[{"key":"sel","name":"Altbruch","values":{}},{"key":"gold","name":"Mandlach","values":{}}]})");
+    CHECK(s.has_value());
+    ResourcesSettings r;
+    r.targets = { { "RegionalWealth", 5000 } };
+    r.regionTargets["sel"] = { { "RegionalWealth", 1000 }, { "Timber", 1000 } };
+    r.regionTargets["gold"] = { { "Timber", 0 } };
+    r.regionTargets["hof"] = { { "RegionalWealth", 600 } };   // 이 세이브에 없는 영지
+    const auto overrides = regionOverrides(&*s, r);
+    CHECK(overrides.size() == 2);
+    CHECK(overrides.at("RegionalWealth") == (std::vector<RegionOverride>{ { "sel", "Altbruch", 1000 } }));
+    CHECK(overrides.at("Timber") == (std::vector<RegionOverride>{ { "sel", "Altbruch", 1000 }, { "gold", "Mandlach", 0 } }));
+    CHECK(regionOverrideText(overrides.at("Timber")) == "Altbruch (sel): 1000\nMandlach (gold): 0");
+    // 게임 밖(영지 목록을 모른다): 설정에 있는 영지를 키로 적는다
+    const auto offline = regionOverrides(nullptr, r);
+    CHECK(offline.at("RegionalWealth").size() == 2 && offline.at("RegionalWealth")[0].key == "hof" && offline.at("RegionalWealth")[0].name == "hof");
+    CHECK(regionOverrides(&*s, ResourcesSettings()).empty());
+}
+
+// "지우기": 보이는 줄의 목표를 지운다. 추리지 않았으면 그 범위의 목표를 모두 지운다(표에 보이지 않는 옛 자원의 목표까지)
+TEST(overlay_resource_clear_removes_shown_targets_or_everything_when_unfiltered) {
+    const std::map<std::string, int> targets = { { "Timber", 500 }, { "Beef", 1000 }, { "Pork", 20 }, { "Beer", 600 } };
+    std::vector<ResourceRow> shown(2);
+    shown[0].id = "Beef";
+    shown[1].id = "Pork";
+    CHECK(clearedTargets(targets, shown, true) == (std::map<std::string, int>{ { "Timber", 500 }, { "Beer", 600 } }));
+    CHECK(clearedTargets(targets, shown, false).empty());
+}

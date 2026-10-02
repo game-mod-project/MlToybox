@@ -192,6 +192,37 @@ void ResourceOrder::arrange(std::vector<ResourceRow>& rows, ResourceColumn colum
     for (const ResourceRow& row : rows) ids_.push_back(row.id);
 }
 
+std::map<std::string, std::vector<RegionOverride>> regionOverrides(const StatusDoc* status, const ResourcesSettings& settings) {
+    std::vector<std::pair<std::string, std::string>> regions;   // 키와 이름
+    if (status && status->regions) {
+        for (const RegionResources& r : *status->regions) regions.emplace_back(r.key, r.name);
+    } else {
+        for (const auto& entry : settings.regionTargets) regions.emplace_back(entry.first, entry.first);
+    }
+    std::map<std::string, std::vector<RegionOverride>> out;
+    for (const auto& [key, name] : regions) {
+        auto it = settings.regionTargets.find(key);
+        if (it == settings.regionTargets.end()) continue;
+        for (const auto& [id, target] : it->second) out[id].push_back({ key, name, target });
+    }
+    return out;
+}
+
+std::string regionOverrideText(const std::vector<RegionOverride>& overrides) {
+    std::string text;
+    for (const RegionOverride& o : overrides) {
+        if (!text.empty()) text += '\n';
+        text += (o.name == o.key ? o.key : regionLabel(o.name, o.key)) + ": " + std::to_string(o.target);
+    }
+    return text;
+}
+
+std::map<std::string, int> clearedTargets(std::map<std::string, int> targets, const std::vector<ResourceRow>& shown, bool filtered) {
+    if (!filtered) return {};
+    for (const ResourceRow& row : shown) targets.erase(row.id);
+    return targets;
+}
+
 std::vector<float> columnShares(const std::vector<float>& widths) {
     float total = 0.0f;
     for (float w : widths) {

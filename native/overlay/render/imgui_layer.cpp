@@ -2,6 +2,7 @@
 #include "input.h"
 #include "overlay/ui/clipboard_sync.h"
 #include "overlay/ui/app.h"
+#include "overlay/ui/window.h"
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
 #include <imgui_impl_win32.h>
@@ -71,6 +72,7 @@ bool initImGuiContext(HWND hwnd, std::string& err) {
     // 시스템 IME 는 쓰지 않는다(게임 창의 IME 는 꺼진 채로 둔다. 한글은 core/hangul 의 조합기가 만든다).
     // 복사·붙여넣기는 App 에 적어 둔 글로 하고, Windows 의 클립보드 함수는 작업 스레드가 부른다(ui/clipboard_sync)
     ImGui::GetPlatformIO().Platform_SetImeDataFn = nullptr;
+    configureOverlayInput();
     installClipboardCallbacks();
     return true;
 }
