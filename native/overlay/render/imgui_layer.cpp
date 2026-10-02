@@ -1,5 +1,6 @@
 #include "imgui_layer.h"
 #include "input.h"
+#include "overlay/ui/clipboard_sync.h"
 #include "overlay/ui/app.h"
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
@@ -67,16 +68,10 @@ bool initImGuiContext(HWND hwnd, std::string& err) {
         return false;
     }
 
-    // 프레임 안에서(화면 스레드가 ImGui 잠금과 App::mutex 를 쥔 채) 불린다. 여기서는 적어 두기만 하고,
-    // Windows 의 클립보드 함수는 작업 스레드가 부른다.
-    // 시스템 IME 는 쓰지 않는다(게임 창의 IME 는 꺼진 채로 둔다. 한글은 core/hangul 의 조합기가 만든다)
-    ImGuiPlatformIO& platform = ImGui::GetPlatformIO();
-    platform.Platform_SetImeDataFn = nullptr;
-    platform.Platform_SetClipboardTextFn = [](ImGuiContext*, const char* text) {
-        App& a = app();
-        a.clipboardOut = text ? text : "";
-        a.clipboardPending = true;
-    };
+    // 시스템 IME 는 쓰지 않는다(게임 창의 IME 는 꺼진 채로 둔다. 한글은 core/hangul 의 조합기가 만든다).
+    // 복사·붙여넣기는 App 에 적어 둔 글로 하고, Windows 의 클립보드 함수는 작업 스레드가 부른다(ui/clipboard_sync)
+    ImGui::GetPlatformIO().Platform_SetImeDataFn = nullptr;
+    installClipboardCallbacks();
     return true;
 }
 

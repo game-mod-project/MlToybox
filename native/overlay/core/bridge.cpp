@@ -58,6 +58,9 @@ std::optional<long long> Bridge::peekSeq() const {
 std::optional<long long> Bridge::saveControl(ControlDoc& doc) const {
     std::error_code ec;
     std::filesystem::create_directories(dir_, ec);
+    // 읽을 수 없는 파일(손으로 고치다 문법을 틀린 것)은 사본을 남긴 뒤에만 덮는다. 사본을 못 남기면 저장하지 않는다.
+    // 시작할 때뿐 아니라 게임 중에 밖에서 깨진 경우에도 여기서 걸린다
+    if (loadControlChecked().unreadable && !backupControl()) return std::nullopt;
     const long long previous = doc.seq();
     const long long next = std::max(peekSeq().value_or(0), previous) + 1;
     doc.setSeq(next);

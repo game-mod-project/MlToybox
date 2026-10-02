@@ -1,5 +1,5 @@
 #include "worker.h"
-#include "overlay/render/clipboard.h"
+#include "overlay/ui/clipboard_sync.h"
 #include "overlay/render/dx12_hook.h"
 #include "overlay/ui/app.h"
 #include "runtime.h"
@@ -91,18 +91,6 @@ static void reloadSettingsIfChangedOutside(App& a, const Bridge& bridge, std::fi
     if (a.settings.startOpen) a.visible = true;
 }
 
-// 화면에서 복사한 글을 Windows 클립보드에 쓴다(잠금 밖에서)
-static void flushClipboard(App& a) {
-    std::string text;
-    {
-        std::lock_guard<std::mutex> lock(a.mutex);
-        if (!a.clipboardPending) return;
-        a.clipboardPending = false;
-        text.swap(a.clipboardOut);
-    }
-    writeClipboardText(text);
-}
-
 // 개발·검증용(overlay.json 의 inputLog): 창 스레드가 적어 둔 글쇠 메시지를 bridge/overlay_input.log 에 덧붙인다
 static void flushInputLog(App& a, const Bridge& bridge) {
     std::vector<std::string> lines;
@@ -158,11 +146,12 @@ void runOverlayWorker(void* selfModule) {
         disableOverlay("hook setup failed: " + err);
     }
 
+    ClipboardSync clipboard(systemClipboard());   // 복사한 글을 쓰고, 붙여넣을 글을 읽어 둔다
     unsigned saveRetryAt = 0;
     for (unsigned tick = 0;; ++tick) {
         // 이 스레드가 예외로 끝나면 저장이 조용히 멈춘다. 그 회차만 건너뛰고 계속한다
         try {
-            flushClipboard(a);
+            clipboard.tick(a);
             flushInputLog(a, bridge);
             if (tick % 2 == 0 && tick >= saveRetryAt) {            // 0.2초마다. 실패했으면 1초 뒤에 다시 한다
                 if (!saveControlIfDirty(a, bridge)) saveRetryAt = tick + 10;

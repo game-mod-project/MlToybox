@@ -6,7 +6,8 @@ void HintTimer::onReady(unsigned long long nowMs) {
     until_ = nowMs + kShowMs;
 }
 
-void HintTimer::update(bool inGame, unsigned long long nowMs) {
+void HintTimer::update(bool connected, bool inGame, unsigned long long nowMs) {
+    if (!connected) return;
     if (inGame && !wasInGame_) until_ = nowMs + kShowMs;
     wasInGame_ = inGame;
 }

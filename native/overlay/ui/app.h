@@ -24,6 +24,7 @@ struct App : Session {
     std::string reason;                        // state 가 Disabled 일 때의 이유
     std::string clipboardOut;                  // 화면에서 복사한 글. 작업 스레드가 Windows 클립보드에 쓴다
     bool clipboardPending = false;
+    std::string clipboardIn;                   // 붙여넣을 글. 작업 스레드가 시스템 클립보드에서 읽어 둔다(글자 칸에 커서가 있는 동안)
     std::vector<std::string> inputLines;       // 개발·검증용(inputLog): 창 스레드가 적어 둔 글쇠 메시지. 작업 스레드가 파일에 쓴다
 
     // --- 잠금 없이 읽고 쓴다 ---

@@ -26,12 +26,13 @@ local function reasonFor(name, c, ctx, seen)
   return nil
 end
 
--- 사용 중(enabled)인 정의만 본다. 통과한 것은 최대 MAX_SLOTS 개, 나머지는 이유와 함께 skipped 로 돌려준다
+-- 사용 중(enabled)인 정의만 본다. enabled 키가 없으면 사용으로 본다(패널과 오버레이가 그렇게 읽고 3개 제한에도 센다).
+-- 통과한 것은 최대 MAX_SLOTS 개, 나머지는 이유와 함께 skipped 로 돌려준다
 function M.validate(companies, ctx)
   local valid, skipped, seen = {}, {}, {}
   if type(companies) ~= "table" then return valid, skipped end
   for _, c in ipairs(companies) do
-    if type(c) == "table" and c.enabled == true then
+    if type(c) == "table" and c.enabled ~= false then
       local name = type(c.name) == "string" and trim(c.name) or ""
       local reason = reasonFor(name, c, ctx, seen)
       if not reason and #valid >= M.MAX_SLOTS then reason = "more than " .. M.MAX_SLOTS .. " enabled companies" end

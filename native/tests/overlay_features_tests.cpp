@@ -40,6 +40,39 @@ TEST(overlay_features_read_a_file_written_by_the_panel) {
     CHECK(c.region == "nus" && c.banner == "battle_brothers" && c.enabled);
 }
 
+// 이 세이브에 없는 영지(sel, hof)의 목표는 공통 목표를 고쳐 저장해도 남는다(패널이 쓴 파일로 확인)
+TEST(overlay_features_targets_of_regions_not_in_this_save_survive_an_edit) {
+    ControlDoc doc = panelFixture();
+    ResourcesSettings r = doc.resources();
+    r.targets["Ale"] = 777;
+    doc.setResources(r);
+    const auto again = ControlDoc::tryParse(doc.dump());
+    CHECK(again.has_value());
+    const ResourcesSettings r2 = again->resources();
+    CHECK(r2.targets.at("Ale") == 777 && r2.regionTargets.size() == 2);
+    CHECK(r2.regionTargets.at("sel").at("Ale") == 1000 && r2.regionTargets.at("hof").at("Barley") == 600);
+}
+
+// 용병단 항목 안의 모르는 키(다음 판의 패널이나 손 편집이 넣은 것)는 그 용병단을 고쳐 써도 남는다
+TEST(overlay_features_mercenary_items_keep_their_unknown_keys) {
+    auto doc = ControlDoc::tryParse(R"({"version":1,"seq":3,"features":{"mercenaries":{"enabled":true,"companies":[
+        {"name":"가","units":["militia"],"cost":1,"enabled":true,"note":"keep me","tags":[1,2]},
+        {"name":"나","units":["militia"],"cost":2,"enabled":true,"note":"leaves with its company"}]}},"commands":[]})");
+    CHECK(doc.has_value());
+    MercSettings m = doc->mercenaries();
+    CHECK(m.companies.size() == 2);
+    m.companies[0].cost = 500;                                                               // 고친다
+    m.companies.erase(m.companies.begin() + 1);                                              // 지운다
+    m.companies.push_back({ "다", { "militia" }, 3, std::nullopt, std::nullopt, true });     // 새로 넣는다
+    doc->setMercenaries(m);
+    const Json root = Json::parse(doc->dump());
+    const Json& items = root["features"]["mercenaries"]["companies"];
+    CHECK(items.size() == 2);
+    CHECK(items[0]["name"] == "가" && items[0]["cost"] == 500 && items[0]["note"] == "keep me" && items[0]["tags"].size() == 2);
+    CHECK(items[1]["name"] == "다" && !items[1].contains("note"));
+    CHECK(doc->mercenaries().companies[0].cost == 500);
+}
+
 TEST(overlay_features_population_and_resources_round_trip) {
     ControlDoc doc;
     PopulationSettings p;

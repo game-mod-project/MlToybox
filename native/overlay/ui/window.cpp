@@ -123,7 +123,7 @@ void notifyOverlayReady() {
 bool overlayWantsFrame(App& a) {
     // 게임(맵)에 들어간 순간에도 안내를 띄운다. 그리기 시작할 때의 안내는 검은 시작 화면에 떠서 보기 어렵다
     const BridgeState state = Bridge::evaluate(a.status.get(), a.lastSentSeq, nowEpochSeconds());
-    g_hint.update(state == BridgeState::Applied || state == BridgeState::Pending, GetTickCount64());
+    g_hint.update(state != BridgeState::Disconnected, state == BridgeState::Applied || state == BridgeState::Pending, GetTickCount64());
     return a.visible.load() || hintActive();
 }
 

@@ -143,6 +143,25 @@ TEST(overlay_bridge_tells_an_unreadable_control_file_from_a_missing_one) {
     CHECK(!good.unreadable && good.doc.seq() == 9 && good.doc.build().enabled);
 }
 
+// 저장은 읽을 수 없는 control.json 을 사본 없이 덮지 않는다. 시작할 때뿐 아니라 게임 중에 파일이 깨진 경우에도 같다
+TEST(overlay_bridge_save_keeps_a_copy_of_an_unreadable_file_or_does_not_save) {
+    Bridge b(freshDir("guard"));
+    writeText(b.controlPath(), "{ broken");
+    fs::create_directories(b.controlBackupPath());                   // 사본을 쓸 자리가 막혀 있다(같은 이름의 폴더)
+    ControlDoc doc;
+    CHECK(!b.saveControl(doc).has_value());                          // 사본을 못 남기면 덮지 않는다
+    CHECK(readFileShared(b.controlPath()) == "{ broken" && doc.seq() == 0);
+    fs::remove(b.controlBackupPath());
+    CHECK(b.saveControl(doc) == 1);
+    CHECK(readFileShared(b.controlBackupPath()) == "{ broken");      // 덮기 전의 내용이 사본에 있다
+    CHECK(b.peekSeq() == 1);
+    writeText(b.controlPath(), "broken again");                      // 게임 중에 밖에서 깨졌다
+    CHECK(b.saveControl(doc) == 2);
+    CHECK(readFileShared(b.controlBackupPath()) == "broken again");
+    CHECK(b.saveControl(doc) == 3);                                  // 읽을 수 있는 파일은 사본을 건드리지 않는다
+    CHECK(readFileShared(b.controlBackupPath()) == "broken again");
+}
+
 TEST(overlay_bridge_shared_read_returns_the_bytes_or_nothing) {
     Bridge b(freshDir("shared"));
     CHECK(!readFileShared(b.statusPath()).has_value());
@@ -186,9 +205,12 @@ TEST(overlay_fixture_for_the_lua_spec_matches_core_output) {
     doc.setResources(resources);
     MercSettings mercenaries;
     mercenaries.enabled = true;
+    std::string longest;                                       // 받아 주는 가장 긴 이름: 한글 40자(120바이트)
+    for (int i = 0; i < 40; ++i) longest += "가";
     mercenaries.companies = {
         { "토이박스 용병단", { "mercenary_infantry", "mercenary_crossbowmen" }, 3000, "gold", "greencaps", true },
         { "예비대", { "militia" }, 0, std::nullopt, std::nullopt, false },
+        { longest, { "militia" }, 10, std::nullopt, std::nullopt, true },
     };
     doc.setMercenaries(mercenaries);
     Json command = makeSetLord("influence", 20000, 1790000000);
