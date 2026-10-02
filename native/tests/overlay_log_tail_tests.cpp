@@ -98,6 +98,18 @@ TEST(overlay_log_tail_starts_over_when_the_file_was_replaced) {
     CHECK(texts(tail.lines()) == (std::vector<std::string>{ "new one" }));
 }
 
+// 줄바꿈 없이 길게 이어지는 글은 줄로 보지 않고 버린다(끝나지 않는 줄을 한없이 쌓아 두지 않는다)
+TEST(overlay_log_tail_drops_a_line_that_never_ends) {
+    const auto path = tempLog("endless.log");
+    append(path, "first\n" + std::string(70000, 'x'));
+    LogTail tail;
+    CHECK(tail.poll(path));
+    CHECK(texts(tail.lines()) == (std::vector<std::string>{ "first" }));
+    append(path, "tail of the long one\nnext\n");
+    CHECK(tail.poll(path));
+    CHECK(texts(tail.lines()) == (std::vector<std::string>{ "first", "next" }));
+}
+
 TEST(overlay_log_filter_by_owner_and_search) {
     const std::vector<LogLine> lines = {
         parseLogLine("[2026-10-02 17:28:08.1] UE4SS - v3.0.1"),

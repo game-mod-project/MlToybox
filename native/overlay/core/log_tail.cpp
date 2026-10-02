@@ -7,6 +7,7 @@ namespace mlt::ov {
 
 namespace {
 constexpr size_t kChunk = 1024 * 1024;   // 한 번에 읽는 가장 큰 크기. 더 남았으면 다음 회차에 이어 읽는다
+constexpr size_t kMaxLine = 64 * 1024;   // 이보다 길게 줄바꿈이 없으면 줄로 보지 않는다
 constexpr std::string_view kModPrefix = "[Lua] [MLToybox] ";
 
 bool isDigit(char c) {
@@ -81,6 +82,10 @@ bool LogTail::poll(const std::filesystem::path& path) {
         changed = true;
     }
     partial_.erase(0, begin);
+    if (partial_.size() > kMaxLine) {   // 줄바꿈 없이 이어지는 글. 버리고, 그 줄의 나머지도 줄바꿈까지 건너뛴다
+        partial_.clear();
+        skipFirst_ = true;
+    }
     if (lines_.size() > maxLines_) lines_.erase(lines_.begin(), lines_.end() - static_cast<std::ptrdiff_t>(maxLines_));
     return changed;
 }

@@ -4,6 +4,9 @@
 -- 출처: 표는 tools/lab/items.lua 로 읽어 tests/fixtures/dt_items.tsv 에 두었다(2026-10-02, Steam buildid 24905706).
 -- 이름은 CXXHeaderDump/ManorLords_enums.hpp 의 enum class EItemType. tests/resources_catalog_spec.lua 가 이 목록과 표를 맞춰 본다.
 -- 순서는 영지 창의 순서다: 분류, 그 안의 묶음(EItemSubcategory), 묶음 안에서는 품목 번호. sub 는 묶음 번호, name 은 게임의 한글 이름.
+-- 이름의 출처: 품목과 분류는 게임의 번역 표(tests/fixtures/dt_translations.tsv. 품목은 DT_Translation_Items 의 ItemId_<번호>,
+-- 분류는 DT_Translation_MainUI 의 resourceGroup_*). 묶음은 번역 표에 없어 영지 창 화면(사용자 캡처)에서 읽었다.
+-- 군사의 묶음 넷(근거리 무기, 원거리 무기, 방패, 방어구)은 화면에서도 재지 못해 열거형 이름을 게임이 쓰는 낱말로 옮긴 것이다.
 -- 게임이 업데이트되면 표를 다시 읽어 견본을 바꾸고, 스펙이 알려 주는 대로 여기를 고친다.
 local M = {}
 
@@ -19,7 +22,7 @@ M.groups = {
   [8] = { name = "채집한 상품", category = 2 }, [6] = { name = "고기", category = 2 }, [12] = { name = "물고기", category = 2 }, [5] = { name = "채소", category = 2 }, [9] = { name = "과일", category = 2 }, [7] = { name = "곡물", category = 2 }, [10] = { name = "동물 생산물", category = 2 },
   [13] = { name = "원재료", category = 3 }, [18] = { name = "작물", category = 3 }, [15] = { name = "광물", category = 3 }, [14] = { name = "섬유", category = 3 }, [16] = { name = "금속 작업물", category = 3 },
   [17] = { name = "연료", category = 4 }, [19] = { name = "의류", category = 4 }, [20] = { name = "신발", category = 4 }, [21] = { name = "음료", category = 4 }, [28] = { name = "사료", category = 4 },
-  [22] = { name = "MeleeWeapons", category = 6 }, [23] = { name = "RangedWeapons", category = 6 }, [24] = { name = "Shields", category = 6 }, [25] = { name = "Armor", category = 6 },
+  [22] = { name = "근거리 무기", category = 6 }, [23] = { name = "원거리 무기", category = 6 }, [24] = { name = "방패", category = 6 }, [25] = { name = "방어구", category = 6 },
 }
 
 M.items = {
@@ -49,10 +52,10 @@ M.items = {
   { id = "Ale", type = 28, sub = 21, name = "맥주" }, { id = "mead", type = 325, sub = 21, name = "벌꿀주" }, { id = "cider", type = 327, sub = 21, name = "사이더" },   -- 음료
   { id = "AnimalFeed", type = 351, sub = 28, name = "동물 사료" },   -- 사료
   -- 군사
-  { id = "spears", type = 133, sub = 22, name = "창" }, { id = "weapons_sidearms", type = 177, sub = 22, name = "부무장" }, { id = "weapons_polearms", type = 178, sub = 22, name = "장창" },   -- MeleeWeapons
-  { id = "warbows", type = 205, sub = 23, name = "전쟁용 활" }, { id = "crossbows", type = 206, sub = 23, name = "석궁" },   -- RangedWeapons
-  { id = "shields_small", type = 270, sub = 24, name = "소형 방패" }, { id = "shields_large", type = 271, sub = 24, name = "대형 방패" },   -- Shields
-  { id = "gambesons", type = 163, sub = 25, name = "갬비슨" }, { id = "mail_armor", type = 164, sub = 25, name = "사슬 갑옷" }, { id = "militia_helmets_resource", type = 273, sub = 25, name = "헬멧" }, { id = "PlateArmor", type = 293, sub = 25, name = "판금 갑옷" },   -- Armor
+  { id = "spears", type = 133, sub = 22, name = "창" }, { id = "weapons_sidearms", type = 177, sub = 22, name = "부무장" }, { id = "weapons_polearms", type = 178, sub = 22, name = "장창" },   -- 근거리 무기
+  { id = "warbows", type = 205, sub = 23, name = "전쟁용 활" }, { id = "crossbows", type = 206, sub = 23, name = "석궁" },   -- 원거리 무기
+  { id = "shields_small", type = 270, sub = 24, name = "소형 방패" }, { id = "shields_large", type = 271, sub = 24, name = "대형 방패" },   -- 방패
+  { id = "gambesons", type = 163, sub = 25, name = "갬비슨" }, { id = "mail_armor", type = 164, sub = 25, name = "사슬 갑옷" }, { id = "militia_helmets_resource", type = 273, sub = 25, name = "헬멧" }, { id = "PlateArmor", type = 293, sub = 25, name = "판금 갑옷" },   -- 방어구
 }
 
 function M.ids()
