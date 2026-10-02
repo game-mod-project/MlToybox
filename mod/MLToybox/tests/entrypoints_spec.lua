@@ -8,7 +8,7 @@ end
 T.run({
   feature_modules_load_and_follow_contract = function()
     local cfg = dofile(SCRIPTS_DIR .. "/config.lua")
-    T.eq(#cfg.featureModules, 7, "seven features")
+    T.eq(#cfg.featureModules, 8, "eight features")
     for _, name in ipairs(cfg.featureModules) do
       local mod = require("features." .. name)
       T.eq(mod.name, name, "name matches module " .. name)

@@ -41,9 +41,10 @@ function M.new(dir)
     return fileio.writeAtomic(self.statusPath, json.encode(status))
   end
 
-  -- 오버레이가 자원 표에 쓸 이름 표(id, 한글 이름, 분류, 묶음). 바뀌지 않는 값이라 status 에 싣지 않고 시작할 때 한 번 쓴다
-  function b:writeCatalog(resources)
-    return fileio.writeAtomic(self.dir .. "\\catalog.json", json.encode({ version = M.VERSION, resources = resources }))
+  -- 오버레이가 자원 표에 쓸 이름 표(id, 한글 이름, 분류, 묶음)와 저장 용량 표에 쓸 건물 목록(id, 한글 이름, 기본 한도).
+  -- 바뀌지 않는 값이라 status 에 싣지 않고 시작할 때 한 번 쓴다
+  function b:writeCatalog(resources, buildings)
+    return fileio.writeAtomic(self.dir .. "\\catalog.json", json.encode({ version = M.VERSION, resources = resources, buildings = buildings }))
   end
 
   return b

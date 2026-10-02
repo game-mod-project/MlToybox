@@ -15,6 +15,7 @@ local retinueEditor = require("features.retinue_editor")
 local population = require("features.population")
 local lord = require("features.lord")
 local resourcesCatalog = require("features.resources_catalog")
+local storageCatalog = require("features.storage_catalog")
 local game = require("core.game")
 local config = require("config")
 
@@ -22,8 +23,8 @@ safe.setThreshold(config.failureThreshold)
 
 local bridgeDir = paths.parentDir(scriptsDir) .. "\\bridge"
 local bridge = bridgeLib.new(bridgeDir)
--- 오버레이가 읽을 자원 이름 표. 오버레이 DLL 을 올리기 전에 써 둔다
-local catalogOk, catalogErr = bridge:writeCatalog(resourcesCatalog.describe())
+-- 오버레이가 읽을 자원 이름 표와 건물 목록. 오버레이 DLL 을 올리기 전에 써 둔다
+local catalogOk, catalogErr = bridge:writeCatalog(resourcesCatalog.describe(), storageCatalog.describe())
 if not catalogOk then log.error("catalog write: %s", tostring(catalogErr)) end
 local nativeDir = paths.parentDir(scriptsDir) .. "\\native"
 local nativeLoaded, nativeErr = native.load(nativeDir)

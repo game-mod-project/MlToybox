@@ -131,3 +131,77 @@ MainUI	resourceGroup_crafting	Crafting Materials	제작 재료
 MainUI	resourceGroup_commodities	Commodities	일용품
 MainUI	resourceGroup_military	Military	군사
 MainUI	regional_wealth	Regional Wealth	지역 자산
+BuildingNames	buildingID_3	Burgage Plot (Level 1)	거주 구획 (1레벨)
+BuildingNames	buildingID_4	Logging Camp	벌목장
+BuildingNames	buildingID_5	Field	농지
+BuildingNames	buildingID_6	Trading Post	교역소
+BuildingNames	buildingID_7	Mining Pit	채굴지
+BuildingNames	buildingID_8	Burgage Plot (Level 2)	거주 구획 (2레벨)
+BuildingNames	buildingID_10	Pasture	목초지
+BuildingNames	buildingID_13	Marketplace	시장
+BuildingNames	buildingID_14	Hunting Camp	사냥 야영지
+BuildingNames	buildingID_18	Sawpit	톱질 구덩이
+BuildingNames	buildingID_20	Windmill	풍차
+BuildingNames	buildingID_21	Well	우물
+BuildingNames	buildingID_25	Smithy	간이 대장간
+BuildingNames	buildingID_26	Communal Oven	공용 오븐
+BuildingNames	buildingID_28	Tannery	제혁소
+BuildingNames	buildingID_30	Hitching Post	가축 말뚝
+BuildingNames	buildingID_31	Livestock Farm	가축 농장
+BuildingNames	buildingID_32	Charcoal Kiln	숯가마
+BuildingNames	buildingID_33	Weaver's Workshop	방직공 작업장
+BuildingNames	buildingID_34	Wooden Church	목조 교회
+BuildingNames	buildingID_35	Quarry	채석장
+BuildingNames	buildingID_36	Forager Hut	채집꾼 오두막
+BuildingNames	buildingID_37	Small Tavern	소형 술집
+BuildingNames	buildingID_39	Fishing Pond	낚시 연못
+BuildingNames	buildingID_42	Stone Gatherer Camp	돌 채집자 야영지
+BuildingNames	buildingID_43	Bloomery	괴철로
+BuildingNames	buildingID_50	Walls and Gates	벽과 관문
+BuildingNames	buildingID_51	Apiary	양봉장
+BuildingNames	buildingID_52	Deep Mine	지하 광산
+BuildingNames	buildingID_57	Garrison Tower	수비용 탑
+BuildingNames	buildingID_58	Tax Office	세무서
+BuildingNames	buildingID_59	Fisherman’s Hut	어부 오두막
+BuildingNames	buildingID_60	Burgage Plot (Level 3)	거주 구획 (3레벨)
+BuildingNames	buildingID_61	Malthouse	맥아 저장고
+BuildingNames	buildingID_68	Large Granary	대형 식량 비축고
+BuildingNames	buildingID_69	Farmhouse	농가
+BuildingNames	buildingID_72	Storehouse	창고
+BuildingNames	buildingID_75	Rubble	돌무더기
+BuildingNames	buildingID_77	Small Stone Church	소형 석조 교회
+BuildingNames	buildingID_79	Livestock Trading Post	가축 교역소
+BuildingNames	buildingID_80	Granary	식량 비축고
+BuildingNames	buildingID_84	Shrine	성소
+BuildingNames	buildingID_86	Forester's Hut	숲지기 오두막
+BuildingNames	buildingID_87	Homeless People's Tents	노숙자 천막
+BuildingNames	buildingID_88	Supplies	비축물
+BuildingNames	buildingID_89	Woodcutter's Lodge	나무꾼 오두막
+BuildingNames	buildingID_91	Food Stall	식량 가판대
+BuildingNames	buildingID_92	Firewood Stall	장작 가판대
+BuildingNames	buildingID_93	Common Goods Stall	일반 물자 가판대
+BuildingNames	buildingID_95	Gatehouse	관문 관리실
+BuildingNames	buildingID_97	Small Stable	소형 마구간
+BuildingNames	buildingID_98	Manor	저택
+BuildingNames	buildingID_99	Large Storehouse	대형 창고
+BuildingNames	buildingID_100	Bandit Camp	도적 야영지
+BuildingNames	buildingID_102	Firewood Cart	장작 수레
+BuildingNames	buildingID_103	Food Cart	식량 수레
+BuildingNames	buildingID_104	Destroyed Windmill	망가진 풍차
+BuildingNames	buildingID_106	Granary Remains	식량 비축고 잔해
+BuildingNames	buildingID_107	Settlers Camp	정착민 야영지
+BuildingNames	buildingID_108	Clay Furnace	점토 화덕
+BuildingNames	buildingID_110	Erase Shrubbery	관목 제거
+BuildingNames	buildingID_111	Worker Camp	일꾼 야영지
+BuildingNames	buildingID_112	Pack Station	물류 거점
+BuildingNames	buildingID_113	Corpse Pit	시체 구덩이
+BuildingNames	buildingID_114	Stone Well	석조 우물
+BuildingNames	buildingID_116	Large Tavern	대형 술집
+BuildingNames	buildingID_117	Stonemason's Station	석공의 거점
+BuildingNames	buildingID_118	Lime Kiln	석회 가마
+BuildingNames	buildingID_119	Construction Yard	자재 적치장
+BuildingNames	buildingID_120	Large Stone Church	대형 석조 교회
+BuildingNames	buildingID_472	Outer Tower	외곽 탑
+BuildingNames	buildingID_473	Dyer's Workshop	염색공 작업장
+BuildingNames	buildingID_483	Siege Camp	공성 야영지
+BuildingNames	buildingID_484	Burgage Plot (Level 4)	거주 구획(레벨 4)

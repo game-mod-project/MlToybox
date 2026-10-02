@@ -1,0 +1,78 @@
+1	Road_DEPREC	fn=0	generic=50	large=0	pantry=0
+3	residentialPlot_lv1	fn=1	generic=25	large=0	pantry=25
+4	logging_camp	fn=0	generic=0	large=28	pantry=0
+6	trading_post	fn=14	generic=500	large=0	pantry=500
+7	Mining pit	fn=18	generic=50	large=0	pantry=0
+8	residentialPlot_lv2	fn=1	generic=50	large=0	pantry=50
+14	Hunting camp	fn=0	generic=12	large=0	pantry=36
+18	sawpit	fn=0	generic=50	large=5	pantry=0
+20	windmill	fn=0	generic=0	large=0	pantry=250
+22	Small Townhouse	fn=0	generic=50	large=0	pantry=75
+25	Smithy	fn=0	generic=50	large=0	pantry=0
+26	CommunalOven	fn=0	generic=12	large=0	pantry=50
+28	tannery	fn=0	generic=50	large=0	pantry=0
+31	sheep_farm	fn=0	generic=50	large=0	pantry=100
+32	charcoal_kilns	fn=0	generic=60	large=0	pantry=0
+33	weaver_lv1	fn=0	generic=50	large=0	pantry=0
+35	Quarry	fn=0	generic=200	large=0	pantry=0
+36	Forager	fn=0	generic=0	large=0	pantry=50
+37	Tavern	fn=16	generic=0	large=0	pantry=15
+40	Archery range	fn=0	generic=50	large=0	pantry=0
+42	stone_gatherer_camp	fn=0	generic=50	large=0	pantry=0
+43	Bloomery	fn=0	generic=50	large=0	pantry=0
+45	Training camp	fn=0	generic=50	large=0	pantry=0
+46	TradepointOLD	fn=9	generic=50	large=0	pantry=0
+50	wall_tool	fn=0	generic=50	large=0	pantry=0
+52	deep mine	fn=18	generic=50	large=0	pantry=0
+53	Rally Point	fn=7	generic=50	large=0	pantry=0
+57	manor_keep_lv1	fn=0	generic=50	large=0	pantry=0
+58	Tax Collector	fn=0	generic=50	large=0	pantry=0
+59	Fisherman's Hut	fn=0	generic=0	large=0	pantry=50
+60	residentialPlot_lv3	fn=1	generic=75	large=0	pantry=75
+61	Malt house	fn=0	generic=12	large=0	pantry=100
+62	Militia training camp	fn=0	generic=50	large=0	pantry=0
+68	Granary	fn=5	generic=0	large=0	pantry=2500
+69	Superfarm	fn=0	generic=1200	large=0	pantry=1200
+72	Storehouse	fn=6	generic=250	large=0	pantry=0
+73	residential_plot_UI_only	fn=0	generic=50	large=0	pantry=0
+75	debris	fn=21	generic=50	large=0	pantry=0
+78	cart_park	fn=0	generic=50	large=0	pantry=0
+80	granary_lv1	fn=5	generic=0	large=0	pantry=500
+81	manor_palace_lv3	fn=0	generic=250	large=0	pantry=250
+82	manor_gate_lv3	fn=0	generic=50	large=0	pantry=0
+83	manor_keep_lv3	fn=0	generic=50	large=0	pantry=0
+85	Roadpost	fn=9	generic=50	large=0	pantry=0
+89	Firewood Cutter	fn=0	generic=50	large=0	pantry=0
+91	foodStall	fn=3	generic=0	large=0	pantry=40
+92	firewoodStall	fn=3	generic=20	large=0	pantry=0
+93	clothingStall	fn=3	generic=20	large=0	pantry=0
+95	manor_gate_lv1	fn=0	generic=50	large=0	pantry=0
+98	manor_palace_lv1	fn=2	generic=250	large=0	pantry=250
+99	storehouse_lv2	fn=6	generic=2500	large=0	pantry=0
+100	bandit_tents	fn=17	generic=500	large=0	pantry=500
+102	firewood_cart	fn=3	generic=15	large=0	pantry=0
+103	food_cart	fn=0	generic=0	large=0	pantry=15
+104	SCENARIO_destroyedWindmill	fn=20	generic=50	large=0	pantry=0
+105	Brewery_idk_lol	fn=0	generic=50	large=0	pantry=50
+108	clay_furnace	fn=0	generic=250	large=0	pantry=0
+109	pithouse	fn=1	generic=30	large=0	pantry=50
+110	tool-eraseShrubs	fn=0	generic=50	large=0	pantry=0
+111	worker_camp	fn=1	generic=200	large=0	pantry=200
+116	Tavern_LV2	fn=16	generic=0	large=0	pantry=50
+117	Stonemasons Station	fn=0	generic=50	large=0	pantry=0
+118	Lime Kiln	fn=0	generic=250	large=0	pantry=0
+119	Construction Yard	fn=22	generic=800	large=80	pantry=0
+469	wooden_gatehouse_module_DEPREC	fn=0	generic=50	large=0	pantry=0
+470	manor_wall_wooden	fn=0	generic=50	large=0	pantry=0
+471	manor_wall_platform_open	fn=0	generic=50	large=0	pantry=0
+473	dyers_shop	fn=0	generic=50	large=0	pantry=50
+474	manor_palace_lv2	fn=2	generic=250	large=0	pantry=250
+475	manor_keep_lv2	fn=0	generic=50	large=0	pantry=0
+476	manor_wall_stone_small	fn=0	generic=50	large=0	pantry=0
+477	manor_wall_stone_large	fn=0	generic=50	large=0	pantry=0
+478	manor_gate_lv2	fn=0	generic=50	large=0	pantry=0
+480	Manor_WoodenPlatformSupport	fn=0	generic=50	large=0	pantry=0
+481	Manor_WoodenPlatformRailing	fn=0	generic=50	large=0	pantry=0
+482	Manor_WoodenPlatformPlank	fn=0	generic=50	large=0	pantry=0
+483	SiegeCamp	fn=17	generic=500	large=0	pantry=500
+484	residentialPlot_lv4	fn=1	generic=100	large=0	pantry=100
