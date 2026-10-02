@@ -42,11 +42,16 @@ std::vector<ResourceRow> buildResourceRows(const StatusDoc* status, const Resour
     const std::map<std::string, double>* current = resourceCurrent(status, key);
     const std::map<std::string, int> targets = resourceTargets(settings, key);
     std::set<std::string> ids;
-    if (status && status->resourceIds) ids.insert(status->resourceIds->begin(), status->resourceIds->end());
+    const bool listed = status && status->resourceIds && !status->resourceIds->empty();
+    if (listed) ids.insert(status->resourceIds->begin(), status->resourceIds->end());
     if (current) {
         for (const auto& entry : *current) ids.insert(entry.first);
     }
-    for (const auto& entry : targets) ids.insert(entry.first);
+    // 모드가 자원 목록을 알려 주면 그 목록이 표다. 목표만 남아 있고 목록에 없는 자원(게임이 더 쓰지 않아 뺀 것)은 보이지 않는다.
+    // 목록이 없을 때(게임 밖)는 목표가 있는 자원을 보여 준다
+    if (!listed) {
+        for (const auto& entry : targets) ids.insert(entry.first);
+    }
 
     std::vector<ResourceRow> rows;
     for (const std::string& id : ids) {

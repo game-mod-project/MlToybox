@@ -45,11 +45,14 @@ TEST(overlay_resources_rows_join_ids_current_and_targets_sorted_by_name) {
     ResourcesSettings r;
     r.targets = { { "Iron", 50 }, { "Timber", 500 } };
     const std::vector<ResourceRow> rows = buildResourceRows(&s, r, std::nullopt);
-    CHECK(rows.size() == 5);
+    // 모드가 자원 목록을 알려 주면 그 목록이 표다. 목표만 남아 있고 모드가 모르는 자원(게임이 더 쓰지 않아 목록에서 뺀
+    // meat, Beer 같은 것)은 줄로 보이지 않는다. 설정에 남은 목표는 지우지 않는다
+    CHECK(rows.size() == 4);
     CHECK(rows[0] == (ResourceRow{ "Influence", std::nullopt, std::nullopt }));
-    CHECK(rows[1] == (ResourceRow{ "Iron", std::nullopt, 50 }));       // 목표만 있고 모드가 모르는 자원도 줄로 남는다
-    CHECK(rows[3] == (ResourceRow{ "Timber", 740.0, 500 }));
-    CHECK(rows[4] == (ResourceRow{ "Treasury", 9000.0, std::nullopt }));
+    CHECK(rows[1].id == "RegionalWealth");
+    CHECK(rows[2] == (ResourceRow{ "Timber", 740.0, 500 }));
+    CHECK(rows[3] == (ResourceRow{ "Treasury", 9000.0, std::nullopt }));
+    CHECK(resourceTargets(r, std::nullopt).at("Iron") == 50);
     // 영지 범위: 영주 전체 값(국고, 영향력)을 숨기고, 그 영지의 재고와 영지 목표를 쓴다
     r.regionTargets["hof"] = { { "Timber", 2000 }, { "Treasury", 5 } };
     const std::vector<ResourceRow> region = buildResourceRows(&s, r, "hof");

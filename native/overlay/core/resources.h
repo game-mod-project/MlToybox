@@ -30,6 +30,7 @@ const std::map<std::string, double>* resourceCurrent(const StatusDoc* status, co
 std::map<std::string, int> resourceTargets(const ResourcesSettings& settings, const std::optional<std::string>& key);
 // 그 범위의 목표를 바꾼다. 영지 목표가 하나도 없으면 그 영지 키를 지운다
 void storeResourceTargets(ResourcesSettings& settings, const std::optional<std::string>& key, std::map<std::string, int> targets);
-// 표의 줄: 모드가 알려 준 자원 이름, 현재 값이 있는 자원, 목표가 있는 자원을 합쳐 이름순으로
+// 표의 줄(이름순): 모드가 알려 준 자원 목록과 현재 값이 있는 자원. 모드가 목록을 알려 주지 않았을 때(게임 밖)는 목표가 있는 자원.
+// 목록에 없는 자원의 목표는 줄로 보이지 않을 뿐 설정에는 남는다
 std::vector<ResourceRow> buildResourceRows(const StatusDoc* status, const ResourcesSettings& settings, const std::optional<std::string>& key);
 }
