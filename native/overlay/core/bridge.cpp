@@ -27,6 +27,27 @@ std::optional<std::string> readFileShared(const std::filesystem::path& path) {
     return out;
 }
 
+std::optional<std::string> readFileFrom(const std::filesystem::path& path, unsigned long long offset, size_t maxBytes) {
+    const HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return std::nullopt;
+    LARGE_INTEGER to{};
+    to.QuadPart = static_cast<LONGLONG>(offset);
+    bool ok = SetFilePointerEx(file, to, nullptr, FILE_BEGIN) != 0;
+    std::string out;
+    char buf[16384];
+    while (ok && out.size() < maxBytes) {
+        DWORD got = 0;
+        const DWORD want = static_cast<DWORD>(std::min(sizeof(buf), maxBytes - out.size()));
+        ok = ReadFile(file, buf, want, &got, nullptr) != 0;
+        if (!ok || got == 0) break;
+        out.append(buf, got);
+    }
+    CloseHandle(file);
+    if (!ok) return std::nullopt;
+    return out;
+}
+
 ControlDoc Bridge::loadControl() const {
     return loadControlChecked().doc;
 }

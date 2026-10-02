@@ -70,3 +70,16 @@ TEST(overlay_settings_input_log_is_off_and_absent_unless_asked_for) {
     s.inputLog = true;
     CHECK(parseSettings(dumpSettings(s)).inputLog);
 }
+
+// 자원 표의 열 너비(표 너비에 대한 백분율 넷). 사용자가 열을 끌어 바꾸면 적힌다. 없거나 이상하면 기본 너비를 쓴다
+TEST(overlay_settings_resource_column_shares) {
+    CHECK(parseSettings("{}").resourceColumns.empty());
+    CHECK(!Json::parse(dumpSettings(OverlaySettings())).contains("resourceColumns"));
+    OverlaySettings s;
+    s.resourceColumns = { 30.0f, 25.5f, 14.5f, 30.0f };
+    CHECK(parseSettings(dumpSettings(s)).resourceColumns == s.resourceColumns);
+    CHECK(parseSettings(R"({"resourceColumns":[30,20,50]})").resourceColumns.empty());            // 열 수가 다르다
+    CHECK(parseSettings(R"({"resourceColumns":[30,0,20,50]})").resourceColumns.empty());          // 0 이하
+    CHECK(parseSettings(R"({"resourceColumns":[30,"a",20,50]})").resourceColumns.empty());
+    CHECK(parseSettings(R"({"resourceColumns":"wide"})").resourceColumns.empty());
+}

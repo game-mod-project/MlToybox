@@ -45,6 +45,7 @@ add_library(overlay_core STATIC
     overlay/core/units.cpp
     overlay/core/merc_rules.cpp
     overlay/core/resources.cpp
+    overlay/core/log_tail.cpp
     overlay/core/view.cpp
     overlay/core/hangul.cpp)
 target_include_directories(overlay_core PUBLIC . third_party)
@@ -102,6 +103,8 @@ add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_t
     tests/overlay_status_tabs_tests.cpp
     tests/overlay_merc_rules_tests.cpp
     tests/overlay_view_tests.cpp
+    tests/overlay_resource_table_tests.cpp
+    tests/overlay_log_tail_tests.cpp
     tests/overlay_hangul_tests.cpp
     tests/overlay_widgets_tests.cpp
     tests/overlay_clipboard_tests.cpp
