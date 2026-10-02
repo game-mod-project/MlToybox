@@ -60,3 +60,13 @@ TEST(overlay_status_file_reports_state_and_reason) {
     CHECK(j["state"] == "disabled" && j["reason"] == "present queue not found");
     CHECK(std::string(overlayStateName(OverlayState::Starting)) == "starting" && std::string(overlayStateName(OverlayState::Waiting)) == "waiting");
 }
+
+// 개발·검증용: 창이 열려 있는 동안의 글쇠 메시지를 bridge/overlay_input.log 에 적는다. 평소에는 꺼져 있고 파일에도 없다
+TEST(overlay_settings_input_log_is_off_and_absent_unless_asked_for) {
+    CHECK(!parseSettings("{}").inputLog);
+    CHECK(parseSettings(R"({"inputLog":true})").inputLog);
+    CHECK(!Json::parse(dumpSettings(OverlaySettings())).contains("inputLog"));
+    OverlaySettings s;
+    s.inputLog = true;
+    CHECK(parseSettings(dumpSettings(s)).inputLog);
+}

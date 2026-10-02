@@ -129,8 +129,9 @@ TEST(overlay_input_releases_held_buttons_when_the_window_closes) {
     CHECK(GetCapture() == nullptr);
 }
 
-// 게임이 창의 IME(한글 입력기)를 꺼 두었으면 오버레이의 글자 칸에 커서가 있는 동안만 켜고, 끝나면 되돌린다
-TEST(overlay_input_turns_the_ime_on_only_while_a_text_field_has_the_cursor) {
+// 게임 창은 IME 가 꺼져 있다(2026-10-02 실측). 오버레이는 그 상태를 건드리지 않는다.
+// 한글은 오버레이의 조합기(core/hangul)가 만든다. 창의 IME 까지 켜면 같은 글쇠가 두 번 조합된다
+TEST(overlay_input_never_touches_the_games_ime) {
     if (!GetSystemMetrics(SM_IMMENABLED)) {
         std::printf("SKIP overlay_input ime: IMM is not enabled on this system\n");
         return;
@@ -142,77 +143,32 @@ TEST(overlay_input_turns_the_ime_on_only_while_a_text_field_has_the_cursor) {
         return imc != nullptr;
     };
     ImmAssociateContext(f.hwnd, nullptr);          // 게임이 꺼 둔 상태
+    f.a.wantText = true;                           // 글자 칸에 커서가 있다
+    f.send(WM_NULL);
     CHECK(!imeOn());
-    f.send(WM_NULL);
-    CHECK(!imeOn());                               // 글자 칸에 커서가 없으면 건드리지 않는다
-    f.a.wantText = true;
-    f.send(WM_NULL);
-    CHECK(imeOn());                                // 글자 칸에 커서가 있다: 한글을 칠 수 있다
-    f.a.wantText = false;
-    f.send(WM_NULL);
-    CHECK(!imeOn());                               // 게임이 꺼 두었던 상태로 되돌린다
-
-    f.a.wantText = true;
-    f.send(WM_NULL);
-    CHECK(imeOn());
-    f.send(WM_KEYDOWN, VK_INSERT, 0x00000001);     // 글자 칸에 커서를 둔 채 창을 닫아도 되돌린다
+    f.send(WM_KEYDOWN, VK_INSERT, 0x00000001);     // 닫을 때도
     CHECK(!f.a.visible.load() && !imeOn());
     f.a.wantText = false;
 }
 
-TEST(overlay_input_leaves_the_ime_alone_when_the_game_had_it_on) {
-    if (!GetSystemMetrics(SM_IMMENABLED)) return;
+// 한/영 글쇠: 글자 칸에 커서가 있으면 오버레이의 조합기를 켜고 끈다. 그 밖에는 게임의 것이다
+TEST(overlay_input_hangul_key_belongs_to_the_overlay_only_while_a_text_field_has_the_cursor) {
     Fixture f;
-    const HIMC before = ImmGetContext(f.hwnd);     // 게임의 입력 칸에 커서가 있어 IME 가 켜져 있던 경우
-    if (!before) return;
-    ImmReleaseContext(f.hwnd, before);
-    f.a.wantText = true;
-    f.send(WM_NULL);
-    f.a.wantText = false;
-    f.send(WM_NULL);
-    const HIMC after = ImmGetContext(f.hwnd);
-    CHECK(after != nullptr);                       // 우리가 켠 것이 아니면 끄지 않는다
-    if (after) ImmReleaseContext(f.hwnd, after);
-}
+    const unsigned before = f.a.hangulKeys.load();
+    f.send(WM_KEYDOWN, VK_HANGUL, 0x00000001);
+    f.send(WM_KEYUP, VK_HANGUL, 0xC0000001);
+    CHECK(f.a.hangulKeys.load() == before);
+    CHECK(g_reached[WM_KEYDOWN] == 1 && g_reached[WM_KEYUP] == 1);
 
-// 글자 칸에 커서가 있을 때의 한글 조합 메시지는 게임에 넘기지 않는다. 조합이 끝난 글자는 WM_CHAR 로 와서 ImGui 가 받는다
-TEST(overlay_input_keeps_korean_composition_away_from_the_game) {
-    Fixture f;
-    f.send(WM_IME_STARTCOMPOSITION);
-    f.send(WM_IME_ENDCOMPOSITION);
-    CHECK(g_reached[WM_IME_STARTCOMPOSITION] == 1 && g_reached[WM_IME_ENDCOMPOSITION] == 1);   // 글자 칸이 아니면 게임의 것
     f.a.wantText = true;
-    f.a.wantKeyboard = true;
-    f.send(WM_IME_STARTCOMPOSITION);
-    f.send(WM_IME_CHAR, 0xAC00, 1);                // '가': 기본 처리가 WM_CHAR 로 바꿔 다시 보낸다
-    f.send(WM_IME_ENDCOMPOSITION);
-    CHECK(g_reached[WM_IME_STARTCOMPOSITION] == 1 && g_reached[WM_IME_ENDCOMPOSITION] == 1);
-    CHECK(g_reached[WM_IME_CHAR] == 0 && g_reached[WM_CHAR] == 0);
-    f.a.wantText = false;
-}
+    f.send(WM_KEYDOWN, VK_HANGUL, 0x00000001);
+    f.send(WM_KEYDOWN, VK_HANGUL, 0x40000001);     // 누르고 있는 동안의 반복은 세지 않는다
+    f.send(WM_KEYUP, VK_HANGUL, 0xC0000001);
+    CHECK(f.a.hangulKeys.load() == before + 1);
+    CHECK(g_reached[WM_KEYDOWN] == 1 && g_reached[WM_KEYUP] == 1);   // 게임에 넘기지 않는다
 
-// 오버레이가 스스로 꺼지면(그리기·입력 예외, 장치 제거) 그 뒤로는 아무것도 가로채지 않는다.
-// 그때 글자 칸 때문에 켜 둔 IME 를 남기면 게임 창의 입력기가 세션 끝까지 켜진 채다. 꺼진 뒤 첫 메시지에서 되돌린다
-TEST(overlay_input_restores_the_ime_when_the_overlay_disables_itself) {
-    if (!GetSystemMetrics(SM_IMMENABLED)) {
-        std::printf("SKIP overlay_input ime: IMM is not enabled on this system\n");
-        return;
-    }
-    Fixture f;
-    auto imeOn = [&] {
-        const HIMC imc = ImmGetContext(f.hwnd);
-        if (imc) ImmReleaseContext(f.hwnd, imc);
-        return imc != nullptr;
-    };
-    ImmAssociateContext(f.hwnd, nullptr);          // 게임이 꺼 둔 상태
-    f.send(WM_NULL);                               // 앞 테스트의 창에서 남은 상태를 이 창에 맞춘다
-    CHECK(!imeOn());
-    f.a.wantText = true;
-    f.send(WM_NULL);
-    CHECK(imeOn());
-    f.a.state = OverlayState::Disabled;            // 글자 칸에 커서가 있는 채로 꺼졌다
-    f.send(WM_NULL);
-    CHECK(!imeOn());
-    CHECK(g_reached[WM_NULL] == 3);                // 메시지는 그대로 게임에 넘긴다
+    f.a.visible = false;                           // 닫혀 있으면 게임의 것
+    f.send(WM_KEYDOWN, VK_HANGUL, 0x00000001);
+    CHECK(f.a.hangulKeys.load() == before + 1 && g_reached[WM_KEYDOWN] == 2);
     f.a.wantText = false;
 }

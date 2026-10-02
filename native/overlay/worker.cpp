@@ -4,6 +4,8 @@
 #include "overlay/ui/app.h"
 #include "runtime.h"
 #include <windows.h>
+#include <cstdio>
+#include <vector>
 
 namespace mlt::ov {
 
@@ -101,6 +103,21 @@ static void flushClipboard(App& a) {
     writeClipboardText(text);
 }
 
+// 개발·검증용(overlay.json 의 inputLog): 창 스레드가 적어 둔 글쇠 메시지를 bridge/overlay_input.log 에 덧붙인다
+static void flushInputLog(App& a, const Bridge& bridge) {
+    std::vector<std::string> lines;
+    {
+        std::lock_guard<std::mutex> lock(a.mutex);
+        lines.swap(a.inputLines);
+    }
+    if (lines.empty()) return;
+    const auto path = bridge.settingsPath().parent_path() / L"overlay_input.log";
+    if (FILE* file = _wfopen(path.c_str(), L"ab")) {
+        for (const std::string& line : lines) std::fprintf(file, "%s\n", line.c_str());
+        std::fclose(file);
+    }
+}
+
 static void writeOverlayStatus(App& a, const Bridge& bridge) {
     OverlayStatus s;
     s.heartbeat = nowEpochSeconds();
@@ -146,6 +163,7 @@ void runOverlayWorker(void* selfModule) {
         // 이 스레드가 예외로 끝나면 저장이 조용히 멈춘다. 그 회차만 건너뛰고 계속한다
         try {
             flushClipboard(a);
+            flushInputLog(a, bridge);
             if (tick % 2 == 0 && tick >= saveRetryAt) {            // 0.2초마다. 실패했으면 1초 뒤에 다시 한다
                 if (!saveControlIfDirty(a, bridge)) saveRetryAt = tick + 10;
             }

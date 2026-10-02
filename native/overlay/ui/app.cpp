@@ -21,6 +21,7 @@ void disableOverlay(const std::string& reason) {
 void syncSettingsAtoms(App& a) {
     a.toggleVk = toggleKeyCode(a.settings.toggleKey);
     a.scale = a.settings.scale;
+    a.inputLog = a.settings.inputLog;
 }
 
 }

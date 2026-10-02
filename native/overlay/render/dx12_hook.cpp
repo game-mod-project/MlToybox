@@ -188,8 +188,9 @@ void renderFrame(IDXGISwapChain* swap) {
         a.wantMouse = visible && io.WantCaptureMouse;
         a.wantKeyboard = visible && (io.WantCaptureKeyboard || io.WantTextInput);
         const bool text = visible && io.WantTextInput;
-        // 화면에서 닫았거나 글자 칸에 커서가 들어오고 나갔다. 창 스레드가 눌린 입력을 정리하고 IME 를 켜고 끈다
-        if ((openAtStart && !visible) || a.wantText.exchange(text) != text) wakeWindowThread();
+        a.wantText = text;
+        // 화면에서 닫았다(닫기 버튼, 꾸미기 열기). 창 스레드가 눌린 입력을 정리한다
+        if (openAtStart && !visible) wakeWindowThread();
     }
 
     UINT index = 0;
@@ -269,7 +270,7 @@ void frame(IDXGISwapChain* swap) {
     if (!wanted) {
         a.wantMouse = false;
         a.wantKeyboard = false;
-        if (a.wantText.exchange(false)) wakeWindowThread();
+        a.wantText = false;
         return;
     }
     renderFrame(swap);

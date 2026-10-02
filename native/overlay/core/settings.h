@@ -12,6 +12,7 @@ struct OverlaySettings {
     int x = 80, y = 80, w = 640, h = 720;
     bool startOpen = false;   // 개발·검증용: 열린 채로 시작
     std::string devTab;       // 개발·검증용: 이 이름의 탭을 연다(비어 있으면 없음)
+    bool inputLog = false;    // 개발·검증용: 창이 열려 있는 동안의 글쇠 메시지를 bridge/overlay_input.log 에 적는다
 
     bool operator==(const OverlaySettings&) const = default;
 };
