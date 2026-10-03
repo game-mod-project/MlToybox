@@ -102,6 +102,35 @@ TEST(not_ready_without_parts_or_with_bad_part_data) {
     CHECK(!instant_build::readyToFinish(s.m.bytes));
 }
 
+TEST(fill_leaves_another_lords_building_alone) {
+    // 게임이 스스로 진행도를 읽을 때도 detour 를 지난다. 다른 영주의 공사 현장은 hp 를 채우지 않는다
+    Site s;
+    setF(s.a.bytes, instant_build::kPartHpOffset, 10.f);
+    s.owner.bytes[instant_build::kPawnIsMainPlayerOffset] = 0;
+    CHECK(instant_build::fillParts(s.m.bytes, true) == 0);
+    CHECK(getF(s.a.bytes, instant_build::kPartHpOffset) == 10.f);
+    s.setOwner(nullptr);
+    CHECK(instant_build::fillParts(s.m.bytes, true) == 0);
+    CHECK(getF(s.a.bytes, instant_build::kPartHpOffset) == 10.f);
+}
+
+TEST(fill_completes_the_main_players_building) {
+    Site s;
+    setF(s.a.bytes, instant_build::kPartHpOffset, 10.f);
+    CHECK(instant_build::fillParts(s.m.bytes, true) == 1);
+    CHECK(getF(s.a.bytes, instant_build::kPartHpOffset) == 100.f);
+}
+
+TEST(fill_does_not_read_the_owner_when_its_offsets_are_not_verified) {
+    // 주인 오프셋은 완공 처리 함수의 본문으로 확인한다. 그 함수를 찾지 못했으면 주인을 읽지 않고 이전처럼 채운다
+    Site s;
+    setF(s.a.bytes, instant_build::kPartHpOffset, 10.f);
+    const auto garbage = static_cast<std::uintptr_t>(0x10);            // 읽으면 튕길 주소
+    std::memcpy(s.m.bytes + instant_build::kOwnerPawnOffset, &garbage, sizeof garbage);
+    CHECK(instant_build::fillParts(s.m.bytes, false) == 1);
+    CHECK(getF(s.a.bytes, instant_build::kPartHpOffset) == 100.f);
+}
+
 TEST(instant_build_registers_the_hook_and_the_finish_function) {
     HookManager m;
     instant_build::registerHook(m);
