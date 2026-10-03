@@ -10,6 +10,7 @@ struct NativeControl {
     bool ignorePopulation = false;
     bool noRegionLimit = false;
     bool noMaterials = false;
+    bool upgradeFree = false;      // 업그레이드 조건·비용 무시(features.upgrade.enabled)
 };
 std::optional<NativeControl> parseControl(std::string_view text);
 }
