@@ -684,3 +684,16 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 
 ### 테스트
 네이티브 199개, .NET·Lua 107개 통과.
+
+## 저장 용량 — "저장실 가득 참" 표시가 남는 문제 (2026-10-03)
+사용자 보고: 한도를 올려도(대형 창고 2,607 / 250,000) 영지 문제 표시줄의 "일반 저장실 가득 참"이 그 건물에 남는다. 철거·재건설·업그레이드한 건물은 사라진다.
+
+### 구조 (덤프)
+- 문제 항목은 `ARegion.problems : TArray<FProblem>`에 있다. `FProblem { EProblem Type; ASMUnit* unit; ASMBuildingMaster* building; FVector Location; int32 day; int32 expiresIn; }`. 저장 관련 종류: `NeedsStorage = 4`, `OutOfStorageSpace = 31`, `OutOfPantrySpace = 32`, `ExposedStorage = 33`, `ExposedFood = 34`.
+- 검사 함수: `ASMBuildingMaster::verifyStorageProblems()`, `ARegion::updateProblems()`, `APawnCPP::updateProblemUI()`(모두 UFunction).
+
+### 실측 (saveGame_8, 저장 없이 종료, Application Error 0)
+- 불러온 직후 영지 gold의 문제: `OutOfStorageSpace`(벌목장 28/28, 주소 1D3BD896AD0), `OutOfStorageSpace`·`OutOfPantrySpace`(저택 17624/500/7734, 한도 250/0/250). 모두 `day=297`, `expiresIn=0`.
+- 벌목장의 한도만 100으로 올리고 게임 시간을 12배로 흘렸다. 11일이 지나도(`daysTotal` 297 → 308) 벌목장의 항목은 `day=297` 그대로 남았다. 저택의 항목은 날마다 `day`가 현재 날짜로 바뀌었다(게임이 가득 찬 건물의 항목은 날마다 갱신하고, 더는 가득 차지 않은 건물의 항목은 그대로 둔다).
+- 벌목장에 `verifyStorageProblems()`를 부르자 그 항목이 바로 사라졌다(문제 3개 → 2개). 화면 위쪽 문제 표시줄의 저장 아이콘에 붙어 있던 숫자 2도 사라졌다(캡처 비교). 그 뒤 `updateProblems()`, `updateProblemUI()`는 변화가 없었다(항목이 이미 사라진 뒤라 이 둘이 단독으로 지우는지는 재지 못했다).
+- 조치: `features/storage.lua`가 건물의 한도를 바꿀 때마다(올릴 때, 되돌릴 때) 그 건물의 `verifyStorageProblems()`를 부른다. 바꾸지 않은 건물은 부르지 않는다(스펙 `changing_a_limit_asks_the_game_to_recheck_the_buildings_storage_problems`).
