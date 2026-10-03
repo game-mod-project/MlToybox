@@ -37,6 +37,7 @@ local function placement(opts)
   game.engine = function() return engine end
   game.pawn = function() return pawn end
   game.fname = fname
+  game.playerRegions = function() return {} end   -- 공사 현장이 없는 맵. 현장이 필요한 테스트는 이 뒤에 setup() 을 부른다
   local function flags()
     local out = {}
     for i = 1, #store do out[i] = store[i]:ToString() end
@@ -153,13 +154,44 @@ T.run({
     game.playerRegions = function() return { region } end
     build.tick({}, { enabled = true, noMaterials = true })
   end,
-  instant_build_triggers_progress_read_on_unbuilt = function()
+  -- 이미 공사 중인 건물(업그레이드 포함): 진행도 함수를 부르면 네이티브가 파츠 hp 를 채우고 게임의 완공 함수를 부른다.
+  -- 네이티브는 낼 자재가 없는 건물만 완공 처리하므로 자재 목록을 먼저 비운다. 완공된 건물은 건드리지 않는다
+  instant_build_finishes_sites_seen_on_the_previous_poll = function()
+    placement()
     local _, unbuilt, built = setup()
     local calls = 0
-    unbuilt.getConstructionProgress = function() calls = calls + 1; return 0.5 end
+    unbuilt.getConstructionProgress = function() calls = calls + 1; T.eq(#unbuilt.constructionGoods, 0, "goods cleared before the call"); return 0.5 end
     built.getConstructionProgress = function() error("must not be called on built") end
-    build.tick({}, { enabled = true, instantBuild = true })
-    T.eq(calls, 1, "triggered once")
+    build.enable({}, { enabled = true, instantBuild = true })
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(calls, 0, "a site seen for the first time is left alone: its parts may still be on their way")
+    T.eq(#unbuilt.constructionGoods, 1, "and keeps its goods")
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(calls, 1, "finished on the next poll")
+    T.eq(#built.constructionGoods, 1, "built untouched")
+  end,
+  instant_build_off_leaves_sites_alone = function()
+    placement()
+    local _, unbuilt = setup()
+    unbuilt.getConstructionProgress = function() error("must not be called") end
+    build.enable({}, { enabled = true, instantBuild = false })
+    build.poll({}, { enabled = true, instantBuild = false }); build.poll({}, { enabled = true, instantBuild = false })
+    T.eq(#unbuilt.constructionGoods, 1, "goods kept")
+    build.tick({}, { enabled = true, instantBuild = true })   -- 10초 tick 은 더는 진행도 함수를 부르지 않는다(poll 이 맡는다)
+  end,
+  sites_seen_before_are_forgotten_when_the_feature_starts_again = function()
+    placement()
+    local _, unbuilt = setup()
+    local calls = 0
+    unbuilt.getConstructionProgress = function() calls = calls + 1; return 0.5 end
+    build.enable({}, { enabled = true, instantBuild = true })
+    build.poll({}, { enabled = true, instantBuild = true })
+    build.enable({}, { enabled = true, instantBuild = true })   -- 새 맵: 같은 주소에 다른 건물이 있을 수 있다
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(calls, 0, "first poll of the new map")
+    build.poll({}, { enabled = true, instantBuild = false })    -- 옵션을 껐다 켜도 처음부터 다시 센다
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(calls, 0, "first poll after turning the option back on")
   end,
   tick_without_cheat_is_noop = function()
     setup()

@@ -81,6 +81,40 @@ TEST(body_check_outside_window_fails) {
     CHECK(!m.states()[0].installed);
 }
 
+TEST(resolve_only_spec_reports_the_address_and_makes_no_hook) {
+    // detour 가 없는 항목은 후킹하지 않고 주소만 찾는다(다른 detour 가 직접 부를 게임 함수)
+    std::array<uint8_t, 8> text{ 0x90, 0xAA, 0xBB, 0xCC, 0xDE, 0xAD, 0x90, 0x90 };
+    HookManager m; FakeBackend be;
+    void* address = nullptr;
+    HookSpec s{ "finish", "AA BB CC", nullptr, &address, &wantsBuild };
+    s.bodyChecks = { "DE AD" };
+    s.bodyWindow = 6;
+    m.add(s);
+    m.installAll(text, 0x5000, be);
+    CHECK(be.created == 0);
+    CHECK(m.states()[0].installed && address == reinterpret_cast<void*>(0x5001));
+    NativeControl on; on.instantBuild = true;
+    m.sync(on, be);
+    CHECK(m.states()[0].active && be.toggles.empty());
+    m.sync(NativeControl{}, be);
+    CHECK(!m.states()[0].active && be.toggles.empty());
+}
+
+TEST(resolve_only_spec_leaves_the_address_empty_when_the_layout_differs) {
+    std::array<uint8_t, 8> text{ 0x90, 0xAA, 0xBB, 0xCC, 0x90, 0x90, 0x90, 0x90 };
+    HookManager m; FakeBackend be;
+    void* address = nullptr;
+    HookSpec s{ "finish", "AA BB CC", nullptr, &address, &wantsBuild };
+    s.bodyChecks = { "DE AD" };
+    s.bodyWindow = 6;
+    m.add(s);
+    m.installAll(text, 0x5000, be);
+    NativeControl on; on.instantBuild = true;
+    m.sync(on, be);
+    CHECK(!m.states()[0].installed && !m.states()[0].active && address == nullptr);
+    CHECK(m.states()[0].error == "layout check failed: DE AD");
+}
+
 TEST(create_failure_reported_and_never_enabled) {
     std::array<uint8_t, 4> text{ 0xAA, 0xBB, 0xCC, 0x90 };
     HookManager m; FakeBackend be; be.failCreate = true;
