@@ -110,10 +110,72 @@ function M.disable(state)
   setFlag(false)
 end
 
+-- 즉시 수리가 건물에 남기는 유지보수 물자 (findings "즉시 수리 — 건물에 남는 유지보수 물자").
+-- 치트(MaintainAllBuildings)는 물자를 쓰지 않고 건물을 채운다. 그때 일꾼이 이미 유지보수 물자를 나르고 있었으면 도착한 물자가 건물에 남는다.
+-- 그 물자의 보관 방식(일반·목재·식량)에 해당하는 저장 한도가 0 인 건물(벌목장의 일반 저장실 등)에서는 게임이 "저장실 가득 참"을 붙인다
+-- (실측: 벌목장에 철제 도구 1개). 치트가 대신 한 유지보수에 쓰였어야 할 물자이므로 그 건물에서 소모시킨다. 게임이 저장 문제를 스스로 다시 검사한다.
+local STORAGE = {
+  [0] = { limit = "storageLimitGeneric", stored = "numStoredGeneric" },
+  [1] = { limit = "storageLimitLarge", stored = "numStoredLarge" },
+  [2] = { limit = "storageLimitPantry", stored = "numStoredPantry" },
+}
+
+-- 한도가 0 인 저장실에 물자가 든 건물인가(값만 읽는 싼 검사. 대부분의 건물이 여기서 걸러진다)
+local function holdsWithoutRoom(b)
+  for _, k in pairs(STORAGE) do
+    if b[k.limit] == 0 and b[k.stored] > 0 then return true end
+  end
+  return false
+end
+
+-- 그 건물의 유지보수 물자 종류. 유지보수 대상이 아니면 nil
+local function maintenanceGoods(b)
+  local comp = b.MaintenanceComponent
+  if not safe.valid(comp) then return nil end
+  local out
+  for _, w in ipairs(comp:GetTrackedMaintenanceTypes()) do
+    local goods = game.unwrap(w).goodTypes
+    for i = 1, #goods do
+      out = out or {}
+      out[goods[i]] = true
+    end
+  end
+  return out
+end
+
+local function hasNoRoomFor(b, goodType)
+  local row = datatable.object("items"):FindRow(tostring(goodType))
+  local kind = row and STORAGE[row.storageType]
+  return kind ~= nil and b[kind.limit] == 0
+end
+
+local function useUpLeftoverSupplies()
+  for _, region in ipairs(game.playerRegions()) do
+    for _, w in ipairs(region:GetBuildings()) do
+      local b = game.unwrap(w)
+      if safe.valid(b) and holdsWithoutRoom(b) then
+        local supplies = maintenanceGoods(b)
+        if supplies then
+          -- 소모하면 인벤토리가 바뀌므로 먼저 모은 뒤 소모한다
+          local found = {}
+          local inventory = b.Inventory
+          for i = 1, #inventory do
+            local g = inventory[i]
+            if supplies[g.Type] and g.amt > 0 and hasNoRoomFor(b, g.Type) then found[#found + 1] = { type = g.Type, amt = g.amt } end
+          end
+          for _, g in ipairs(found) do region:consumeGood(g.type, g.amt, b, false, false, false) end
+        end
+      end
+    end
+  end
+end
+
 function M.tick(_, settings)
   if not settings.instantRepair then return end
   local cheat = game.cheat()
-  if cheat then cheat:MaintainAllBuildings() end
+  if not cheat then return end
+  cheat:MaintainAllBuildings()
+  useUpLeftoverSupplies()
 end
 
 return M
