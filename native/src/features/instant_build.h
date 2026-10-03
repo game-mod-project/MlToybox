@@ -24,6 +24,9 @@ constexpr std::ptrdiff_t kGoodsNumOffset = 0x3C8;          // TArray<FGood> cons
 
 // 파츠마다 hp 를 maxHp 로 채운다. 바꾼 파츠 수를 돌려준다.
 int completeParts(uint8_t* master);
+// detour 가 하는 채우기: 주인이 플레이어인 건물만 채운다(게임이 스스로 진행도를 읽을 때 다른 영주의 공사 현장이 채워지지 않게).
+// ownerOffsetsVerified 가 false 면(완공 처리 함수를 찾지 못해 주인 오프셋을 확인하지 못했다) 주인을 읽지 않고 채운다.
+int fillParts(uint8_t* master, bool ownerOffsetsVerified);
 // 완공 처리 함수를 불러도 되는가: 아직 미완공이고, 주인이 플레이어이고, 낼 자재가 없고, 파츠가 있고 모두 hp 가 찼다.
 // 게임의 인부 쪽 경로와 같은 조건이다(남은 작업 0, 자재 충족). 주인 조건은 AI 영주의 건물을 건드리지 않기 위한 것이다.
 bool readyToFinish(const uint8_t* master);
