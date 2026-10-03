@@ -977,3 +977,24 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 
 ### 조사 중에 있던 일
 - 세션이 길어 게임이 `autosave`를 덮어썼다(19:29). 시작 전에 받아 둔 백업(`backups/20261003-185836`)에서 여섯 파일을 되돌렸다.
+## 즉시 수리 — 내 영지 전체 (2026-10-03)
+사용자 요청: 즉시 수리를 내 영지 전체에 듣게. 위 "즉시 수리 — 건물에 남는 유지보수 물자"에서 치트가 폰의 `currentRegion` 영지에만 듣는 것을 쟀다.
+
+### 구현
+- `features/build.lua`의 `maintainMyRegions`: 폰의 `currentRegion`을 읽어 두고, 내 영지 가운데 그 영지가 아닌 것마다 `pawn.currentRegion = 영지` 뒤 `MaintainAllBuildings()`를 부른다. 끝나면(치트가 실패해도) 원래 값으로 돌려놓고, 원래 영지가 내 것이면 그 영지에도 부른다. 원래 영지가 내 것이 아니면 그 영지에는 부르지 않는다. `currentRegion`을 읽지 못하면 예전처럼 한 번만 부른다.
+- 한 번의 게임 스레드 호출 안에서 바꾸고 되돌린다.
+
+### 검증 (saveGame_1, 즉시 수리만 켬, 저장 없이 종료)
+- 두 영지의 유지보수 대상 건물이 모두 1.00이 됐다: Himmelreich 9채(일꾼이 없어 원래 방식으로는 유지보수되지 않던 종류 18, 89, 7 포함), Im Graben 2채. Im Graben의 벌목장에 남아 있던 도구도 사라졌다.
+- 같은 동작을 Lab으로 한 번 실행: 전후 모두 `currentRegion` = Himmelreich, `regionUnderCursor` = Himmelreich, `RegionPanelTarget` = Himmelreich. 12초 뒤까지 같았고 화면 위쪽의 영지 이름과 카메라 위치도 같았다(캡처 비교).
+- 실행 중에 기능을 켜고 38초(tick 네 번): `currentRegion` 그대로, 화면 그대로, 로그 오류 0.
+- 불러올 때부터 켠 경우를 두 번 봤다.
+  - 첫 번째: 불러온 직후 `currentRegion`이 Himmelreich였다가 6초 뒤 Tuefelsberg(내 영지가 아님)였고, 화면도 Tuefelsberg의 숲이었다.
+  - 두 번째(같은 조건): 0초에 `regionUnderCursor`만 Tuefelsberg였고 5초 뒤 Himmelreich, `currentRegion`은 계속 Himmelreich, 화면은 Himmelreich의 풀밭.
+  - 기능을 끈 채 켠 한 번: 계속 Himmelreich.
+  - 첫 번째가 왜 달랐는지는 확인하지 못했다. 불러온 직후 카메라가 Tuefelsberg 쪽에서 시작해 내 영지로 옮겨 가는 것으로 보이는데(두 번째의 0초 값), 첫 번째에서는 옮겨 가지 않았다. 모드의 코드는 읽어 둔 값을 그대로 되돌리므로 게임이 갖고 있지 않던 값을 넣지는 않는다.
+- 테스트: .NET·Lua 107개, 네이티브 225개 통과.
+
+### 확인하지 못한 것
+- 다른 영주의 영지를 보고 있을 때(스펙 `instant_repair_never_runs_on_a_region_that_is_not_mine`으로만 확인).
+- 영지가 셋 이상일 때.

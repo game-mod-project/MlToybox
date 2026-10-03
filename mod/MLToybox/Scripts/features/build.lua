@@ -170,11 +170,38 @@ local function useUpLeftoverSupplies()
   end
 end
 
+-- 게임의 유지보수 치트(MaintainAllBuildings)는 폰의 currentRegion 인 영지에만 듣는다(실측 2026-10-03, findings "즉시 수리 — 내 영지 전체").
+-- 내 영지를 하나씩 현재 영지로 두고 부른 뒤 원래 값으로 돌려놓는다. 한 번의 게임 스레드 호출 안에서 끝나므로 게임은 바뀐 값을 보지 못한다.
+-- 화면의 영지가 내 것이 아니면 그 영지에는 부르지 않는다. 현재 영지를 읽지 못하면 예전처럼 한 번만 부른다
+local function maintainMyRegions(cheat)
+  local pawn = game.pawn()
+  local current = pawn and pawn.currentRegion
+  if not safe.valid(current) then
+    cheat:MaintainAllBuildings()
+    return
+  end
+  local here = current:GetAddress()
+  local viewingMine = false
+  local ok, err = pcall(function()
+    for _, region in ipairs(game.playerRegions()) do
+      if region:GetAddress() == here then
+        viewingMine = true
+      else
+        pawn.currentRegion = region
+        cheat:MaintainAllBuildings()
+      end
+    end
+  end)
+  pawn.currentRegion = current
+  if not ok then error(err, 0) end
+  if viewingMine then cheat:MaintainAllBuildings() end
+end
+
 function M.tick(_, settings)
   if not settings.instantRepair then return end
   local cheat = game.cheat()
   if not cheat then return end
-  cheat:MaintainAllBuildings()
+  maintainMyRegions(cheat)
   useUpLeftoverSupplies()
 end
 
