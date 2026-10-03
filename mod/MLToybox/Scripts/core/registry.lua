@@ -102,13 +102,15 @@ function M.new()
       local f = self.features[name]
       -- poll 은 간격 없이 매번 돈다(화면 상태를 바로 따라가야 하는 일). 실패해서 기능이 꺼졌으면 아래 tick 은 건너뛴다
       if self.active[name] and f.poll then self:_invoke(name, "poll") end
-      if self.active[name] and f.tick then
+      -- 켜져 있으면 tick, 꺼져 있으면 게임 안에서 observe(읽기만 하는 일: 꺼 둔 기능의 탭에도 지금 값을 보여 준다). 간격은 같다
+      local method = self.active[name] and "tick" or (self.state.inGame and not self.tripped[name] and "observe") or nil
+      if method and f[method] then
         local s = self.settings[name]
         local interval = (type(s) == "table" and tonumber(s.intervalSec)) or f.intervalSec or M.DEFAULT_INTERVAL
         local last = self.lastTick[name]
         if last == nil or now - last >= interval then
           self.lastTick[name] = now
-          self:_invoke(name, "tick")
+          self:_invoke(name, method)
         end
       end
     end
