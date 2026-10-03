@@ -30,7 +30,22 @@ function M.status(statusPath, now, loaded, loadErr)
       if type(d.features) == "table" and next(d.features) then out.features = d.features end
     end
   end
+  M.last = out
   return out
+end
+
+-- 네이티브 DLL 이 그 항목들을 모두 설치했는가(마지막으로 읽은 상태로 본다).
+-- true: 네이티브가 그 일을 맡았다. false: 못 맡는다(DLL 을 올리지 못했거나 항목이 설치되지 않았다). nil: 아직 모른다(상태를 못 읽었다)
+function M.installed(names)
+  local s = M.last
+  if not s then return nil end
+  if not s.loaded then return false end
+  if s.stale or type(s.features) ~= "table" then return nil end
+  for _, name in ipairs(names) do
+    local f = s.features[name]
+    if not (type(f) == "table" and f.installed == true) then return false end
+  end
+  return true
 end
 
 -- 오버레이 DLL 이 쓰는 overlay_status.json 을 합친다. 올리지 못했으면 파일을 보지 않는다(지난 실행의 파일이 남아 있을 수 있다)

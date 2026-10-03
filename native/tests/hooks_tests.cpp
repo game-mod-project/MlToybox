@@ -115,6 +115,31 @@ TEST(resolve_only_spec_leaves_the_address_empty_when_the_layout_differs) {
     CHECK(m.states()[0].error == "layout check failed: DE AD");
 }
 
+namespace {
+int g_configured = 0; bool g_lastPlacement = false;
+void configureProbe(const NativeControl& c) { ++g_configured; g_lastPlacement = c.ignorePlacement; }
+}
+
+TEST(configure_passes_the_control_to_an_installed_spec_on_every_sync) {
+    // 한 후킹이 옵션 여럿을 맡을 때 detour 가 어느 옵션이 켜졌는지 알아야 한다
+    std::array<uint8_t, 4> text{ 0xAA, 0xBB, 0xCC, 0x90 };
+    HookManager m; FakeBackend be;
+    HookSpec s{ "b", "AA BB CC", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    s.configure = &configureProbe;
+    m.add(s);
+    HookSpec missing{ "missing", "DE AD", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    missing.configure = &configureProbe;
+    m.add(missing);
+    m.installAll(text, 0, be);
+    g_configured = 0;
+    NativeControl c; c.ignorePlacement = true;
+    m.sync(c, be);
+    CHECK(g_configured == 1 && g_lastPlacement);      // 설치되지 않은 항목에는 부르지 않는다
+    c.ignorePlacement = false;
+    m.sync(c, be);
+    CHECK(g_configured == 2 && !g_lastPlacement);     // 후킹을 켜고 끌 일이 없어도 옵션은 매번 전한다
+}
+
 TEST(create_failure_reported_and_never_enabled) {
     std::array<uint8_t, 4> text{ 0xAA, 0xBB, 0xCC, 0x90 };
     HookManager m; FakeBackend be; be.failCreate = true;

@@ -2,7 +2,17 @@ local T = require("t")
 local F = require("fakes")
 local datatable = require("core.datatable")
 local game = require("core.game")
+local native = require("core.native")
 local build = require("features.build")
+
+-- 네이티브가 "플레이어의 배치 판정 동안만 행을 고치는 일"을 맡았는가: true 맡음, false 못 맡음(DLL 없음), nil 아직 모름
+local function nativeCan(v)
+  if v == nil then native.last = nil
+  elseif v then
+    native.last = { loaded = true, stale = false, features = {
+      placement = { installed = true }, building_row = { installed = true }, placement_rows = { installed = true } } }
+  else native.last = { loaded = false, stale = true } end
+end
 
 local function setup()
   local rows = { ["3"] = { constructionGoods = F.array({ { Type = 16, amt = 4 } }) }, ["72"] = { constructionGoods = F.array({ { Type = 17, amt = 2 } }) } }
@@ -106,53 +116,107 @@ T.run({
     build.poll({}, { enabled = true, instantBuild = true })
     build.disable({}, { enabled = true, instantBuild = true })
   end,
-  no_region_limit_clears_max_in_region = function()
+  -- 지역당 개수 제한과 건설 자재: 네이티브가 플레이어의 배치 판정 동안만 표의 행을 고친다
+  -- (findings "표를 바꾸는 기능을 플레이어에게만 — 방법 조사"). 표를 바꾸면 AI 영주도 읽으므로 Lua 는 표를 건드리지 않는다
+  the_stats_table_is_left_alone_when_native_scopes_the_rows_to_the_player = function()
+    placement()
+    local rows, unbuilt, built = setup()
+    rows["57"] = { constructionGoods = F.array({}), maxInRegion = 1 }
+    nativeCan(true)
+    local settings = { enabled = true, noRegionLimit = true, noMaterials = true }
+    build.enable({}, settings)
+    build.poll({}, settings)
+    T.eq(rows["57"].maxInRegion, 1, "limit kept in the table"); T.eq(#rows["3"].constructionGoods, 1, "goods kept in the table")
+    T.eq(#unbuilt.constructionGoods, 0, "my site still loses its goods list"); T.eq(#built.constructionGoods, 1, "built untouched")
+  end,
+  -- 네이티브가 못 맡으면(DLL 을 올리지 못했다, 게임 업데이트로 함수를 못 찾았다) 예전처럼 표를 바꾼다. 이때는 AI 영주에게도 적용된다
+  without_native_no_region_limit_clears_max_in_region_in_the_table = function()
     -- 실측: 수비용 탑(manor_keep_lv1) 등 9개 행이 maxInRegion=1, 나머지 93개 행은 0(제한 없음)
     local rows = setup()
     rows["57"] = { constructionGoods = F.array({}), maxInRegion = 1 }
     rows["3"].maxInRegion = 0
+    nativeCan(false)
     build.enable({}, { enabled = true, noRegionLimit = true })
     T.eq(rows["57"].maxInRegion, 0, "limit removed"); T.eq(rows["3"].maxInRegion, 0, "unlimited stays")
+    T.eq(#rows["3"].constructionGoods, 1, "goods are another option")
   end,
-  no_region_limit_off_leaves_data = function()
-    local rows = setup()
-    rows["57"] = { constructionGoods = F.array({}), maxInRegion = 1 }
-    build.enable({}, { enabled = true, noRegionLimit = false })
-    T.eq(rows["57"].maxInRegion, 1, "untouched")
-  end,  no_materials_clears_stats_and_unbuilt_only = function()
+  without_native_no_materials_clears_the_goods_in_the_table = function()
     local rows, unbuilt, built = setup()
+    nativeCan(false)
     build.enable({}, { enabled = true, noMaterials = true })
     T.eq(#rows["3"].constructionGoods, 0, "stats row"); T.eq(#rows["72"].constructionGoods, 0, "stats row 2")
     T.eq(#unbuilt.constructionGoods, 0, "unbuilt cleared"); T.eq(#built.constructionGoods, 1, "built untouched")
   end,
-  no_materials_off_leaves_data = function()
+  the_options_off_leave_the_table_alone_either_way = function()
     local rows = setup()
-    build.enable({}, { enabled = true, noMaterials = false })
-    T.eq(#rows["3"].constructionGoods, 1, "untouched")
+    rows["57"] = { constructionGoods = F.array({}), maxInRegion = 1 }
+    nativeCan(false)
+    build.enable({}, { enabled = true, noRegionLimit = false, noMaterials = false })
+    T.eq(rows["57"].maxInRegion, 1, "limit untouched"); T.eq(#rows["3"].constructionGoods, 1, "goods untouched")
   end,
-  instant_repair_maintains_on_tick = function()
+  the_table_waits_until_the_native_state_is_known = function()
+    -- 맵을 불러온 직후에는 네이티브 상태를 아직 읽지 못했을 수 있다. 표를 바꾸면 되돌릴 수 없으므로 알 때까지 기다린다
+    placement()
+    local rows = setup()
+    rows["57"] = { constructionGoods = F.array({}), maxInRegion = 1 }
+    local settings = { enabled = true, noRegionLimit = true, noMaterials = true }
+    nativeCan(nil)
+    build.enable({}, settings)
+    build.poll({}, settings)
+    T.eq(rows["57"].maxInRegion, 1, "not yet"); T.eq(#rows["3"].constructionGoods, 1, "not yet")
+    nativeCan(false)
+    build.poll({}, settings)
+    T.eq(rows["57"].maxInRegion, 0, "native cannot: the table after all"); T.eq(#rows["3"].constructionGoods, 0, "goods too")
+  end,
+  an_option_turned_on_later_still_reaches_the_table_without_native = function()
+    placement()
+    local rows = setup()
+    rows["57"] = { constructionGoods = F.array({}), maxInRegion = 1 }
+    nativeCan(false)
+    build.enable({}, { enabled = true, noRegionLimit = true, noMaterials = false })
+    T.eq(#rows["3"].constructionGoods, 1, "goods option is off")
+    build.configure({}, { enabled = true, noRegionLimit = true, noMaterials = true })
+    T.eq(#rows["3"].constructionGoods, 0, "turned on from the panel")
+  end,  instant_repair_maintains_on_tick = function()
     local _, _, _, cheat = setup()
     build.tick({}, { enabled = true, instantRepair = true })
     T.eq(cheat.maintained, 1, "maintained")
     build.tick({}, { enabled = true, instantRepair = false })
     T.eq(cheat.maintained, 1, "not when off")
   end,
-  no_materials_clears_sites_on_tick_when_enable_ran_before_regions_existed = function()
-    local rows, unbuilt = setup()
+  -- 표의 자재를 그대로 두므로 새로 놓은 건물은 자재 목록을 갖고 생긴다. 운반이 시작되기 전에 비우도록 매 poll(1초)에 비운다
+  no_materials_clears_my_sites_on_every_poll = function()
+    placement()
+    local _, unbuilt, built = setup()
+    nativeCan(true)
     local regions = game.playerRegions
     game.playerRegions = function() return {} end          -- 로드 직후: 아직 지역 없음
     build.enable({}, { enabled = true, noMaterials = true })
     T.eq(#unbuilt.constructionGoods, 1, "not reachable at enable")
     game.playerRegions = regions
+    build.poll({}, { enabled = true, noMaterials = true })
+    T.eq(#unbuilt.constructionGoods, 0, "cleared on the next poll"); T.eq(#built.constructionGoods, 1, "built untouched")
+    unbuilt.constructionGoods = F.array({ { Type = 16, amt = 2 } })   -- 새로 놓은 건물
     build.tick({}, { enabled = true, noMaterials = true, instantRepair = false })
-    T.eq(#unbuilt.constructionGoods, 0, "cleared on tick")
+    T.eq(#unbuilt.constructionGoods, 1, "the 10 second tick no longer does it")
+    build.poll({}, { enabled = true, noMaterials = true })
+    T.eq(#unbuilt.constructionGoods, 0, "poll does")
+  end,
+  no_materials_off_keeps_the_goods_of_my_sites = function()
+    placement()
+    local _, unbuilt = setup()
+    nativeCan(true)
+    build.enable({}, { enabled = true, noMaterials = false })
+    build.poll({}, { enabled = true, noMaterials = false })
+    T.eq(#unbuilt.constructionGoods, 1, "kept")
   end,
   invalid_building_elements_are_skipped = function()
+    placement()
     setup()
     local region = F.object({})
     region.GetBuildings = function() return { F.wrap(nil), F.wrap(F.invalid()) } end
     game.playerRegions = function() return { region } end
-    build.tick({}, { enabled = true, noMaterials = true })
+    build.poll({}, { enabled = true, noMaterials = true })
   end,
   -- 이미 공사 중인 건물(업그레이드 포함): 진행도 함수를 부르면 네이티브가 파츠 hp 를 채우고 게임의 완공 함수를 부른다.
   -- 네이티브는 낼 자재가 없는 건물만 완공 처리하므로 자재 목록을 먼저 비운다. 완공된 건물은 건드리지 않는다

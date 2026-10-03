@@ -8,6 +8,8 @@ struct NativeControl {
     bool instantBuild = false;
     bool ignorePlacement = false;
     bool ignorePopulation = false;
+    bool noRegionLimit = false;
+    bool noMaterials = false;
 };
 std::optional<NativeControl> parseControl(std::string_view text);
 }
