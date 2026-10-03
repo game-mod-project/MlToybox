@@ -697,3 +697,46 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 벌목장의 한도만 100으로 올리고 게임 시간을 12배로 흘렸다. 11일이 지나도(`daysTotal` 297 → 308) 벌목장의 항목은 `day=297` 그대로 남았다. 저택의 항목은 날마다 `day`가 현재 날짜로 바뀌었다(게임이 가득 찬 건물의 항목은 날마다 갱신하고, 더는 가득 차지 않은 건물의 항목은 그대로 둔다).
 - 벌목장에 `verifyStorageProblems()`를 부르자 그 항목이 바로 사라졌다(문제 3개 → 2개). 화면 위쪽 문제 표시줄의 저장 아이콘에 붙어 있던 숫자 2도 사라졌다(캡처 비교). 그 뒤 `updateProblems()`, `updateProblemUI()`는 변화가 없었다(항목이 이미 사라진 뒤라 이 둘이 단독으로 지우는지는 재지 못했다).
 - 조치: `features/storage.lua`가 건물의 한도를 바꿀 때마다(올릴 때, 되돌릴 때) 그 건물의 `verifyStorageProblems()`를 부른다. 바꾸지 않은 건물은 부르지 않는다(스펙 `changing_a_limit_asks_the_game_to_recheck_the_buildings_storage_problems`).
+
+## 즉시 완공 — instaBuild 플래그 (2026-10-03, Steam buildid 24905706)
+사용자 요청: 건물을 놓는 순간 완공되게. 그때까지의 "즉시 완공"은 10초마다 파츠 hp만 채우고(Plan 3 부록 A.1) 완공 처리는 게임에 맡겨서, 놓고 수십 초가 걸리고 인부가 없으면 미완공으로 남았다(시험 세이브에 진행도 1.000인데 `not_enough_workers`로 남은 건물 14개).
+
+### 실행 파일에서 읽은 것
+- 엔진에 디버그 플래그 목록이 있다: `ARTSMultiEngineCPP.drawDebugFlags : TArray<FName>`(0x10C0, 리플렉션 필드). 목록에 이름이 있는지 보는 함수가 `0x144AA4230(목록, const char*)`이고 부르는 곳이 134곳이다.
+- 문자열 `"instaBuild"`(ASCII, `0x147EC5440`)를 쓰는 곳은 다섯이다.
+  - `ASMBuildingMaster::SetupBuilding`(구현 `0x144C9A720`, `0x144C9A747`): 플래그가 있으면 `Data.constructed`를 1로 한다. 같은 함수가 파츠를 만들 때 `constructed`이면 hp를 maxHp로 둔다(`0x144C9D9FB`). 소유자 검사는 없다.
+  - 플레이어의 배치 코드(`0x144AC5A6C`): 플래그 값을 `Data.constructed`에 쓴다(`0x144AC5A85`).
+  - `convertBlueprintsToBuildings`로 보이는 함수(`0x144CADF50`, `0x144CAE023`), 공사 갱신 함수(`0x144C8E950`, `0x144C8EA93`: 파츠의 꼬리표에 `instaBuild`가 있으면 건너뛴다), 큰 엔진 함수(`0x144C3BCAD`).
+- 완공 플래그는 `ASMBuildingMaster.Data.constructed`다(`FBuildingDataStruct`가 건물+0x3A8, `constructed`는 +9 = 건물+0x3B1. 리플렉션 필드). `IsConstructed()`가 읽는 바이트와 같다.
+- 배치 모드: `APawnCPP::isInAnyConstructionMode()`(구현 `0x144AE5F50`)는 `roadmode`(0x7B0) 또는 `placeBuilding`(0x608) > 0 또는 `placeFieldMode`(0xF21)이다. 셋 다 리플렉션 필드다.
+- "공사를 끝내라"는 리플렉션 함수는 없다(건물, 치트 관리자).
+
+### 실측 (saveGame_8, 저장 없이 종료. 모드의 즉시 완공·자재 불필요·자원 유지는 끔)
+- Lua로 플래그를 넣을 수 있다: `engine.drawDebugFlags = { FName("instaBuild") }` 뒤 `#flags` 0 → 1(Max 4), 유닛의 `getDebugFlag(FName("instaBuild"))`가 false → true. `:Empty()`로 비운다.
+- 같은 벌목장(건물 종류 4, 자재 목재 2)을 사용자가 직접 놓았다.
+  - 플래그를 켜고 놓은 2개: 처음 읽을 때(놓고 1초 안)부터 `constructed=true`, 진행도 1.000, 상태 `Finished`, 자재 목록 0개. 화면에 완성된 건물. 목재 재고는 줄지 않았다(696 → 698 → 700). 3초 뒤 모드의 저장 한도(2800)가 적용됐다.
+  - 플래그를 끄고 놓은 2개: `constructed=false`, 진행도 0.000, 자재 목록 1개, 35초 뒤에도 그대로.
+- 이미 놓인 미완공 건물에는 효과가 없다: 플래그를 다시 켜고 25초 뒤에도 위의 미완공 2개는 진행도 0.000이었다. 기존 미완공 건물이 완공되는 속도는 플래그와 무관했다(끈 55초 동안 AI 영지 eich 21 → 13, 내 영지 Lei 3 → 0).
+- 플래그가 꺼져 있을 때 AI가 놓은 건물(종류 86, eich)은 미완공으로 생겼다. 플래그가 켜진 동안 AI가 놓은 건물은 보지 못했다.
+- 배치 모드 값: 건물 배치 `pawn:setPlacedBuilding(4)` → `placeBuilding` 0 → 4, 놓은 뒤 0. 거주 구획 도구 → `placeBuilding=0`, `placeFieldMode=true`.
+- 건물을 놓는 클릭은 창 메시지(`WM_LBUTTONDOWN`/`UP`, `WM_ACTIVATE`를 먼저 보낸 것 포함)와 폰의 `InpActEvt_LeftMouseButton_K2Node_InputKeyEvent_0/1` 호출로는 되지 않았다. 사용자가 눌렀다.
+
+### 구현과 검증
+- `features/build.lua`의 `poll`(1초마다, `core/registry.lua`가 간격과 무관하게 부른다): `instantBuild`가 켜져 있고 `pawn.placeBuilding > 0` 또는 `pawn.placeFieldMode`이면 목록에 `instaBuild`를 넣고, 아니면 뺀다. 다른 플래그는 그대로 둔다. `disable`은 플래그를 빼고, 맵을 떠날 때는 건드리지 않는다. 도로 모드는 건물이 생기지 않아 보지 않는다.
+- 게임 확인(고친 모드, `instantBuild`만 켬):
+  - 배치 모드가 아닐 때 목록은 비어 있다. 배치 모드에 들어가면 0.3~1.5초 뒤 플래그가 들어가고, 나오면 0.4초 뒤 빠진다.
+  - 배치 중에 `instantBuild`를 끄면 0.9초, 건설 기능을 끄면 1.5초 뒤 빠지고 다시 켜면 돌아온다. 로그에 오류 없음.
+  - 사용자가 놓은 벌목장 1개, 종류 34 건물 1개, 거주 구획 13필지: 처음 읽을 때부터 `constructed=true`, 상태 `Finished`. 거주 구획은 생긴 직후 한 번 진행도가 NaN으로 읽혔고(파츠가 아직 없을 때의 0/0) 0.6초 뒤 1.000이었다.
+
+### 측정 도구가 낸 크래시 (2026-10-03 14:48)
+- Lab 스크립트 안에서 `LoopAsync(200, ...)` + `ExecuteInGameThread`로 0.2초마다 건물 목록을 도는 감시를 건 세션에서 게임이 튕겼다(`EXCEPTION_ACCESS_VIOLATION reading 0xf`). 호출 스택은 게임 틱 → UE4SS의 게임 스레드 작업 → Lua 인터프리터이고, 직전에 감시가 `Global for __index doesn't exist` 오류를 남겼다. 감시가 원인으로 보인다(심볼이 없어 추정). 세이브는 바뀌지 않았다.
+- 그 뒤로는 감시 루프 없이 밖에서 `lab.ps1`을 여러 번 불러 쟀고(`analysis/dumps/probes/ib*.lua`) 크래시가 없었다.
+- 세션이 길면 게임이 `autosave`를 덮는다. 세션 전에 `backup-saves.ps1`로 받아 둔 사본에서 되돌렸다.
+
+### 업그레이드와 이미 공사 중인 건물 (읽은 것, 구현하지 않음)
+- 업그레이드는 건물을 새로 만들지 않는다. `useUpgrade`(구현 `0x144CDD830`)가 `Data.constructed`를 0으로 돌리고 `spawnBuildingsForUpgrade`(`0x144CCE840`)로 파츠를 더한다. 이 경로에는 `instaBuild` 검사가 없어 플래그로는 바로 완공되지 않는다(사용자 확인: 업그레이드는 바로 완공되지 않았다).
+- 게임의 완공 처리 함수는 `0x144CB7890(건물)`이다: `constructed = 1`, `isBeingUpgraded = 0`, 건설 자재 소비, 영지 갱신. 부르는 곳은 둘이다(엔진 쪽 `0x144C4270E`, 인부 쪽 `0x144D74E4F`). 엔진 쪽은 먼저 `0x144C97840(건물)`이 참인지 본다: 파츠 배열(+0x2F8)의 모든 파츠에서 바이트 `+0x312`가 0일 때 참이다. 지금의 후킹은 파츠의 hp(+0x314)만 채우고 이 바이트는 건드리지 않는다.
+
+### 확인하지 못한 것
+- 플래그가 켜진 동안 AI가 새로 놓는 건물(코드로는 완공 상태로 생긴다).
+- 밭, 목초지, 영주 저택 모듈.
