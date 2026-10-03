@@ -56,6 +56,51 @@ local function placement(opts)
   return pawn, flags, function() return writes end
 end
 
+-- 유지보수 물자가 남은 건물이 있는 영지. 벌목장: 일반 한도 0, 일반 물자 1개(철제 도구 6), 목재(16)는 목재 저장실에 있다.
+-- opts.supply / opts.kind 로 유지보수 물자와 그 보관 방식을 바꾼다(기본 6, 일반 = 0)
+local STORED = { [0] = "numStoredGeneric", [1] = "numStoredLarge", [2] = "numStoredPantry" }
+local function supplySite(opts)
+  opts = opts or {}
+  local supply, kind = opts.supply or 6, opts.kind or 0
+  local items = { ["6"] = { storageType = 0 }, ["16"] = { storageType = 1 }, ["172"] = { storageType = 2 } }
+  items[tostring(supply)] = { storageType = kind }
+  datatable.find = function(p) if p == datatable.PATHS.items then return F.datatable(items) end end
+  local function maintained(goods)
+    local comp = F.object({})
+    comp.GetTrackedMaintenanceTypes = function() return { F.wrap({ goodTypes = F.array(goods) }) } end
+    return comp
+  end
+  local function building(fields)
+    local b = F.object(fields)
+    b.IsConstructed = function() return true end
+    return b
+  end
+  local camp = building({ storageLimitGeneric = 0, storageLimitLarge = 28, storageLimitPantry = 0, numStoredGeneric = 0, numStoredLarge = 4, numStoredPantry = 0,
+    Inventory = F.array({ { Type = supply, amt = 1 }, { Type = 16, amt = 4 } }), MaintenanceComponent = maintained({ supply }) })
+  camp[STORED[kind]] = (kind == 1) and 5 or 1
+  local list = { F.wrap(camp) }
+  if opts.roomy then
+    list[#list + 1] = F.wrap(building({ storageLimitGeneric = 50, storageLimitLarge = 0, storageLimitPantry = 0, numStoredGeneric = 1, numStoredLarge = 0, numStoredPantry = 0,
+      Inventory = F.array({ { Type = 6, amt = 1 } }), MaintenanceComponent = maintained({ 6 }) }))
+  end
+  if opts.pile then
+    local none = F.object({})
+    none.GetTrackedMaintenanceTypes = function() return {} end
+    list[#list + 1] = F.wrap(building({ storageLimitGeneric = 0, storageLimitLarge = 0, storageLimitPantry = 0, numStoredGeneric = 470, numStoredLarge = 0, numStoredPantry = 0,
+      Inventory = F.array({ { Type = 6, amt = 470 } }), MaintenanceComponent = none }))
+  end
+  local site = { camp = camp, consumed = {} }
+  local region = F.object({})
+  region.GetBuildings = function() return list end
+  region.consumeGood = function(_, goodType, amt, b, scramble, respectReservation, redistribute)
+    site.consumed[#site.consumed + 1] = { type = goodType, amt = amt, building = b, scramble = scramble, respectReservation = respectReservation, redistribute = redistribute }
+    return true
+  end
+  game.playerRegions = function() return { region } end
+  local cheat = { MaintainAllBuildings = function() end }
+  game.cheat = function() return cheat end
+  return site
+end
 T.run({
   -- 새로 놓는 건물: 게임은 엔진의 디버그 플래그에 instaBuild 가 있으면 건물을 놓는 순간 완공 상태로 만든다(findings "즉시 완공 — instaBuild 플래그").
   -- 플래그는 AI 영주의 건물에도 적용되므로 내가 배치하는 동안만 넣는다
@@ -256,6 +301,43 @@ T.run({
     build.poll({}, { enabled = true, instantBuild = false })    -- 옵션을 껐다 켜도 처음부터 다시 센다
     build.poll({}, { enabled = true, instantBuild = true })
     T.eq(calls, 0, "first poll after turning the option back on")
+  end,
+  -- 즉시 수리의 치트는 물자를 쓰지 않고 건물을 채운다. 그때 일꾼이 이미 유지보수 물자를 나르고 있었으면 도착한 물자가 건물에 남는다
+  -- (실측 2026-10-03: 벌목장에 철제 도구 1개). 그 종류의 저장 한도가 0 인 건물이면 게임이 "저장실 가득 참"을 붙인다.
+  -- 치트가 대신 한 유지보수에 쓰였어야 할 물자이므로 그 건물에서 소모시킨다
+  instant_repair_uses_up_a_supply_left_in_a_building_with_no_room_for_it = function()
+    local site = supplySite()
+    build.tick({}, { enabled = true, instantRepair = true })
+    T.eq(#site.consumed, 1, "one consume call")
+    local c = site.consumed[1]
+    T.eq(c.type, 6, "the iron tools"); T.eq(c.amt, 1, "all of them"); T.eq(c.building, site.camp, "from that building")
+    T.eq(c.scramble, false, "not from anywhere else"); T.eq(c.respectReservation, false, "reservation flag"); T.eq(c.redistribute, false, "market flag")
+  end,
+  instant_repair_leaves_other_goods_and_buildings_alone = function()
+    local site = supplySite({
+      roomy = true,        -- 일반 한도가 있는 건물에 든 도구: 자리가 있으니 표시가 붙지 않는다
+      pile = true,         -- 유지보수 대상이 아닌 건물(야적 물자 등)에 든 도구
+    })
+    build.tick({}, { enabled = true, instantRepair = true })
+    T.eq(#site.consumed, 1, "only the camp's tools: not its timber, not the workshop's tools, not the pile's")
+    T.eq(site.consumed[1].building, site.camp, "the camp")
+  end,
+  instant_repair_off_leaves_the_supplies_alone = function()
+    local site = supplySite()
+    build.tick({}, { enabled = true, instantRepair = false })
+    T.eq(#site.consumed, 0, "that is the game's own maintenance then")
+  end,
+  a_supply_kept_in_another_kind_of_storage_is_handled_the_same_way = function()
+    -- 식량 저장실(종류 2)에 들어가는 물자가 유지보수 물자인 건물, 식량 한도 0
+    local site = supplySite({ supply = 172, kind = 2 })
+    build.tick({}, { enabled = true, instantRepair = true })
+    T.eq(#site.consumed, 1, "consumed"); T.eq(site.consumed[1].type, 172, "the pantry good")
+  end,
+  a_building_that_cannot_tell_its_supplies_is_skipped = function()
+    local site = supplySite()
+    site.camp.MaintenanceComponent = F.invalid()
+    build.tick({}, { enabled = true, instantRepair = true })
+    T.eq(#site.consumed, 0, "no component: nothing to go by")
   end,
   tick_without_cheat_is_noop = function()
     setup()
