@@ -20,7 +20,91 @@ local function setup()
   return rows, unbuilt, built, cheat
 end
 
+-- 엔진의 디버그 플래그 목록(drawDebugFlags)과 플레이어 폰의 배치 상태. 게임처럼 Lua 표를 대입하면 배열이 통째로 바뀐다
+local function fname(s) return { ToString = function() return s end } end
+local function placement(opts)
+  opts = opts or {}
+  local items = {}
+  for i, s in ipairs(opts.flags or {}) do items[i] = fname(s) end
+  local store, writes = F.array(items), 0
+  local engine = setmetatable(F.object({}), {
+    __index = function(_, k) if k == "drawDebugFlags" then return store end end,
+    __newindex = function(t, k, v)
+      if k == "drawDebugFlags" then store = F.array(v); writes = writes + 1 else rawset(t, k, v) end
+    end,
+  })
+  local pawn = F.object({ placeBuilding = opts.placeBuilding or 0, placeFieldMode = opts.placeFieldMode or false })
+  game.engine = function() return engine end
+  game.pawn = function() return pawn end
+  game.fname = fname
+  local function flags()
+    local out = {}
+    for i = 1, #store do out[i] = store[i]:ToString() end
+    return table.concat(out, ",")
+  end
+  return pawn, flags, function() return writes end
+end
+
 T.run({
+  -- 새로 놓는 건물: 게임은 엔진의 디버그 플래그에 instaBuild 가 있으면 건물을 놓는 순간 완공 상태로 만든다(findings "즉시 완공 — instaBuild 플래그").
+  -- 플래그는 AI 영주의 건물에도 적용되므로 내가 배치하는 동안만 넣는다
+  placing_a_building_puts_the_insta_build_flag_on_the_engine = function()
+    local _, flags, writes = placement({ placeBuilding = 4 })
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(flags(), "instaBuild", "flag on while placing")
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(writes(), 1, "the list is not rewritten every second")
+  end,
+  leaving_placement_mode_takes_the_flag_off = function()
+    local pawn, flags = placement({ placeBuilding = 4 })
+    build.poll({}, { enabled = true, instantBuild = true })
+    pawn.placeBuilding = 0
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(flags(), "", "flag off once the building is placed or the mode is cancelled")
+  end,
+  placing_a_field_or_plot_counts_as_placing = function()
+    local _, flags = placement({ placeFieldMode = true })
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(flags(), "instaBuild", "placeFieldMode")
+  end,
+  not_placing_leaves_the_engine_alone = function()
+    local _, flags, writes = placement()
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(flags(), "", "no flag"); T.eq(writes(), 0, "nothing written")
+  end,
+  instant_build_off_never_sets_the_flag_and_clears_a_leftover = function()
+    local _, flags = placement({ placeBuilding = 4 })
+    build.poll({}, { enabled = true, instantBuild = false })
+    T.eq(flags(), "", "not set")
+    _, flags = placement({ placeBuilding = 4, flags = { "instaBuild" } })
+    build.poll({}, { enabled = true, instantBuild = false })
+    T.eq(flags(), "", "a flag left from before the option was turned off is removed")
+  end,
+  flags_the_game_already_had_are_kept = function()
+    local pawn, flags = placement({ placeBuilding = 4, flags = { "showPaths" } })
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(flags(), "showPaths,instaBuild", "added after the others")
+    pawn.placeBuilding = 0
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(flags(), "showPaths", "only ours is removed")
+  end,
+  disable_takes_the_flag_off_unless_the_map_is_going_away = function()
+    local _, flags, writes = placement({ placeBuilding = 4, flags = { "instaBuild" } })
+    build.disable({ leaving = true }, { enabled = true, instantBuild = true })
+    T.eq(flags(), "instaBuild", "leaving the map: the engine is about to go, leave it"); T.eq(writes(), 0, "untouched")
+    build.disable({}, { enabled = true, instantBuild = true })
+    T.eq(flags(), "", "turned off by the user")
+  end,
+  poll_without_pawn_or_engine_does_nothing = function()
+    local _, flags = placement({ placeBuilding = 4 })
+    game.pawn = function() return nil end
+    build.poll({}, { enabled = true, instantBuild = true })
+    T.eq(flags(), "", "no pawn: not placing")
+    placement({ placeBuilding = 4 })
+    game.engine = function() return nil end
+    build.poll({}, { enabled = true, instantBuild = true })
+    build.disable({}, { enabled = true, instantBuild = true })
+  end,
   no_region_limit_clears_max_in_region = function()
     -- 실측: 수비용 탑(manor_keep_lv1) 등 9개 행이 maxInRegion=1, 나머지 93개 행은 0(제한 없음)
     local rows = setup()

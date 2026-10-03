@@ -100,6 +100,8 @@ function M.new()
     self:_sync()
     for _, name in ipairs(self.order) do
       local f = self.features[name]
+      -- poll 은 간격 없이 매번 돈다(화면 상태를 바로 따라가야 하는 일). 실패해서 기능이 꺼졌으면 아래 tick 은 건너뛴다
+      if self.active[name] and f.poll then self:_invoke(name, "poll") end
       if self.active[name] and f.tick then
         local s = self.settings[name]
         local interval = (type(s) == "table" and tonumber(s.intervalSec)) or f.intervalSec or M.DEFAULT_INTERVAL

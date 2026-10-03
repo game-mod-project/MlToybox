@@ -71,6 +71,20 @@ T.run({
     r:tick(10); r:tick(11); r:tick(12)
     T.eq(count(a, "tick"), 2, "t=10 and t=12")
   end,
+  -- poll 은 간격과 무관하게 tick 을 부를 때마다(1초) 돈다: 화면 상태를 바로 따라가야 하는 일(features/build.lua 의 배치 모드)
+  poll_runs_on_every_tick_whatever_the_interval = function()
+    local r = registry.new()
+    local polls, ticks, got = 0, 0, nil
+    local a = { name = "a", intervalSec = 10, poll = function(state, s) polls = polls + 1; got = s end, tick = function() ticks = ticks + 1 end }
+    r:add(a); r:setInGame(true)
+    r:tick(99)
+    T.eq(polls, 0, "not while the feature is off")
+    r:apply({ a = { enabled = true, x = 7 } })
+    r:tick(100); r:tick(101); r:tick(102)
+    T.eq(polls, 3, "every tick"); T.eq(ticks, 1, "tick keeps its interval"); T.eq(got.x, 7, "poll gets the settings")
+    r:apply({ a = { enabled = false } }); r:tick(103)
+    T.eq(polls, 3, "stops with the feature")
+  end,
   trip_disables_only_that_feature = function()
     safe.setThreshold(3)
     local r = registry.new(); local bad, good = fake("bad", { fail = "tick" }), fake("good"); r:add(bad); r:add(good)
