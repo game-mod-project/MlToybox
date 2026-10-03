@@ -43,6 +43,26 @@ int fillParts(uint8_t* master, bool ownerOffsetsVerified) {
     return completeParts(master);
 }
 
+bool ownedByAnotherLord(const uint8_t* master) {
+    if (!master) return false;
+    const auto owner = reinterpret_cast<const uint8_t*>(read<std::uintptr_t>(master, kOwnerPawnOffset));
+    return owner && read<uint8_t>(owner, kPawnIsMainPlayerOffset) == 0;
+}
+
+int32_t hideFlags(uint8_t* engine) {
+    if (!engine) return -1;
+    const int32_t num = read<int32_t>(engine, kEngineFlagsNumOffset);
+    if (num <= 0) return -1;
+    const int32_t zero = 0;
+    std::memcpy(engine + kEngineFlagsNumOffset, &zero, sizeof zero);
+    return num;
+}
+
+void restoreFlags(uint8_t* engine, int32_t saved) {
+    if (!engine || saved < 0) return;
+    std::memcpy(engine + kEngineFlagsNumOffset, &saved, sizeof saved);
+}
+
 bool readyToFinish(const uint8_t* master) {
     if (!master || read<uint8_t>(master, kConstructedOffset) != 0) return false;
     if (!ownedByMainPlayer(master)) return false;
@@ -78,6 +98,37 @@ float __fastcall Detour(void* self) {
     return g_original(self);
 }
 
+using SetupFn = void(__fastcall*)(void* self);
+using ConvertFn = void(__fastcall*)(void* self, bool onlyFirst);
+SetupFn g_setup = nullptr;
+ConvertFn g_convert = nullptr;
+
+// 다른 영주의 건물에 대한 호출 동안만 플래그 목록을 비워 보인다. 주인 오프셋은 완공 처리 함수의 본문으로 확인한 것이라
+// 그 함수를 찾았을 때만 주인을 읽는다(못 찾았으면 아무것도 숨기지 않는다: 이전 동작).
+struct HideFromOtherLords {
+    uint8_t* engine = nullptr;
+    int32_t saved = -1;
+    explicit HideFromOtherLords(void* building) {
+        const auto master = static_cast<const uint8_t*>(building);
+        if (!g_finish || !ownedByAnotherLord(master)) return;
+        engine = reinterpret_cast<uint8_t*>(read<std::uintptr_t>(master, kBuildingEngineOffset));
+        saved = hideFlags(engine);
+    }
+    ~HideFromOtherLords() { restoreFlags(engine, saved); }
+    HideFromOtherLords(const HideFromOtherLords&) = delete;
+    HideFromOtherLords& operator=(const HideFromOtherLords&) = delete;
+};
+
+void __fastcall SetupDetour(void* self) {
+    HideFromOtherLords hide(self);
+    g_setup(self);
+}
+
+void __fastcall ConvertDetour(void* self, bool onlyFirst) {
+    HideFromOtherLords hide(self);
+    g_convert(self, onlyFirst);
+}
+
 bool wanted(const NativeControl& c) { return c.instantBuild; }
 }
 
@@ -103,6 +154,24 @@ void registerHook(HookManager& manager) {
     };
     finish.bodyWindow = 0x400;
     manager.add(finish);
+
+    // 플래그를 읽는 두 함수: 다른 영주의 건물이면 호출 동안 플래그를 숨긴다
+    HookSpec setup{ "instant_setup", kSetupPattern, reinterpret_cast<void*>(&SetupDetour), reinterpret_cast<void**>(&g_setup), &wanted };
+    setup.bodyChecks = {
+        "48 8B 89 E8 02 00 00",      // mov rcx,[rcx+2E8h]      엔진
+        "48 81 C1 C0 10 00 00",      // add rcx,10C0h           디버그 플래그 목록
+        "C6 86 B1 03 00 00 01",      // mov byte [rsi+3B1h],1   Data.constructed
+    };
+    setup.bodyWindow = 0x100;
+    manager.add(setup);
+
+    HookSpec convert{ "instant_convert", kConvertPattern, reinterpret_cast<void*>(&ConvertDetour), reinterpret_cast<void**>(&g_convert), &wanted };
+    convert.bodyChecks = {
+        "48 8B 98 C0 10 00 00",      // mov rbx,[rax+10C0h]     디버그 플래그 목록의 Data
+        "48 63 80 C8 10 00 00",      // movsxd rax,[rax+10C8h]  디버그 플래그 목록의 Num
+    };
+    convert.bodyWindow = 0x140;
+    manager.add(convert);
 }
 
 }
