@@ -38,11 +38,20 @@ function M.target(base, default, value)
   return math.min(math.floor(base * value / default + 0.5), M.MAX)
 end
 
+-- 한도를 바꾼 건물은 저장 문제 항목을 다시 검사하게 한다. 영지의 문제 목록(ARegion.problems)에 든 "저장실 가득 참"은
+-- 한도를 올려도 저절로 사라지지 않는다(실측 2026-10-03: verifyStorageProblems() 를 부르면 바로 사라지고 화면 표시도 바뀐다)
+local function recheck(b) b:verifyStorageProblems() end
+
 -- 우리가 쓴 값이 그대로 있을 때만 게임이 준 값으로 되돌린다(그사이 게임이 다시 계산했으면 그 값을 둔다)
 local function restore(b, t)
+  local changed = false
   for _, k in ipairs(KINDS) do
-    if t.applied[k.key] ~= nil and b[k.field] == t.applied[k.key] then b[k.field] = t.base[k.key] end
+    if t.applied[k.key] ~= nil and b[k.field] == t.applied[k.key] and b[k.field] ~= t.base[k.key] then
+      b[k.field] = t.base[k.key]
+      changed = true
+    end
   end
+  if changed then recheck(b) end
 end
 
 local function apply(b, addr, limits)
@@ -59,14 +68,19 @@ local function apply(b, addr, limits)
   if not def then return end
   if not t then t = { type = btype, base = {}, applied = {} } end
   tracked[addr] = t
+  local changed = false
   for _, k in ipairs(KINDS) do
     local current = b[k.field]
     -- 처음 보는 건물이거나, 게임이 값을 다시 계산했다(업그레이드 등): 지금 값이 게임이 준 값이다
     if t.applied[k.key] ~= current then t.base[k.key] = current end
     local target = M.target(t.base[k.key], def[k.key], want[k.key])
-    if target ~= current then b[k.field] = target end
+    if target ~= current then
+      b[k.field] = target
+      changed = true
+    end
     t.applied[k.key] = target
   end
+  if changed then recheck(b) end
 end
 
 local function forEachBuilding(fn)
