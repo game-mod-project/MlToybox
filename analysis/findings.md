@@ -786,6 +786,7 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 배치 제한 무시: 후킹한 배치 갱신 함수(`0x144AC61E0`)는 `isAI`(폰+0x34D)이면 바로 돌아간다(`0x144AC6216`). detour는 그 뒤 폰의 배치 불가 플래그만 지운다. AI 폰에서 이 플래그가 쓰이는 곳은 찾지 않았다.
 
 ### 다른 영주에게도 닿는 것
+같은 날 뒤에 고친 것: 업그레이드, 자재 불필요, 지역당 개수 제한 해제는 표를 바꾸지 않고 플레이어의 호출에만 적용한다(아래 "자재 불필요·개수 제한 해제를 내 배치에만", "업그레이드 조건·비용 무시를 내 건물에만"). 아래 세 항목은 고치기 전의 조사 결과다. 군사는 AI에게 닿는 곳이 없는 것으로 봤다("표를 바꾸는 기능을 플레이어에게만 — 방법 조사").
 - **업그레이드 조건·비용·해금 무시**: 게임 전체의 표(`DT_Upgrades`)와 설정(`ResidentialRequirementSettings`)을 바꾼다.
   - 실측: 기능을 끈 채 시작했을 때 다른 영주의 거주 구획 1레벨 14개는 `canUpgrade(2)`가 모두 false였다(이유 `construction_resources_missing` 14, `residential_requirements_not_met` 7). 기능을 켜자 14개 모두 true가 됐다. 내 것은 3/23 → 23/23.
   - 켠 뒤 2분 동안(게임 시간 약 8일) 다른 영주의 구획 수는 1레벨 32, 2레벨 6 그대로였다. AI가 이것으로 실제 업그레이드를 더 하는지는 재지 못했다.
@@ -901,3 +902,44 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 성 설계, 건물 이전, 밭.
 - 놓은 직후 자재 목록을 비우기 전(1초 이내)에 운반이 시작되는지.
 - 곁가지: 같은 세션에서 `pawn.silver`는 148500이었고 화면의 금고 표시는 148.5k였다.
+## 업그레이드 조건·비용 무시를 내 건물에만 — 구현과 검증 (2026-10-03, Steam buildid 24905706)
+"표를 바꾸는 기능을 플레이어에게만 — 방법 조사"의 방법 A 가운데 업그레이드 표 쪽.
+
+### 실행 파일에서 더 읽은 것
+- 행 함수(`0x144C50AD0`)를 부르는 16곳이 읽는 필드를 모두 봤다.
+  - `canUpgrade`: `bUseOnlyOnce`(+0x7F), `minimumSettlementLevel`(+0x78), `minimumHouseLv`(+0x7D), `treasury`(+0x54. 주인 폰+0xA40과 비교).
+  - 비용 지불 `0x144C8F6D0`: `treasury`(+0x54). `GetRegionalWealthCostForUpgrade`: `bIsCostScalable`(+0x38), `regionalWealth`(+0x50). `GetUpgradeResourceCost`: `cost`(+0x40, +0x48).
+  - AI 계획 함수 `0x144B5FCD0`(`0x144B61D38`): `cost`를 직접 읽는다.
+  - `requiresBuilding`(+0x58), `requiredPerks`(+0x68), `minimumProsperity`(+0x7C), `lockedInOutposts`(+0x7E)를 읽는 곳은 `getUpgradeData`의 썽크(`0x144A8A070`, 행을 통째로 블루프린트에 복사)뿐이다. 이 넷은 화면(블루프린트)만 읽는다.
+- 건물의 자재 목록(+0x3C0)은 `useUpgrade` 호출이 돌아온 뒤에 채워진다(아래 실측). 비용 지불 함수가 그때 불리므로 `useUpgrade`가 아니라 비용 지불 함수를 후킹해야 한다.
+
+### 구현
+- 네이티브 `features/upgrade_scope`: `upgrade_can`, `upgrade_pay`, `upgrade_cost`, `upgrade_wealth`의 detour가 건물의 주인이 `isMainPlayer`이면 행 함수로 그 업그레이드의 행을 얻어 `cost.Num`(+0x48), `regionalWealth`(+0x50), `treasury`(+0x54), `minimumSettlementLevel`(+0x78), `minimumHouseLv`(+0x7D)를 0으로 두고 원본을 부른 뒤 되돌린다(겹쳐 불려도 된다). `upgrade_residential`의 detour는 내 건물이면 참을 돌려준다. `upgrade_row`는 주소만 찾는다.
+- 주인·엔진 오프셋(+0x2E0, +0x2E8, 폰+0x34C)은 비용 지불 함수의 본문으로 확인한다. 그 함수와 행 함수를 찾았을 때만 주인을 읽는다.
+- 켜고 끄는 값은 `features.upgrade.enabled`(`NativeControl.upgradeFree`).
+- Lua `features/upgrade.lua`: 여섯 항목이 모두 설치됐으면 표에서 화면만 읽는 네 값만 바꾼다. 못 맡으면(false) 예전처럼 행 전체와 주거 요구 설정을 바꾸고, 아직 모르면(nil) 화면 값만 바꾼 채 기다린다(poll).
+- 게임을 켜지 않고 여섯 패턴과 본문 검사를 실행 파일에서 확인했다(모두 한 곳, 검사 통과).
+
+### 검증 (saveGame_8, 업그레이드 기능만 켬, 저장 없이 종료)
+- `native_status.json`: `upgrade_` 여섯 항목 모두 installed·active.
+- 기능을 켠 채로 표: 51행 가운데 `cost`가 있는 행 33, `regionalWealth` 28, `minimumSettlementLevel` 3, `minimumHouseLv` 11(원래 값). 화면만 읽는 넷은 모두 0. 주거 요구 설정의 `VarietyRequired`가 0이 아닌 값 33개(원래 값).
+- 거주 구획 1레벨(종류 3, 업그레이드 중이 아닌 것)에 업그레이드 2를 물었다:
+
+| | 구획 수 | `canUpgrade` 참 | 이유 | `GetUpgradeResourceCost` | `AllResidentialRequirementsSatisfied` 참 |
+|---|---|---|---|---|---|
+| 내 것, 기능 켬 | 23 | 23 | 없음 | 0종 | 23 |
+| 다른 영주, 기능 켬 | 14 | 0 | 자재 부족 14, 주거 요구 미충족 7 | 2종 | 7 |
+| 내 것, 기능 끔(4초 뒤) | 22 | 4 | 주거 요구 미충족 18 | 2종 | 4 |
+| 다른 영주, 기능 끔 | 15 | 0 | 자재 부족 15, 주거 요구 미충족 8 | 2종 | 7 |
+
+  - 다른 영주 쪽은 기능과 무관하게 같다(오전에 기능을 끈 채 잰 0/14, 이유 14·7과도 같다). 전에는 기능을 켜면 14/14가 됐다.
+- `useUpgrade(2)`를 걸었다. 호출 직후에는 두 경우 모두 자재 목록이 0개였고, 조금 뒤 읽으니:
+  - 기능을 켜고 건 구획(Mandlach): 종류 8, 자재 목록 없음, 상태 `constructing`.
+  - 기능을 끄고 건 구획(Haderwand, 원래도 올릴 수 있던 것): 종류 8, 자재 목록 목재 2·판자 6, 상태 `transporting`.
+  - 지역 자산과 `pawn.silver`는 두 경우 모두 그대로였다(이 업그레이드는 원래 지역 자산·금고 비용이 0이다).
+- 로그 오류 0, 크래시 없음, 세이브는 백업과 같음. 테스트: 네이티브 225개, .NET·Lua 107개, 도구 스크립트 통과. 패널 빌드 경고·오류 0.
+
+### 확인하지 못한 것
+- 건물 창의 업그레이드 버튼(화면). 버튼이 `canUpgrade` 말고 다른 것으로 켜지고 꺼지는지 모른다.
+- 지역 자산·금고 비용이 있는 업그레이드, 확장(`changeExtension`), 다시 짓기(업그레이드 16).
+- 기능을 끈 뒤에도 화면만 읽는 네 값은 표에 0으로 남는다(게임을 다시 켜야 돌아온다).
