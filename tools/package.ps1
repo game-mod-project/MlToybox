@@ -1,12 +1,13 @@
 # 릴리스용 압축 파일을 만든다: <OutDir>\MLToybox-<Version>.zip (기본 OutDir 은 dist).
 # 빌드 도구 없이 설치할 수 있는 묶음이다: 모드 폴더(Lua, 네이티브 DLL, 오버레이 DLL), 비상용 패널, 서드파티 라이선스, 설치 안내.
-# 설정·상태 파일(bridge 의 control.json 등), 테스트, 개발용 모드는 넣지 않는다.
+# 설정·상태 파일(bridge 의 control.json 등), 테스트, 개발용 모드, 도구가 소스 폴더에 남긴 점 폴더(.omc 등)는 넣지 않는다.
 #   -Version <글>   파일 이름과 설치 안내에 적을 판 이름(예: v1.0.0)
 #   -OutDir <폴더>  만들 곳
 #   -NoPanel        패널을 빼고 만든다(테스트용)
 # 네이티브 DLL 은 먼저 빌드돼 있어야 한다: pwsh tools/build-native.ps1 -Test
 param([Parameter(Mandatory)][string]$Version, [string]$OutDir, [switch]$NoPanel)
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\common.ps1"
 if ($Version -notmatch '^[0-9A-Za-z][0-9A-Za-z.\-]*$') { throw "bad version: $Version" }
 $repo = Split-Path $PSScriptRoot -Parent
 if (-not $OutDir) { $OutDir = Join-Path $repo 'dist' }
@@ -18,6 +19,7 @@ $mod = (New-Item -ItemType Directory -Force (Join-Path $stage 'MLToybox')).FullN
 $scripts = Join-Path $repo 'mod\MLToybox\Scripts'
 if (-not (Test-Path (Join-Path $scripts 'main.lua'))) { throw "Missing $scripts\main.lua" }
 Copy-Item $scripts (Join-Path $mod 'Scripts') -Recurse
+Remove-MLDotEntries (Join-Path $mod 'Scripts')
 
 # 2. 네이티브 DLL 과 오버레이 DLL
 $native = (New-Item -ItemType Directory -Force (Join-Path $mod 'native')).FullName

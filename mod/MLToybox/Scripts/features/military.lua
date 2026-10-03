@@ -1,7 +1,7 @@
 local datatable = require("core.datatable")
 local game = require("core.game")
 
--- 주민 수를 넘는 징집은 네이티브 계층(spec §11)이, 용병 비용과 고용 창은 features/mercenaries.lua 가 담당한다
+-- 주민 수와 무관한 병력은 features/spawn_squads.lua(병력 생성)가, 용병 비용과 고용 창은 features/mercenaries.lua 가 담당한다
 local M = { name = "military", intervalSec = 5, MAX_SQUADS = 99 }
 
 local function clear(arr) if arr and arr.Empty then arr:Empty() end end

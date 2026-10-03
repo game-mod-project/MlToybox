@@ -57,6 +57,8 @@ New-Item -ItemType Directory -Force $dstScripts | Out-Null
 robocopy $src $dstScripts /MIR /NJH /NJS /NP /NFL /NDL | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 $global:LASTEXITCODE = 0
+# 도구가 소스 폴더에 남긴 점 폴더(.omc 등)는 배포하지 않는다. 예전 배포가 복사해 둔 것도 여기서 지운다
+Remove-MLDotEntries $dstScripts
 if ($Mod -eq 'MLToybox') { New-Item -ItemType Directory -Force (Join-Path $target 'bridge') | Out-Null }
 if ($Mod -eq 'MLToyboxLab') { New-Item -ItemType Directory -Force (Join-Path $target 'lab') | Out-Null }
 if ($Mod -eq 'MLToybox') {

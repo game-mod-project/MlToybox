@@ -1,6 +1,21 @@
 # 변경 이력
 
-날짜는 작업한 날이고, 괄호 안은 `develop` 병합 커밋입니다. 기능별 분석 근거(오프셋, 함수, 실측값)는 [`analysis/findings.md`](../analysis/findings.md)에 있습니다.
+날짜는 작업한 날입니다. 기능별 분석 근거(오프셋, 함수, 실측값)는 [`analysis/findings.md`](../analysis/findings.md)에 있습니다.
+
+## GitHub 릴리스
+| 판 | 올린 날 | `main` 커밋 | 처음 들어간 항목 |
+|---|---|---|---|
+| [v1.0.2](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.2) | 2026-10-03 | 7c6ac49 | 2026-10-03 「저장 용량: "저장실 가득 참" 표시가 남던 것」 |
+| [v1.0.1](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.1) | 2026-10-02 | 755b2e9 | 2026-10-02 「건물 저장 용량」, 「자원 표: 열 경계 잡기, 영지 목표 표시」, 「자원 표(한글 이름, 분류, 정렬, 검색, 열 너비)와 로그 탭」, 「자원 목록을 게임의 품목 표에 맞춤」 |
+| [v1.0.0](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.0) | 2026-10-02 | 2ae056a | 「첫 GitHub 릴리스 v1.0.0」과 그 아래의 모든 항목 |
+
+각 판에는 앞선 판의 항목이 모두 들어 있습니다. 표에 없는 맨 위 항목은 아직 릴리스에 들어가지 않은 것입니다.
+
+## 2026-10-03 — 묶음과 배포에 섞여 들어가던 도구 파일
+### 수정
+- 릴리스 압축 파일(v1.0.0~v1.0.2)과 배포한 게임 폴더의 `MLToybox/Scripts/features`에 개발 도구가 남긴 `.omc` 폴더(상태 파일 3개)가 들어 있었습니다. 모드는 이 파일을 읽지 않고, 내용은 도구의 종료 기록과 시각뿐입니다. 이제 `tools/package.ps1`과 `tools/deploy.ps1`은 이름이 점으로 시작하는 폴더와 파일을 넣지 않고, 배포할 때는 예전에 복사된 것도 지웁니다.
+- 이미 올린 압축 파일은 바꾸지 않았습니다. 그 파일로 설치했다면 `MLToybox/Scripts/features/.omc` 폴더는 지워도 됩니다.
+- 이 문서에 GitHub 릴리스 표를 넣었습니다. README의 오타("지역 자산를")와 `features/military.lua`의 낡은 주석을 고쳤습니다.
 
 ## 2026-10-03 — 저장 용량: "저장실 가득 참" 표시가 남던 것
 ### 수정 (사용자 확인에서 발견)
