@@ -800,3 +800,65 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 고치기 전: 측정 스크립트가 다른 영주(eich)의 미완공 건물 진행도를 읽자 hp가 채워져 진행도가 0.5~0.8에서 1.000이 됐다(완공 처리는 되지 않았다).
 - 수정: detour가 `fillParts`로 채운다. 주인(`ownerPawn`의 `isMainPlayer`)이 플레이어일 때만 채운다. 주인 오프셋은 완공 처리 함수의 본문 검사로 확인한 것이라, 그 함수를 찾지 못했을 때(`instant_finish` 미설치)는 주인을 읽지 않고 이전처럼 채운다.
 - 검증(saveGame_8, 고친 DLL, `instantBuild` 켬, 저장 없이 종료): 같은 스크립트로 두 번 읽어도 다른 영주의 미완공 건물은 0.500 10개, 0.501 6개, 0.503, 0.564, 0.597, 0.633, 0.658, 0.787, 1.000 2개(처음부터 1.000이던 것)였고, 3초 사이의 변화는 인부가 올린 만큼(0.769 → 0.787 등)이었다. 내 영지 셋의 미완공은 0이었다. 로그 오류 0, 크래시 없음. 네이티브 211개 통과.
+
+## 표를 바꾸는 기능을 플레이어에게만 — 방법 조사 (2026-10-03, Steam buildid 24905706)
+사용자 요청: 표를 바꾸는 네 기능(업그레이드, 군사 요구, 자재 불필요, 개수 제한)을 플레이어에게만 걸 방법을 기능마다 찾아 적용을 검토. 이 절은 실행 파일과 덤프를 읽은 결과다. **게임에서 잰 것은 없다.** 구현은 하지 않았다.
+
+### 게임이 표를 읽는 길
+- 건물 표(`buildingStats`): `FStat* 0x144C48480(int32 id)`. 전역 맵(id → 행 포인터)을 찾고, 없으면 정적 기본 행(`0x1493C2370`)을 돌려준다. 부르는 곳 130곳. 패턴 `40 53 48 83 EC 20 8B 15 ?? ?? ?? ?? 65 48 8B 04 25 58 00 00 00 8B D9 B9 64 11 00 00 48 8B 04 D0 8B 04 01 39 05 ?? ?? ?? ?? 0F 8F ?? ?? ?? ??`.
+- 업그레이드 표(`DT_Upgrades`): `FUpgrade* 0x144C50AD0(engine, int32 id)`. 엔진+0xDD8의 표에서 행을 찾는다(`0x144BFBE30`). 부르는 곳 16곳. 블루프린트는 `getUpgradeData`(썽크 `0x144A8A070`)로 같은 함수를 지난다. 패턴 `48 89 5C 24 10 57 48 83 EC 30 44 8B 05 ?? ?? ?? ?? 48 8B D9`.
+- 유닛 표(`DT_UnitTemplates`): `FUnitTemplate* 0x144C50770(engine, FName*)`(부르는 곳 5곳), 행 찾기 `0x144BFBD10`(8곳), 표 포인터는 엔진+0xB78.
+- 건설 메뉴 카드(`UMLBuildingCardWidget.StatsTable`)는 표를 직접 읽는다(위 함수를 지나지 않는다).
+
+### AI가 표를 읽는 곳
+- AI 폰은 `APawnCPP_AI`다(타이머 `AICommandHandle`, `AIGeneralStrategyHandle`, `AILetterwritingHandle`). 건설 쪽 틱은 `0x144BB3EE0(pawn)`이고(패턴 `48 8B C4 55 57 48 8D A8 B8 FE FF FF`, 부르는 곳은 `0x144B6E7D0` 하나), `militia_guard`가 걸린 두 함수도 이 안에서 불린다. 첫머리에서 폰의 플래그 `cant_build`를 본다.
+- 작업 실행 `0x144B6E490(pawn, task)`: 작업 이름이 `upgrade`이면 `canUpgrade(task.building, task.upgradeID, reasons)`를 부르고, 참이면 `AI_upgrade: ` 로그 뒤 `useUpgrade`(종류에 따라 `changeExtension` 등)를 부른다. 거짓이고 이유가 `construction_resources_missing` 하나면 `0x144B93ED0`으로 넘긴다. 플레이어와 같은 판정·실행 함수를 쓴다.
+- 작업 비용 `0x144B7FE10`: 건물 표 행의 `constructionGoods`(+0x290)와 `GetUpgradeResourceCost`를 읽는다. 예산 검사 `0x144BB8A90`: 영지에 벌목장(종류 4)이 없으면 벌목장 행의 자재만큼 재고가 남는지 본다. 계획 `0x144B62C90`: `canUpgrade`, `GetRegionalWealthCostForUpgrade`.
+- 직접 호출을 거슬러 올라가면 건설 틱 말고도 뿌리가 있다: `0x144B9BE10`, `0x144B6BD60`(둘 다 `disableAI` 플래그를 본다. 다른 AI 루프), `0x144C26A50`, `0x144D18D70`, `0x144B49050`(무엇인지 보지 않았다).
+
+### 기능별로 읽은 것
+**업그레이드 (조건·비용·해금)** — AI에게 실제로 듣는다.
+- `canUpgrade`(구현 `0x144CA8ED0`)가 행의 조건을 모두 본다. 주인이 `isAI`면 먼저 `getAllPossibleUpgrades`(`0x144CB9B00`)의 목록에 든 업그레이드만 통과시킨다.
+- 비용을 치르는 곳은 `0x144C8F6D0(building, id, bool)` 하나다(`useUpgrade` 끝에서 부르고, `0x144C848EB`의 jmp로도 온다): `GetRegionalWealthCostForUpgrade`만큼 영지 재화를 빼고(`0x144BE5FC0`), 행의 `treasury`(+0x54)를 주인 폰의 +0xA40에서 빼고, 건물의 `constructionGoods`(+0x3C0)에 `GetUpgradeResourceCost`를 넣는다. 모두 `useUpgrade` 호출 안에서 끝난다.
+- 주거 요구는 `AllResidentialRequirementsSatisfied`(구현 `0x144C82E40`)가 설정 CDO의 `UpgradeRequirementsPerLevel`을 읽어 판정한다. 부르는 곳은 썽크와 `canUpgrade`(`0x144CA9A0A`) 둘이다. 엔진 플래그 목록에 `ignoreRequirementsForHouseUpgrades`가 있으면 바로 참을 돌려준다(전역 플래그라 AI의 집에도 듣는다).
+- 판정·비용 함수는 모두 첫 인자가 건물이다. 건물+0x2E0이 주인 폰이다.
+
+**자재 불필요** — AI에게 실제로 듣는다(계획과 예산 검사가 표의 자재를 읽는다).
+- 플레이어의 배치 갱신 함수(`0x144AC61E0`, 네이티브 `placement`가 이미 걸려 있고 `isAI`면 바로 돌아간다)가 배치 가능 여부를 정한다. 지형 검사를 지난 뒤(`0x144AC7E20`) 폰의 플래그를 세운다.
+  - +0xA80(낼 수 있음): 처음 1. 행의 `constructionCost`(+0x2A0)가 폰+0xA40보다 크거나, 행의 `constructionGoods` 가운데 영지 재고(영지+0x538)가 모자란 것이 있으면 0. 청사진(폰+0x850)이나 이전(폰+0x1140) 중이면 검사하지 않는다.
+  - +0xA91(개수 제한): 아래.
+  - 끝에서 `+0x60C(배치 불가) = !(A80 && A81 && !A91 && !A90 && 지역 검사 && 미해금 기술 0)`. 지형에서 이미 막혔으면 이 검사들을 건너뛴다.
+- 즉 원래 게임은 영지에 건설 자재가 없으면 건물을 놓지 못한다. 지금은 표의 자재를 비워서 이 검사가 통과한다.
+- 놓은 뒤: 건물의 자재 목록(+0x3C0)은 놓을 때 표에서 계산해 넣는다(`SetupBuilding` → `0x144C94970`). 모드는 내 영지의 미완공 건물 자재 목록을 이미 비우고 있다(`clearConstructionSites`).
+- 배치 확정 함수는 `0x144AC53B0(pawn, bool)`이다. `isAI`가 아니고 +0x60C가 서 있으면 돌아간다(AI 폰도 이 함수를 쓰는 것으로 보인다).
+
+**지역당 개수 제한** — AI에게는 거의 닿지 않는다.
+- `maxInRegion`(+0x2D8)을 읽는 곳은 둘이다.
+  - 배치 갱신 함수(`0x144AC8072`, `0x144AC85BE`): `getBuildingCount(영지, 종류)`가 `maxInRegion` 이상이면 폰+0xA91 = 1. 이 함수는 AI면 바로 돌아간다.
+  - `canUpgrade`(`0x144CA911E`, `0x144CA922E`): 업그레이드 16(다시 짓기, AI 로그는 `AI_rebuild: `)일 때 건물+0x370 종류의 개수를 보고 이유 `limit_reached`를 넣는다. AI에게 닿는 곳은 여기뿐이다.
+- 건설 메뉴 카드의 블루프린트(`W_HUD_BuildingCardV2`)에는 자물쇠 갱신(`UpdatePadlockVisibility`)만 있다. `IsBuildingLocked(pawn, stat)`(`0x144B83390`)은 정착지 레벨(+0x2DC)과 선행 건물(+0x2C8)만 본다. 개수 제한은 보지 않는다.
+
+**군사 (장비 요구, 주민·집 레벨·훈련 요구)** — AI에게 닿는 곳을 찾지 못했다.
+- 모드가 바꾸는 네 값(`requiredEquipment` +0x118, `minMeleeTraining` +0x128, `minArcheryTraining` +0x12C, `minHouseLv` +0x130)을 읽는 네이티브 코드가 없다. 유닛 표를 읽는 길(행 찾기 8곳, 행 함수 5곳, 엔진+0xB78을 직접 쓰는 함수들)을 모두 봤다. `getNumRequiredEqiupmentOfType`(`0x144BE9880`)은 `weapons`(+0x78)와 `shields`(+0x88)를 읽는다.
+- `ARegion::getAvailableRecruits(minMelee, minArchery, …, minHouseLv)`(구현 `0x144BE8020`)와 `getAllAvailableRecruits`(`0x144BE7D50`)를 부르는 곳은 각자의 썽크뿐이다. 값을 넘기는 쪽은 블루프린트다(민병대 화면 `W_HUD_ArmyRecruitCardV2.UpdateCanAddUnit`, 위젯 `requiredEquipment`).
+- 그러니 이 네 값은 플레이어의 화면만 읽는 것으로 보인다. AI는 그 화면을 쓰지 않는다.
+
+### 방법
+- **A. 플레이어의 호출 동안만 행을 바꾼다(주인으로 가른다).** 표는 원래대로 두고, 첫 인자가 건물이나 폰인 함수를 후킹해 주인이 `isMainPlayer`일 때만 그 호출 동안 행의 값을 0으로 두었다가 되돌린다. 배열은 `Num`만 0으로 둔다(지금의 `Empty()`와 달리 내용을 지우지 않는다). 게임 논리는 게임 스레드 하나에서 돌므로 그 사이에 AI가 읽지 않는다.
+  - 개수 제한, 자재 불필요: 이미 있는 `placement` 후킹에서 `0x144C48480(폰.placeBuilding)`으로 행을 얻어 `maxInRegion`(+0x2D8)과 `constructionGoods.Num`(+0x298)을 바꾼다. 새로 필요한 것은 행 함수의 주소뿐이다(후킹 없이 주소만 찾는 항목). 자재 목록은 지금처럼 Lua가 비운다(10초 tick → 1초 poll).
+  - 업그레이드: `canUpgrade`, 비용 지불 `0x144C8F6D0`, `GetUpgradeResourceCost`(`0x144C96510`), `GetRegionalWealthCostForUpgrade`(`0x144C94E40`) 넷을 후킹하고, `AllResidentialRequirementsSatisfied`는 내 건물이면 참을 돌려준다. 다섯 다 64바이트 안에서 고유한 패턴이 나온다.
+  - 표가 늘 원래 값이므로 AI가 바뀐 값을 읽을 길이 없다. 대신 플레이어 쪽에서 후킹하지 않은 길은 원래 값으로 남는다: 건설 메뉴와 커서 툴팁의 자재 표시, `getUpgradeData`로 그리는 금고 비용·해금 표시, 주거 요구 목록.
+  - Lua로 바로 잴 수 있다: 내 건물과 다른 영주의 건물에 `canUpgrade`, `GetUpgradeResourceCost`를 불러 비교.
+- **B. AI 틱 동안만 표를 원래대로 돌린다(맥락으로 가른다).** 표는 지금처럼 바꿔 두고 AI 루프의 뿌리를 후킹한다. 플레이어 쪽 동작과 화면은 지금과 같다. 뿌리가 적어도 셋(`0x144B6E7D0`, `0x144B6BD60`, `0x144B9BE10`)이고 더 있을 수 있어 AI가 바뀐 값을 읽는 길이 남는지 확인하기 어렵다. 원래 값을 네이티브가 보관하고 써야 해서 Lua의 표 쓰기를 네이티브로 옮겨야 한다. Lua 호출로는 차이를 잴 수 없다(Lua 호출은 AI 틱 밖이다).
+- **C. 엔진 플래그.** `ignoreRequirementsForHouseUpgrades`, `instaBuild`처럼 전역이라 AI에도 듣는다. 비용·조건을 플레이어에게만 거는 플래그는 없다(플래그 이름 67개 + 이름 비교 251개를 훑었다).
+- 군사는 바꿀 것이 없다(위).
+
+### 곁가지
+- `APawnCPP.silver : int32`(+0xA40)가 리플렉션 필드다. 업그레이드의 `treasury` 비용을 여기서 빼므로 영주 금고로 보인다. "① 자원"의 "금고 필드는 리플렉션에 없다"와 다르다. 게임에서 화면의 금고 값과 같은지 재지 않았다.
+- 엔진에 `upgrades : TArray<FUpgrade>`(+0xA40)가 따로 있다. 읽는 곳은 찾아보지 않았다. 지금의 표 쓰기만으로 `canUpgrade`가 바뀌는 것은 잰 사실이다(위 "기능이 다른 영주(AI)에게 닿는 범위").
+- AI 건설 틱 후킹 하나로 "내가 배치하는 동안 AI가 놓는 건물이 완공 상태로 생기는" 것을 막을 수 있어 보인다(틱 동안 플래그 목록의 `Num`을 0으로). 해 보지 않았다.
+
+### 확인하지 못한 것
+- 이 절 전체. 특히 군사의 네 값을 AI가 쓰지 않는다는 것, 자재가 없으면 원래 게임이 배치를 막는다는 것(코드로만 읽었다).
+- 방법 A에서 플레이어 쪽에 빠지는 길: 성 설계(`getCastleReconstructionCost`), 건물 이전, 건물 창의 업그레이드 버튼이 `getUpgradeData`의 값으로 켜지고 꺼지는지.
+- 놓은 직후 Lua가 자재 목록을 비우기 전(1초 이내)에 운반이 시작되는지.
