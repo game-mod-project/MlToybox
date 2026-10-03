@@ -67,4 +67,27 @@ T.run({
     local s = native.status(TEST_TMP .. "\\none.json", 1, false, "not deployed")
     T.eq(s.loaded, false, "not loaded"); T.eq(s.error, "not deployed", "error"); T.eq(s.stale, true, "stale when missing")
   end,
+  -- 기능이 "네이티브가 이 일을 맡았는가"를 묻는다. 맡았으면 Lua 는 표를 바꾸지 않고, 못 맡으면 예전 방식으로 돌아간다
+  installed_is_unknown_until_a_status_was_read = function()
+    native.last = nil
+    T.eq(native.installed({ "placement" }), nil, "nothing read yet")
+  end,
+  installed_tells_whether_every_named_item_is_installed = function()
+    local p = TEST_TMP .. "\\ns3.json"
+    write(p, '{"version":1,"heartbeat":100,"appliedSeq":3,"features":{"placement":{"installed":true,"active":true},"building_row":{"installed":true,"active":true},"placement_rows":{"installed":false,"active":false,"lastError":"layout check failed"}}}')
+    native.status(p, 101, true, nil)
+    T.eq(native.installed({ "placement", "building_row" }), true, "both installed")
+    T.eq(native.installed({ "placement", "placement_rows" }), false, "one failed its layout check")
+    T.eq(native.installed({ "placement", "nope" }), false, "an item this DLL does not have (older DLL)")
+  end,
+  installed_is_false_without_the_dll_and_unknown_while_the_status_is_stale = function()
+    native.status(TEST_TMP .. "\\none.json", 1, false, "not deployed")
+    T.eq(native.installed({ "placement" }), false, "the DLL is not there: nothing will ever be installed")
+    local p = TEST_TMP .. "\\ns4.json"
+    write(p, '{"version":1,"heartbeat":100,"appliedSeq":3,"features":{"placement":{"installed":true,"active":true}}}')
+    native.status(p, 200, true, nil)
+    T.eq(native.installed({ "placement" }), nil, "old heartbeat: wait")
+    native.status(TEST_TMP .. "\\none.json", 200, true, nil)
+    T.eq(native.installed({ "placement" }), nil, "loaded but no status file yet: wait")
+  end,
 })

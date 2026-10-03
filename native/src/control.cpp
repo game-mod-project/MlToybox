@@ -11,6 +11,12 @@ static bool flag(const Json* features, const char* section, const char* name) {
     return f && f->asBool(false);
 }
 
+static bool enabled(const Json* features, const char* section) {
+    if (!features) return false;
+    const Json* s = features->get(section);
+    return s && s->get("enabled") && s->get("enabled")->asBool(false);
+}
+
 std::optional<NativeControl> parseControl(std::string_view text) {
     auto j = parseJson(text);
     if (!j || j->type != Json::Type::Object) return std::nullopt;
@@ -25,6 +31,9 @@ std::optional<NativeControl> parseControl(std::string_view text) {
     c.instantBuild = flag(features, "build", "instantBuild");
     c.ignorePlacement = flag(features, "build", "ignorePlacement");
     c.ignorePopulation = flag(features, "military", "ignorePopulation");
+    c.noRegionLimit = flag(features, "build", "noRegionLimit");
+    c.noMaterials = flag(features, "build", "noMaterials");
+    c.upgradeFree = enabled(features, "upgrade");
     return c;
 }
 

@@ -7,6 +7,7 @@ M.PATHS = {
   buildingStats = "/Game/NotStronghold/Data/buildingStats.buildingStats",
   unitTemplates = "/Game/NotStronghold/Data/DT_UnitTemplates.DT_UnitTemplates",
   mercenaries = "/Game/NotStronghold/Data/DT_MercenaryCompanies.DT_MercenaryCompanies",
+  items = "/Game/NotStronghold/Data/DT_Items.DT_Items",
   residentialSettings = "/Script/ManorLords.Default__ResidentialRequirementSettings",
 }
 

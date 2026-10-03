@@ -697,3 +697,304 @@ exe 정적 분석과 Lab 실측(맵 LargeLake, 진행된 세이브와 `saveGame_
 - 벌목장의 한도만 100으로 올리고 게임 시간을 12배로 흘렸다. 11일이 지나도(`daysTotal` 297 → 308) 벌목장의 항목은 `day=297` 그대로 남았다. 저택의 항목은 날마다 `day`가 현재 날짜로 바뀌었다(게임이 가득 찬 건물의 항목은 날마다 갱신하고, 더는 가득 차지 않은 건물의 항목은 그대로 둔다).
 - 벌목장에 `verifyStorageProblems()`를 부르자 그 항목이 바로 사라졌다(문제 3개 → 2개). 화면 위쪽 문제 표시줄의 저장 아이콘에 붙어 있던 숫자 2도 사라졌다(캡처 비교). 그 뒤 `updateProblems()`, `updateProblemUI()`는 변화가 없었다(항목이 이미 사라진 뒤라 이 둘이 단독으로 지우는지는 재지 못했다).
 - 조치: `features/storage.lua`가 건물의 한도를 바꿀 때마다(올릴 때, 되돌릴 때) 그 건물의 `verifyStorageProblems()`를 부른다. 바꾸지 않은 건물은 부르지 않는다(스펙 `changing_a_limit_asks_the_game_to_recheck_the_buildings_storage_problems`).
+
+## 즉시 완공 — instaBuild 플래그 (2026-10-03, Steam buildid 24905706)
+사용자 요청: 건물을 놓는 순간 완공되게. 그때까지의 "즉시 완공"은 10초마다 파츠 hp만 채우고(Plan 3 부록 A.1) 완공 처리는 게임에 맡겨서, 놓고 수십 초가 걸리고 인부가 없으면 미완공으로 남았다(시험 세이브에 진행도 1.000인데 `not_enough_workers`로 남은 건물 14개).
+
+### 실행 파일에서 읽은 것
+- 엔진에 디버그 플래그 목록이 있다: `ARTSMultiEngineCPP.drawDebugFlags : TArray<FName>`(0x10C0, 리플렉션 필드). 목록에 이름이 있는지 보는 함수가 `0x144AA4230(목록, const char*)`이고 부르는 곳이 134곳이다.
+- 문자열 `"instaBuild"`(ASCII, `0x147EC5440`)를 쓰는 곳은 다섯이다.
+  - `ASMBuildingMaster::SetupBuilding`(구현 `0x144C9A720`, `0x144C9A747`): 플래그가 있으면 `Data.constructed`를 1로 한다. 같은 함수가 파츠를 만들 때 `constructed`이면 hp를 maxHp로 둔다(`0x144C9D9FB`). 소유자 검사는 없다.
+  - 플레이어의 배치 코드(`0x144AC5A6C`): 플래그 값을 `Data.constructed`에 쓴다(`0x144AC5A85`).
+  - `convertBlueprintsToBuildings`로 보이는 함수(`0x144CADF50`, `0x144CAE023`), 공사 갱신 함수(`0x144C8E950`, `0x144C8EA93`: 파츠의 꼬리표에 `instaBuild`가 있으면 건너뛴다), 큰 엔진 함수(`0x144C3BCAD`).
+- 완공 플래그는 `ASMBuildingMaster.Data.constructed`다(`FBuildingDataStruct`가 건물+0x3A8, `constructed`는 +9 = 건물+0x3B1. 리플렉션 필드). `IsConstructed()`가 읽는 바이트와 같다.
+- 배치 모드: `APawnCPP::isInAnyConstructionMode()`(구현 `0x144AE5F50`)는 `roadmode`(0x7B0) 또는 `placeBuilding`(0x608) > 0 또는 `placeFieldMode`(0xF21)이다. 셋 다 리플렉션 필드다.
+- "공사를 끝내라"는 리플렉션 함수는 없다(건물, 치트 관리자).
+
+### 실측 (saveGame_8, 저장 없이 종료. 모드의 즉시 완공·자재 불필요·자원 유지는 끔)
+- Lua로 플래그를 넣을 수 있다: `engine.drawDebugFlags = { FName("instaBuild") }` 뒤 `#flags` 0 → 1(Max 4), 유닛의 `getDebugFlag(FName("instaBuild"))`가 false → true. `:Empty()`로 비운다.
+- 같은 벌목장(건물 종류 4, 자재 목재 2)을 사용자가 직접 놓았다.
+  - 플래그를 켜고 놓은 2개: 처음 읽을 때(놓고 1초 안)부터 `constructed=true`, 진행도 1.000, 상태 `Finished`, 자재 목록 0개. 화면에 완성된 건물. 목재 재고는 줄지 않았다(696 → 698 → 700). 3초 뒤 모드의 저장 한도(2800)가 적용됐다.
+  - 플래그를 끄고 놓은 2개: `constructed=false`, 진행도 0.000, 자재 목록 1개, 35초 뒤에도 그대로.
+- 이미 놓인 미완공 건물에는 효과가 없다: 플래그를 다시 켜고 25초 뒤에도 위의 미완공 2개는 진행도 0.000이었다. 기존 미완공 건물이 완공되는 속도는 플래그와 무관했다(끈 55초 동안 AI 영지 eich 21 → 13, 내 영지 Lei 3 → 0).
+- 플래그가 꺼져 있을 때 AI가 놓은 건물(종류 86, eich)은 미완공으로 생겼다. 플래그가 켜진 동안 AI가 놓은 건물은 보지 못했다.
+- 배치 모드 값: 건물 배치 `pawn:setPlacedBuilding(4)` → `placeBuilding` 0 → 4, 놓은 뒤 0. 거주 구획 도구 → `placeBuilding=0`, `placeFieldMode=true`.
+- 건물을 놓는 클릭은 창 메시지(`WM_LBUTTONDOWN`/`UP`, `WM_ACTIVATE`를 먼저 보낸 것 포함)와 폰의 `InpActEvt_LeftMouseButton_K2Node_InputKeyEvent_0/1` 호출로는 되지 않았다. 사용자가 눌렀다.
+
+### 구현과 검증
+- `features/build.lua`의 `poll`(1초마다, `core/registry.lua`가 간격과 무관하게 부른다): `instantBuild`가 켜져 있고 `pawn.placeBuilding > 0` 또는 `pawn.placeFieldMode`이면 목록에 `instaBuild`를 넣고, 아니면 뺀다. 다른 플래그는 그대로 둔다. `disable`은 플래그를 빼고, 맵을 떠날 때는 건드리지 않는다. 도로 모드는 건물이 생기지 않아 보지 않는다.
+- 게임 확인(고친 모드, `instantBuild`만 켬):
+  - 배치 모드가 아닐 때 목록은 비어 있다. 배치 모드에 들어가면 0.3~1.5초 뒤 플래그가 들어가고, 나오면 0.4초 뒤 빠진다.
+  - 배치 중에 `instantBuild`를 끄면 0.9초, 건설 기능을 끄면 1.5초 뒤 빠지고 다시 켜면 돌아온다. 로그에 오류 없음.
+  - 사용자가 놓은 벌목장 1개, 종류 34 건물 1개, 거주 구획 13필지: 처음 읽을 때부터 `constructed=true`, 상태 `Finished`. 거주 구획은 생긴 직후 한 번 진행도가 NaN으로 읽혔고(파츠가 아직 없을 때의 0/0) 0.6초 뒤 1.000이었다.
+
+### 측정 도구가 낸 크래시 (2026-10-03 14:48)
+- Lab 스크립트 안에서 `LoopAsync(200, ...)` + `ExecuteInGameThread`로 0.2초마다 건물 목록을 도는 감시를 건 세션에서 게임이 튕겼다(`EXCEPTION_ACCESS_VIOLATION reading 0xf`). 호출 스택은 게임 틱 → UE4SS의 게임 스레드 작업 → Lua 인터프리터이고, 직전에 감시가 `Global for __index doesn't exist` 오류를 남겼다. 감시가 원인으로 보인다(심볼이 없어 추정). 세이브는 바뀌지 않았다.
+- 그 뒤로는 감시 루프 없이 밖에서 `lab.ps1`을 여러 번 불러 쟀고(`analysis/dumps/probes/ib*.lua`) 크래시가 없었다.
+- 세션이 길면 게임이 `autosave`를 덮는다. 세션 전에 `backup-saves.ps1`로 받아 둔 사본에서 되돌렸다.
+
+### 업그레이드와 이미 공사 중인 건물
+- 플래그가 닿지 않는다. 아래 "즉시 완공 — 완공 처리 함수"에서 따로 다룬다.
+
+### 확인하지 못한 것
+- 플래그가 켜진 동안 AI가 새로 놓는 건물(코드로는 완공 상태로 생긴다).
+- 밭, 목초지, 영주 저택 모듈.
+
+## 즉시 완공 — 완공 처리 함수 (2026-10-03, Steam buildid 24905706)
+사용자 확인: 건물 업그레이드는 바로 완공되지 않는다. `instaBuild` 플래그는 건물이 만들어질 때만 듣는다.
+
+### 실행 파일에서 읽은 것
+- 업그레이드는 건물을 새로 만들지 않는다. `useUpgrade`(구현 `0x144CDD830`)가 `Data.constructed`를 0으로 돌리고 `spawnBuildingsForUpgrade`(`0x144CCE840`)로 파츠를 더한다. 이 경로에는 `instaBuild` 검사가 없다.
+- 게임의 완공 처리 함수는 `void 0x144CB7890(ASMBuildingMaster*)`이다(패턴 `48 8B C4 48 89 58 10 48 89 70 18 48 89 78 20 55 41 54 41 55 41 56 41 57 48 8D A8 08 FE FF FF 48 81 EC D0 02 00 00 44 0F 29 48 98`, count = 1). 주인이 `isMainPlayer`(폰+0x34C)이면 엔진의 건설 통계에 더하고, `Data.constructed = 1`(+0x3B1), `isBeingUpgraded = 0`(+0x391), 건설 자재(+0x3C0)를 재고(+0x438)에서 정산하고 영지를 갱신한다.
+- 부르는 곳은 둘이다.
+  - 인부 쪽(`0x144D74E4F`): 남은 작업이 있으면 `0x144CA48A0(건물, 작업량)`으로 파츠 hp를 올린다(이 함수는 hp 덧셈만 한다). 남은 작업이 0이고 `0x144BEE860(재고, 건설 자재)`가 참이면 완공 처리 함수를 부른다.
+  - 엔진 쪽(`0x144C4270E`): `0x144C97840(건물)`(모든 파츠의 바이트 +0x312가 0)이 참이면 부른다.
+- 그러니 모드가 파츠 hp를 채우는 것은 인부가 하는 일과 같고, 그 뒤 완공 처리 함수만 부르면 인부 쪽 경로와 같아진다.
+
+### 실측 (saveGame_8, 저장 없이 종료)
+- 메모리 프로브로 파츠를 읽었다. 바이트 +0x312는 완공된 벌목장에서도 1인 파츠가 있었다(maxHp가 0보다 큰 파츠). "공사 중" 표시가 아니므로 완공 조건으로 쓰지 않는다.
+- 내 건물의 `ownerPawn`(+0x2E0)은 완공·미완공 모두 플레이어 폰이고 `pawn.isMainPlayer`는 true였다.
+- 진행도 1.000인데 `not_enough_workers`로 남은 건물: 파츠 hp가 모두 max 이상, 자재 목록 0개, `constructed = 0`.
+- Lua `b:useUpgrade(2)`(`BurgagePlot_Lv2`)를 빈 거주 구획에 부르면 `constructed` true → false, `isBeingUpgraded` true, 0.6초쯤 뒤 건물 종류가 3 → 8로 바뀌고 새 파츠의 hp는 0이다.
+
+### 구현
+- 네이티브 `instant_build`의 detour: 파츠 hp를 채운 뒤 `readyToFinish`(미완공, 주인이 `isMainPlayer`, 자재 목록 0개, 파츠가 있고 모두 hp ≥ maxHp)이면 완공 처리 함수를 부른다. 재진입은 막는다.
+- 완공 처리 함수는 후킹하지 않고 주소만 찾는다(`instant_finish`. `HookSpec`의 detour가 없는 항목). 본문 검사로 쓰는 오프셋(+0x2E0, +0x34C, +0x391, +0x3B1, +0x3C0)을 확인한다. 찾지 못하면 hp만 채운다.
+- Lua `features/build.lua`의 `poll`(1초): 내 영지의 미완공 건물 가운데 지난 poll에도 미완공이던 것의 자재 목록을 비우고 `getConstructionProgress()`를 부른다. 10초 tick은 더는 부르지 않는다.
+
+### 검증 (saveGame_8, 고친 모드와 DLL, `instantBuild`만 켬)
+- `native_status.json`: `instant_finish` installed·active.
+- 불러온 직후 Lei 영지의 미완공 14개가 모두 완공됐다(첫 읽기에서 unbuilt = 0).
+- 업그레이드(진행도 함수를 부르지 않는 스크립트로 잼): 거주 구획 1 → 2레벨 둘이 `useUpgrade` 뒤 2.1초, 1.9초에 `constructed = true`, `isBeingUpgraded = false`, 종류 8. 창고 → 대형 창고(`Storehouse_Lv2 = 7`)는 1.7초, 종류 99. 화면에 완성된 건물로 보였고 "가족들이 정착민과 합류합니다 (거주 구획 (2레벨))" 알림이 떴다.
+- 측정 스크립트가 `useUpgrade` 직후 같은 호출 안에서 진행도 함수를 불렀을 때(파츠가 바뀌기 전)도 완공 처리됐고, 1초 뒤 종류 8의 완공 건물이었다.
+- AI 영지(eich)의 미완공 건물은 측정 스크립트가 진행도를 읽어 hp가 찼지만(진행도 1.000) 완공 처리되지 않았다(`constructed = false`).
+- 로그 오류 0, 크래시 없음, 세이브 변경 없음. 네이티브 208개, .NET·Lua 107개 통과.
+
+### 확인하지 못한 것
+- 불에 탄 건물(화재 뒤 `constructed`가 0으로 돌아간다), 영주 저택 모듈, 밭.
+- 자재가 일부 들어온 현장에서 자재 목록을 비우고 완공했을 때 그 자재의 행방.
+
+## 기능이 다른 영주(AI)에게 닿는 범위 (2026-10-03, Steam buildid 24905706)
+사용자 요청: 켜져 있을 때 플레이어 말고 다른 영주에게도 적용되는 기능 확인. 코드가 무엇을 바꾸는지로 가르고, 코드로 알 수 없는 것은 게임에서 쟀다(saveGame_8, 저장 없이 종료).
+
+### 플레이어에게만 닿는 것
+- 내 영지만 도는 기능(`game.playerRegions()`: `ownerPawn`이 플레이어 폰인 영지): 자원, 인구, 저장 용량, 자재 불필요의 공사 현장 비우기, 즉시 완공의 진행도 호출.
+- 플레이어 폰(`MyPawnCPP_BP3_C`)과 치트 관리자만 쓰는 기능: 영주(국고, 영향력, 왕의 총애), 군사의 부대 수 상한과 민병대 모집비, 병력 생성·재구성, 수행원 꾸미기, 용병 환급(내 분대가 있는 용병단만).
+  - 실측: 군사 기능이 켜진 상태에서 내 폰은 `maxNumOfMilitiaToSpawn = 99`, AI 폰 둘은 6이었다(`isAI = true`).
+- 즉시 수리(`MaintainAllBuildings`): 내 건물만 바뀌었다. 유지보수 상태가 내 건물은 Pending 17 → Maintained 9 + Pending 8, 다른 영주 건물은 Pending 11 그대로였다. `UnmaintainAllBuildings`는 어느 쪽도 바꾸지 않았다.
+- 즉시 완공의 완공 처리: 주인이 `isMainPlayer`인 건물만(위 "즉시 완공 — 완공 처리 함수").
+- 배치 제한 무시: 후킹한 배치 갱신 함수(`0x144AC61E0`)는 `isAI`(폰+0x34D)이면 바로 돌아간다(`0x144AC6216`). detour는 그 뒤 폰의 배치 불가 플래그만 지운다. AI 폰에서 이 플래그가 쓰이는 곳은 찾지 않았다.
+
+### 다른 영주에게도 닿는 것
+같은 날 뒤에 고친 것: 업그레이드, 자재 불필요, 지역당 개수 제한 해제는 표를 바꾸지 않고 플레이어의 호출에만 적용한다(아래 "자재 불필요·개수 제한 해제를 내 배치에만", "업그레이드 조건·비용 무시를 내 건물에만"). 아래 세 항목은 고치기 전의 조사 결과다. 군사는 AI에게 닿는 곳이 없는 것으로 봤다("표를 바꾸는 기능을 플레이어에게만 — 방법 조사").
+- **업그레이드 조건·비용·해금 무시**: 게임 전체의 표(`DT_Upgrades`)와 설정(`ResidentialRequirementSettings`)을 바꾼다.
+  - 실측: 기능을 끈 채 시작했을 때 다른 영주의 거주 구획 1레벨 14개는 `canUpgrade(2)`가 모두 false였다(이유 `construction_resources_missing` 14, `residential_requirements_not_met` 7). 기능을 켜자 14개 모두 true가 됐다. 내 것은 3/23 → 23/23.
+  - 켠 뒤 2분 동안(게임 시간 약 8일) 다른 영주의 구획 수는 1레벨 32, 2레벨 6 그대로였다. AI가 이것으로 실제 업그레이드를 더 하는지는 재지 못했다.
+- **군사의 장비 요구 무시, 주민·집 레벨·훈련 요구 무시**: 유닛 표(`DT_UnitTemplates`)의 모든 행을 바꾼다. AI가 민병대를 모을 때 이 값을 쓰는지는 재지 않았다.
+- **자재 불필요**: 건물 표(`buildingStats`)의 건설 자재를 모든 행에서 비운다. 다만 이 옵션을 끈 세션에서도 AI가 새로 놓은 건물(종류 86)과 AI의 미완공 건물은 자재 목록이 0개였다(AI의 새 건물은 원래 자재가 없다).
+- **지역당 개수 제한 해제**: 건물 표의 `maxInRegion`을 바꾼다. AI가 이 제한을 쓰는지는 재지 않았다.
+- **용병 고용 창**: 목록(`availableMercs`)을 AI와 같이 쓴다(위 "용병 고용"). 자동 보충은 AI가 고용할 용병단도 계속 채워 준다. 커스텀 용병단은 AI 잠금(닫혀 있을 때 고용비 10,000,000)으로 막는다.
+- **즉시 완공**: `instaBuild` 플래그가 켜진 동안(내가 배치 중일 때) AI가 새로 놓는 건물은 완공 상태로 생긴다(코드로 본 것, 재지 못함). 네이티브 후킹이 진행도가 읽히는 건물의 파츠 hp를 주인과 상관없이 채우던 것은 같은 날 고쳤다(아래 "hp 채우기를 내 건물로"). 게임이 스스로 진행도를 읽는 곳은 exec 썽크 말고 폰 코드 한 곳(`0x144AD537D`)이다.
+- **게임 버그 방어**(`militia_guard`, `militia_guard_2`): AI 틱의 민병대 점검 함수에 걸려 있다. 튕길 조건일 때 그 호출만 건너뛴다(의도한 동작).
+
+### hp 채우기를 내 건물로 (2026-10-03, 사용자 요청)
+- 고치기 전: 측정 스크립트가 다른 영주(eich)의 미완공 건물 진행도를 읽자 hp가 채워져 진행도가 0.5~0.8에서 1.000이 됐다(완공 처리는 되지 않았다).
+- 수정: detour가 `fillParts`로 채운다. 주인(`ownerPawn`의 `isMainPlayer`)이 플레이어일 때만 채운다. 주인 오프셋은 완공 처리 함수의 본문 검사로 확인한 것이라, 그 함수를 찾지 못했을 때(`instant_finish` 미설치)는 주인을 읽지 않고 이전처럼 채운다.
+- 검증(saveGame_8, 고친 DLL, `instantBuild` 켬, 저장 없이 종료): 같은 스크립트로 두 번 읽어도 다른 영주의 미완공 건물은 0.500 10개, 0.501 6개, 0.503, 0.564, 0.597, 0.633, 0.658, 0.787, 1.000 2개(처음부터 1.000이던 것)였고, 3초 사이의 변화는 인부가 올린 만큼(0.769 → 0.787 등)이었다. 내 영지 셋의 미완공은 0이었다. 로그 오류 0, 크래시 없음. 네이티브 211개 통과.
+
+## 표를 바꾸는 기능을 플레이어에게만 — 방법 조사 (2026-10-03, Steam buildid 24905706)
+사용자 요청: 표를 바꾸는 네 기능(업그레이드, 군사 요구, 자재 불필요, 개수 제한)을 플레이어에게만 걸 방법을 기능마다 찾아 적용을 검토. 이 절은 실행 파일과 덤프를 읽은 결과다. **게임에서 잰 것은 없다.** 구현은 하지 않았다.
+
+### 게임이 표를 읽는 길
+- 건물 표(`buildingStats`): `FStat* 0x144C48480(int32 id)`. 전역 맵(id → 행 포인터)을 찾고, 없으면 정적 기본 행(`0x1493C2370`)을 돌려준다. 부르는 곳 130곳. 패턴 `40 53 48 83 EC 20 8B 15 ?? ?? ?? ?? 65 48 8B 04 25 58 00 00 00 8B D9 B9 64 11 00 00 48 8B 04 D0 8B 04 01 39 05 ?? ?? ?? ?? 0F 8F ?? ?? ?? ??`.
+- 업그레이드 표(`DT_Upgrades`): `FUpgrade* 0x144C50AD0(engine, int32 id)`. 엔진+0xDD8의 표에서 행을 찾는다(`0x144BFBE30`). 부르는 곳 16곳. 블루프린트는 `getUpgradeData`(썽크 `0x144A8A070`)로 같은 함수를 지난다. 패턴 `48 89 5C 24 10 57 48 83 EC 30 44 8B 05 ?? ?? ?? ?? 48 8B D9`.
+- 유닛 표(`DT_UnitTemplates`): `FUnitTemplate* 0x144C50770(engine, FName*)`(부르는 곳 5곳), 행 찾기 `0x144BFBD10`(8곳), 표 포인터는 엔진+0xB78.
+- 건설 메뉴 카드(`UMLBuildingCardWidget.StatsTable`)는 표를 직접 읽는다(위 함수를 지나지 않는다).
+
+### AI가 표를 읽는 곳
+- AI 폰은 `APawnCPP_AI`다(타이머 `AICommandHandle`, `AIGeneralStrategyHandle`, `AILetterwritingHandle`). 건설 쪽 틱은 `0x144BB3EE0(pawn)`이고(패턴 `48 8B C4 55 57 48 8D A8 B8 FE FF FF`, 부르는 곳은 `0x144B6E7D0` 하나), `militia_guard`가 걸린 두 함수도 이 안에서 불린다. 첫머리에서 폰의 플래그 `cant_build`를 본다.
+- 작업 실행 `0x144B6E490(pawn, task)`: 작업 이름이 `upgrade`이면 `canUpgrade(task.building, task.upgradeID, reasons)`를 부르고, 참이면 `AI_upgrade: ` 로그 뒤 `useUpgrade`(종류에 따라 `changeExtension` 등)를 부른다. 거짓이고 이유가 `construction_resources_missing` 하나면 `0x144B93ED0`으로 넘긴다. 플레이어와 같은 판정·실행 함수를 쓴다.
+- 작업 비용 `0x144B7FE10`: 건물 표 행의 `constructionGoods`(+0x290)와 `GetUpgradeResourceCost`를 읽는다. 예산 검사 `0x144BB8A90`: 영지에 벌목장(종류 4)이 없으면 벌목장 행의 자재만큼 재고가 남는지 본다. 계획 `0x144B62C90`: `canUpgrade`, `GetRegionalWealthCostForUpgrade`.
+- 직접 호출을 거슬러 올라가면 건설 틱 말고도 뿌리가 있다: `0x144B9BE10`, `0x144B6BD60`(둘 다 `disableAI` 플래그를 본다. 다른 AI 루프), `0x144C26A50`, `0x144D18D70`, `0x144B49050`(무엇인지 보지 않았다).
+
+### 기능별로 읽은 것
+**업그레이드 (조건·비용·해금)** — AI에게 실제로 듣는다.
+- `canUpgrade`(구현 `0x144CA8ED0`)가 행의 조건을 모두 본다. 주인이 `isAI`면 먼저 `getAllPossibleUpgrades`(`0x144CB9B00`)의 목록에 든 업그레이드만 통과시킨다.
+- 비용을 치르는 곳은 `0x144C8F6D0(building, id, bool)` 하나다(`useUpgrade` 끝에서 부르고, `0x144C848EB`의 jmp로도 온다): `GetRegionalWealthCostForUpgrade`만큼 영지 재화를 빼고(`0x144BE5FC0`), 행의 `treasury`(+0x54)를 주인 폰의 +0xA40에서 빼고, 건물의 `constructionGoods`(+0x3C0)에 `GetUpgradeResourceCost`를 넣는다. 모두 `useUpgrade` 호출 안에서 끝난다.
+- 주거 요구는 `AllResidentialRequirementsSatisfied`(구현 `0x144C82E40`)가 설정 CDO의 `UpgradeRequirementsPerLevel`을 읽어 판정한다. 부르는 곳은 썽크와 `canUpgrade`(`0x144CA9A0A`) 둘이다. 엔진 플래그 목록에 `ignoreRequirementsForHouseUpgrades`가 있으면 바로 참을 돌려준다(전역 플래그라 AI의 집에도 듣는다).
+- 판정·비용 함수는 모두 첫 인자가 건물이다. 건물+0x2E0이 주인 폰이다.
+
+**자재 불필요** — AI에게 실제로 듣는다(계획과 예산 검사가 표의 자재를 읽는다).
+- 플레이어의 배치 갱신 함수(`0x144AC61E0`, 네이티브 `placement`가 이미 걸려 있고 `isAI`면 바로 돌아간다)가 배치 가능 여부를 정한다. 지형 검사를 지난 뒤(`0x144AC7E20`) 폰의 플래그를 세운다.
+  - +0xA80(낼 수 있음): 처음 1. 행의 `constructionCost`(+0x2A0)가 폰+0xA40보다 크거나, 행의 `constructionGoods` 가운데 영지 재고(영지+0x538)가 모자란 것이 있으면 0. 청사진(폰+0x850)이나 이전(폰+0x1140) 중이면 검사하지 않는다.
+  - +0xA91(개수 제한): 아래.
+  - 끝에서 `+0x60C(배치 불가) = !(A80 && A81 && !A91 && !A90 && 지역 검사 && 미해금 기술 0)`. 지형에서 이미 막혔으면 이 검사들을 건너뛴다.
+- 즉 원래 게임은 영지에 건설 자재가 없으면 건물을 놓지 못한다. 지금은 표의 자재를 비워서 이 검사가 통과한다.
+- 놓은 뒤: 건물의 자재 목록(+0x3C0)은 놓을 때 표에서 계산해 넣는다(`SetupBuilding` → `0x144C94970`). 모드는 내 영지의 미완공 건물 자재 목록을 이미 비우고 있다(`clearConstructionSites`).
+- 배치 확정 함수는 `0x144AC53B0(pawn, bool)`이다. `isAI`가 아니고 +0x60C가 서 있으면 돌아간다(AI 폰도 이 함수를 쓰는 것으로 보인다).
+
+**지역당 개수 제한** — AI에게는 거의 닿지 않는다.
+- `maxInRegion`(+0x2D8)을 읽는 곳은 둘이다.
+  - 배치 갱신 함수(`0x144AC8072`, `0x144AC85BE`): `getBuildingCount(영지, 종류)`가 `maxInRegion` 이상이면 폰+0xA91 = 1. 이 함수는 AI면 바로 돌아간다.
+  - `canUpgrade`(`0x144CA911E`, `0x144CA922E`): 업그레이드 16(다시 짓기, AI 로그는 `AI_rebuild: `)일 때 건물+0x370 종류의 개수를 보고 이유 `limit_reached`를 넣는다. AI에게 닿는 곳은 여기뿐이다.
+- 건설 메뉴 카드의 블루프린트(`W_HUD_BuildingCardV2`)에는 자물쇠 갱신(`UpdatePadlockVisibility`)만 있다. `IsBuildingLocked(pawn, stat)`(`0x144B83390`)은 정착지 레벨(+0x2DC)과 선행 건물(+0x2C8)만 본다. 개수 제한은 보지 않는다.
+
+**군사 (장비 요구, 주민·집 레벨·훈련 요구)** — AI에게 닿는 곳을 찾지 못했다.
+- 모드가 바꾸는 네 값(`requiredEquipment` +0x118, `minMeleeTraining` +0x128, `minArcheryTraining` +0x12C, `minHouseLv` +0x130)을 읽는 네이티브 코드가 없다. 유닛 표를 읽는 길(행 찾기 8곳, 행 함수 5곳, 엔진+0xB78을 직접 쓰는 함수들)을 모두 봤다. `getNumRequiredEqiupmentOfType`(`0x144BE9880`)은 `weapons`(+0x78)와 `shields`(+0x88)를 읽는다.
+- `ARegion::getAvailableRecruits(minMelee, minArchery, …, minHouseLv)`(구현 `0x144BE8020`)와 `getAllAvailableRecruits`(`0x144BE7D50`)를 부르는 곳은 각자의 썽크뿐이다. 값을 넘기는 쪽은 블루프린트다(민병대 화면 `W_HUD_ArmyRecruitCardV2.UpdateCanAddUnit`, 위젯 `requiredEquipment`).
+- 그러니 이 네 값은 플레이어의 화면만 읽는 것으로 보인다. AI는 그 화면을 쓰지 않는다.
+
+### 방법
+- **A. 플레이어의 호출 동안만 행을 바꾼다(주인으로 가른다).** 표는 원래대로 두고, 첫 인자가 건물이나 폰인 함수를 후킹해 주인이 `isMainPlayer`일 때만 그 호출 동안 행의 값을 0으로 두었다가 되돌린다. 배열은 `Num`만 0으로 둔다(지금의 `Empty()`와 달리 내용을 지우지 않는다). 게임 논리는 게임 스레드 하나에서 돌므로 그 사이에 AI가 읽지 않는다.
+  - 개수 제한, 자재 불필요: 이미 있는 `placement` 후킹에서 `0x144C48480(폰.placeBuilding)`으로 행을 얻어 `maxInRegion`(+0x2D8)과 `constructionGoods.Num`(+0x298)을 바꾼다. 새로 필요한 것은 행 함수의 주소뿐이다(후킹 없이 주소만 찾는 항목). 자재 목록은 지금처럼 Lua가 비운다(10초 tick → 1초 poll).
+  - 업그레이드: `canUpgrade`, 비용 지불 `0x144C8F6D0`, `GetUpgradeResourceCost`(`0x144C96510`), `GetRegionalWealthCostForUpgrade`(`0x144C94E40`) 넷을 후킹하고, `AllResidentialRequirementsSatisfied`는 내 건물이면 참을 돌려준다. 다섯 다 64바이트 안에서 고유한 패턴이 나온다.
+  - 표가 늘 원래 값이므로 AI가 바뀐 값을 읽을 길이 없다. 대신 플레이어 쪽에서 후킹하지 않은 길은 원래 값으로 남는다: 건설 메뉴와 커서 툴팁의 자재 표시, `getUpgradeData`로 그리는 금고 비용·해금 표시, 주거 요구 목록.
+  - Lua로 바로 잴 수 있다: 내 건물과 다른 영주의 건물에 `canUpgrade`, `GetUpgradeResourceCost`를 불러 비교.
+- **B. AI 틱 동안만 표를 원래대로 돌린다(맥락으로 가른다).** 표는 지금처럼 바꿔 두고 AI 루프의 뿌리를 후킹한다. 플레이어 쪽 동작과 화면은 지금과 같다. 뿌리가 적어도 셋(`0x144B6E7D0`, `0x144B6BD60`, `0x144B9BE10`)이고 더 있을 수 있어 AI가 바뀐 값을 읽는 길이 남는지 확인하기 어렵다. 원래 값을 네이티브가 보관하고 써야 해서 Lua의 표 쓰기를 네이티브로 옮겨야 한다. Lua 호출로는 차이를 잴 수 없다(Lua 호출은 AI 틱 밖이다).
+- **C. 엔진 플래그.** `ignoreRequirementsForHouseUpgrades`, `instaBuild`처럼 전역이라 AI에도 듣는다. 비용·조건을 플레이어에게만 거는 플래그는 없다(플래그 이름 67개 + 이름 비교 251개를 훑었다).
+- 군사는 바꿀 것이 없다(위).
+
+### 곁가지
+- `APawnCPP.silver : int32`(+0xA40)가 리플렉션 필드다. 업그레이드의 `treasury` 비용을 여기서 빼므로 영주 금고로 보인다. "① 자원"의 "금고 필드는 리플렉션에 없다"와 다르다. 게임에서 화면의 금고 값과 같은지 재지 않았다.
+- 엔진에 `upgrades : TArray<FUpgrade>`(+0xA40)가 따로 있다. 읽는 곳은 찾아보지 않았다. 지금의 표 쓰기만으로 `canUpgrade`가 바뀌는 것은 잰 사실이다(위 "기능이 다른 영주(AI)에게 닿는 범위").
+- AI 건설 틱 후킹 하나로 "내가 배치하는 동안 AI가 놓는 건물이 완공 상태로 생기는" 것을 막을 수 있어 보인다(틱 동안 플래그 목록의 `Num`을 0으로). 해 보지 않았다.
+
+### 확인하지 못한 것
+- 이 절 전체. 특히 군사의 네 값을 AI가 쓰지 않는다는 것, 자재가 없으면 원래 게임이 배치를 막는다는 것(코드로만 읽었다).
+- 방법 A에서 플레이어 쪽에 빠지는 길: 성 설계(`getCastleReconstructionCost`), 건물 이전, 건물 창의 업그레이드 버튼이 `getUpgradeData`의 값으로 켜지고 꺼지는지.
+- 놓은 직후 Lua가 자재 목록을 비우기 전(1초 이내)에 운반이 시작되는지.
+
+## 자재 불필요·개수 제한 해제를 내 배치에만 — 구현과 검증 (2026-10-03, Steam buildid 24905706)
+위 "표를 바꾸는 기능을 플레이어에게만 — 방법 조사"의 방법 A 가운데 건물 표 쪽. 사용자 승인("이 순서로 진행").
+
+### 구현
+- 네이티브 `placement`의 detour: 플레이어가 배치 중이면(`isMainPlayer`, `isAI` 아님, `placeBuilding` > 0) 행 함수(`0x144C48480`)로 그 종류의 행을 얻어 `maxInRegion`(+0x2D8)과 `constructionGoods`의 `Num`(+0x298)을 0으로 두고 원본을 부른 뒤 되돌린다. 켜진 옵션만 고친다. 그 뒤 "배치 제한 무시"가 켜져 있으면 전처럼 +0x60C를 지운다.
+- 주소만 찾는 항목 둘: `building_row`(행 함수. 맵 조회 본문 확인), `placement_rows`(배치 갱신 함수를 한 번 더 찾아 본문에서 +0x2D8, +0x290, +0x298, 폰+0x34C를 쓰는 명령 확인, 창 0x2800). `placement`와 따로 두어 이 검사가 실패해도 "배치 제한 무시"는 남는다.
+- `HookSpec.configure`: 설치된 항목이면 sync 때마다 설정을 받는다(한 후킹이 옵션 셋을 맡는다).
+- Lua `features/build.lua`: 표를 바꾸지 않는다. `core/native.lua`의 `installed({placement, building_row, placement_rows})`가 false일 때만(DLL 없음, 항목 미설치) 예전처럼 표를 바꾸고, 아직 모르면(nil) 기다린다. 내 영지 공사 현장의 자재 목록은 poll(1초)마다 비운다.
+
+### 검증 (saveGame_8, 건설 기능만 켜고 `noRegionLimit`·`noMaterials`만 켬, 저장 없이 종료)
+- `native_status.json`: `placement`, `building_row`, `placement_rows` 모두 installed·active.
+- 두 옵션을 켠 채로 표: 102행 가운데 `maxInRegion`이 0이 아닌 행 9개가 모두 1(57, 58, 81, 83, 98, 102, 103, 474, 475), 자재가 있는 행 60개. 옵션을 껐다 켜는 동안에도 행 98은 `maxInRegion` 1·자재 3종, 행 119는 자재 3종 그대로였다.
+- 배치 판정 플래그(네이티브 메모리 프로브로 폰을 읽음. 영지 Mandlach, 커서 아래 영지가 잡힌 상태, `pawn:setPlacedBuilding`으로 배치 모드 진입):
+
+| 놓으려는 건물 | 옵션 | +0xA91(개수 제한) | +0xA80(낼 수 있음) | +0x60C(배치 불가) |
+|---|---|---|---|---|
+| 저택(98). 이 영지에 이미 1채 | `noRegionLimit` 켬 | 0 | 1 | 0 |
+| | 끔 | 1 | 1 | 1 |
+| 자재 적치장(119). 자재 7번이 6개 필요한데 재고 0 | `noMaterials` 켬 | 0 | 1 | 0 |
+| | 끔 | 0 | 0 | 1 |
+
+  - 옵션을 바꾸고 3초 안에 값이 바뀌었고, 다시 켜면 돌아왔다.
+  - 이것으로 "영지에 자재가 없으면 원래 게임이 배치를 막는다"(위 조사에서 코드로만 읽은 것)가 확인됐다.
+- 사용자가 자재 적치장을 4채 놓았다(재고 0인 자재가 필요한 건물). 넷 다 자재 목록 0개였고, 몇 분 뒤 둘은 `constructing`, 둘은 `not_enough_workers`였다.
+- 커서가 게임 화면 밖에 있을 때는 폰+0x988(커서 아래 영지)이 0이고 +0x60C가 1, 나머지 플래그는 처음 값(A80 1, A91 0)이라 판정을 잴 수 없다. 사용자가 게임 화면을 만진 직후에 쟀다.
+- 테스트: 네이티브 219개, .NET·Lua 107개, 도구 스크립트 통과. 패널 빌드 경고·오류 0.
+
+### 측정 도구가 낸 크래시 (2026-10-03 17:43)
+- 건설 메뉴의 저택 카드 상태를 보려고 Lab 스크립트가 카드 묶음 위젯(`MLBuildingCardContainerWidget`, 인스턴스 2개)에 `SetCategory(n)`을 불렀다. 분류 0은 됐고 1에서 게임이 튕겼다(`EXCEPTION_ACCESS_VIOLATION reading 0x0`, 스택: 게임 → UE4SS Lua → 게임). 모드의 DLL은 스택에 없다.
+- 세이브는 백업과 같았다(차이 0). 설정 파일과 Lab은 원래대로 돌렸다.
+- Lab 스크립트에서 UI 위젯의 상태를 바꾸는 함수를 부르지 않는다.
+- 튕기기 전에 읽은 것: 카드 묶음의 `AvailableBuildings`는 42종이고 저택(98)과 자재 적치장(119)이 들어 있다. 화면에 만들어진 카드는 10장이었다.
+
+### 확인하지 못한 것
+- 건설 메뉴에서 저택 카드를 눌러 하나 더 놓는 것(카드가 막혀 있는지 읽지 못했다. 판정 플래그까지만 쟀다).
+- 성 설계, 건물 이전, 밭.
+- 놓은 직후 자재 목록을 비우기 전(1초 이내)에 운반이 시작되는지.
+- 곁가지: 같은 세션에서 `pawn.silver`는 148500이었고 화면의 금고 표시는 148.5k였다.
+## 업그레이드 조건·비용 무시를 내 건물에만 — 구현과 검증 (2026-10-03, Steam buildid 24905706)
+"표를 바꾸는 기능을 플레이어에게만 — 방법 조사"의 방법 A 가운데 업그레이드 표 쪽.
+
+### 실행 파일에서 더 읽은 것
+- 행 함수(`0x144C50AD0`)를 부르는 16곳이 읽는 필드를 모두 봤다.
+  - `canUpgrade`: `bUseOnlyOnce`(+0x7F), `minimumSettlementLevel`(+0x78), `minimumHouseLv`(+0x7D), `treasury`(+0x54. 주인 폰+0xA40과 비교).
+  - 비용 지불 `0x144C8F6D0`: `treasury`(+0x54). `GetRegionalWealthCostForUpgrade`: `bIsCostScalable`(+0x38), `regionalWealth`(+0x50). `GetUpgradeResourceCost`: `cost`(+0x40, +0x48).
+  - AI 계획 함수 `0x144B5FCD0`(`0x144B61D38`): `cost`를 직접 읽는다.
+  - `requiresBuilding`(+0x58), `requiredPerks`(+0x68), `minimumProsperity`(+0x7C), `lockedInOutposts`(+0x7E)를 읽는 곳은 `getUpgradeData`의 썽크(`0x144A8A070`, 행을 통째로 블루프린트에 복사)뿐이다. 이 넷은 화면(블루프린트)만 읽는다.
+- 건물의 자재 목록(+0x3C0)은 `useUpgrade` 호출이 돌아온 뒤에 채워진다(아래 실측). 비용 지불 함수가 그때 불리므로 `useUpgrade`가 아니라 비용 지불 함수를 후킹해야 한다.
+
+### 구현
+- 네이티브 `features/upgrade_scope`: `upgrade_can`, `upgrade_pay`, `upgrade_cost`, `upgrade_wealth`의 detour가 건물의 주인이 `isMainPlayer`이면 행 함수로 그 업그레이드의 행을 얻어 `cost.Num`(+0x48), `regionalWealth`(+0x50), `treasury`(+0x54), `minimumSettlementLevel`(+0x78), `minimumHouseLv`(+0x7D)를 0으로 두고 원본을 부른 뒤 되돌린다(겹쳐 불려도 된다). `upgrade_residential`의 detour는 내 건물이면 참을 돌려준다. `upgrade_row`는 주소만 찾는다.
+- 주인·엔진 오프셋(+0x2E0, +0x2E8, 폰+0x34C)은 비용 지불 함수의 본문으로 확인한다. 그 함수와 행 함수를 찾았을 때만 주인을 읽는다.
+- 켜고 끄는 값은 `features.upgrade.enabled`(`NativeControl.upgradeFree`).
+- Lua `features/upgrade.lua`: 여섯 항목이 모두 설치됐으면 표에서 화면만 읽는 네 값만 바꾼다. 못 맡으면(false) 예전처럼 행 전체와 주거 요구 설정을 바꾸고, 아직 모르면(nil) 화면 값만 바꾼 채 기다린다(poll).
+- 게임을 켜지 않고 여섯 패턴과 본문 검사를 실행 파일에서 확인했다(모두 한 곳, 검사 통과).
+
+### 검증 (saveGame_8, 업그레이드 기능만 켬, 저장 없이 종료)
+- `native_status.json`: `upgrade_` 여섯 항목 모두 installed·active.
+- 기능을 켠 채로 표: 51행 가운데 `cost`가 있는 행 33, `regionalWealth` 28, `minimumSettlementLevel` 3, `minimumHouseLv` 11(원래 값). 화면만 읽는 넷은 모두 0. 주거 요구 설정의 `VarietyRequired`가 0이 아닌 값 33개(원래 값).
+- 거주 구획 1레벨(종류 3, 업그레이드 중이 아닌 것)에 업그레이드 2를 물었다:
+
+| | 구획 수 | `canUpgrade` 참 | 이유 | `GetUpgradeResourceCost` | `AllResidentialRequirementsSatisfied` 참 |
+|---|---|---|---|---|---|
+| 내 것, 기능 켬 | 23 | 23 | 없음 | 0종 | 23 |
+| 다른 영주, 기능 켬 | 14 | 0 | 자재 부족 14, 주거 요구 미충족 7 | 2종 | 7 |
+| 내 것, 기능 끔(4초 뒤) | 22 | 4 | 주거 요구 미충족 18 | 2종 | 4 |
+| 다른 영주, 기능 끔 | 15 | 0 | 자재 부족 15, 주거 요구 미충족 8 | 2종 | 7 |
+
+  - 다른 영주 쪽은 기능과 무관하게 같다(오전에 기능을 끈 채 잰 0/14, 이유 14·7과도 같다). 전에는 기능을 켜면 14/14가 됐다.
+- `useUpgrade(2)`를 걸었다. 호출 직후에는 두 경우 모두 자재 목록이 0개였고, 조금 뒤 읽으니:
+  - 기능을 켜고 건 구획(Mandlach): 종류 8, 자재 목록 없음, 상태 `constructing`.
+  - 기능을 끄고 건 구획(Haderwand, 원래도 올릴 수 있던 것): 종류 8, 자재 목록 목재 2·판자 6, 상태 `transporting`.
+  - 지역 자산과 `pawn.silver`는 두 경우 모두 그대로였다(이 업그레이드는 원래 지역 자산·금고 비용이 0이다).
+- 로그 오류 0, 크래시 없음, 세이브는 백업과 같음. 테스트: 네이티브 225개, .NET·Lua 107개, 도구 스크립트 통과. 패널 빌드 경고·오류 0.
+
+### 확인하지 못한 것
+- 건물 창의 업그레이드 버튼(화면). 버튼이 `canUpgrade` 말고 다른 것으로 켜지고 꺼지는지 모른다.
+- 지역 자산·금고 비용이 있는 업그레이드, 확장(`changeExtension`), 다시 짓기(업그레이드 16).
+- 기능을 끈 뒤에도 화면만 읽는 네 값은 표에 0으로 남는다(게임을 다시 켜야 돌아온다).
+## 즉시 수리 — 건물에 남는 유지보수 물자와 "저장실 가득 참" (2026-10-03, Steam buildid 24905706)
+사용자 보고: 새 영지를 점령한 뒤 지은 벌목장에 자원이 하나 들어왔는데 "일반 저장실 가득 참"이 뜬다(화면: 목재 저장실 1 / 2,800, 인벤토리에 망치 모양 물자 1개와 통나무 1개). 사용자의 세이브(`saveGame_1`, 영지 Himmelreich·Im Graben)를 Lab으로 불러 쟀다. 세 번 켰고 매번 저장 없이 껐다.
+
+### 실행 파일에서 읽은 것
+- `ASMBuildingMaster::verifyStorageProblems`(구현 `0x144CDE660`). 문제 추가 `0x144BC2ED0(영지, 종류, 건물, 0)`, 제거 `0x144BF1C40`. 부르는 곳은 썽크 말고 여섯(게임이 인벤토리가 바뀔 때 스스로 다시 검사한다).
+  - 표의 `SupportsTargetStock`(+0x2A5)이 0인 건물(벌목장 등): 저장실 종류마다 `저장량 > 0 && 저장량 >= 한도 + 여유`이면 `OutOfStorageSpace`(31. 식량은 32)를 붙인다. 여유는 그 건물의 생산품 재료 가운데 그 종류로 보관하는 것이 있으면 1이다.
+  - 그래서 한도가 0인 저장실에 물자가 하나라도 있으면 "가득 참"이다. 화면의 제목은 저장실 종류와 무관하게 "일반 저장실 가득 참"이다.
+- `ARegion::grantResources`(구현 `0x144BEC5D0`)가 물자를 넣는 곳: 일반 물자는 자리 있는 창고 기능(`buildingFunction` 6) 건물, 식량은 식량 비축고 기능(5) 건물. 없으면 종류 88(야적 물자 더미), 그것도 없으면 영지의 건물 목록에서 기능이 13이 아닌 첫 건물의 인벤토리에 직접 넣는다. 이번 원인은 아니었다(더미가 있었다).
+
+### 실측
+- 모든 기능을 끄고 불러온 직후: Im Graben의 벌목장(종류 4)은 저장량 일반 1·목재 4, 한도 일반 0·목재 28, 인벤토리 `6(Iron tools, 일반) x1`, `16(Wood) x4`, 문제 목록에 `OutOfStorageSpace`. Himmelreich의 벌목장 3채는 인벤토리가 비어 있었다.
+- 벌목장의 유지보수 물자는 품목 6(철제 도구)이다(`MaintenanceComponent:GetTrackedMaintenanceTypes()`).
+- 게임의 원래 유지보수(기능 끔, `UnmaintainAllBuildings`로 필요 상태를 만든 뒤): 일꾼이 있는 건물은 14~27초(12배속) 또는 98초(1배속) 뒤 유지보수됐고 그때 영지의 도구 재고가 1 줄었다. 4초 간격으로 봤을 때 건물에 도구가 남아 있던 적은 없다. 일꾼이 없는 건물(종류 18, 89, 7)은 끝까지 유지보수되지 않았다.
+- 건물에 도구가 이미 있으면 그것부터 쓴다: 도구 1개를 가진 벌목장을 필요 상태로 만들자 3초 뒤 그 도구가 소모됐다(건물 1 → 0, 재고 500 → 499).
+- 치트(`MaintainAllBuildings`, `UnmaintainAllBuildings`)는 폰의 `currentRegion`(+0x980)인 영지에만 듣는다: `currentRegion`이 Himmelreich일 때는 Im Graben의 건물이 바뀌지 않았고, Lua로 `currentRegion`을 Im Graben으로 바꾸고 부르자 Im Graben의 건물만 1.00이 됐다(화면 위의 영지 이름도 따라 바뀐다). 치트는 도구 재고를 줄이지 않는다.
+- **재현**(1배속, 즉시 수리를 흉내): Im Graben의 벌목장을 필요 상태로 만들고 72초에 `MaintainAllBuildings`를 불렀다(건물은 유지보수됨, 도구 없음). 111초에 벌목장의 도구가 0 → 1이 됐고 그대로 남았다. 저장량 일반 1, 한도 0, 문제 목록에 `OutOfStorageSpace`.
+  - 1.5~4.5초 뒤에 부른 세 번은 남지 않았다(일꾼이 아직 도구를 집기 전으로 보인다).
+- 치우기: `region:consumeGood(6, 1, 건물, false, false, false)`가 true를 돌려주고 그 건물의 도구가 사라졌으며(재고 499 → 498) 문제 항목이 바로 없어졌다(`verifyStorageProblems`를 따로 부르지 않아도).
+
+### 조치
+- `features/build.lua`의 10초 tick: 즉시 수리가 켜져 있으면 치트를 부른 뒤, 내 영지의 건물 가운데 한도가 0인 저장실에 물자가 든 것을 찾아, 그 건물의 유지보수 물자이고 그 물자의 보관 방식(`DT_Items`의 `storageType`)에 해당하는 한도가 0이면 `consumeGood`으로 그 건물에서 소모시킨다.
+- 창고로 돌려보내지 않고 소모시키는 이유: 치트가 대신 한 유지보수에 쓰였을 물자이고, 창고가 없는 영지에서는 `grantResources`가 같은 건물에 다시 넣을 수 있다(위 규칙).
+
+### 검증 (고친 모드, 사용자의 설정 그대로, 같은 세이브)
+- 불러온 뒤 첫 읽기에서 Im Graben의 벌목장은 인벤토리 `16 x4`뿐이고 문제 항목이 없었다. 영지의 저장 문제는 야적 물자 더미의 `ExposedStorage`·`ExposedFood`만 남았다.
+- 더미(종류 88)의 도구 470·29·490개는 그대로였다(유지보수 대상이 아니다). 로그 오류 없음, 기능 모두 active. .NET·Lua 107개 통과.
+
+### 확인하지 못한 것
+- 사용자의 건물에 도구가 남은 바로 그때의 경위(새 건물이 지어진 직후 유지보수를 필요로 하는지 등). 재현한 경로와 결과는 같다.
+- 철제 도구 말고 다른 유지보수 물자, 목재·식량 저장실 쪽.
+- 즉시 수리가 `currentRegion`에만 듣는 것은 그대로 두었다(다른 영지의 건물은 원래 방식으로 유지보수된다).
+
+### 조사 중에 있던 일
+- 세션이 길어 게임이 `autosave`를 덮어썼다(19:29). 시작 전에 받아 둔 백업(`backups/20261003-185836`)에서 여섯 파일을 되돌렸다.
+## 즉시 수리 — 내 영지 전체 (2026-10-03)
+사용자 요청: 즉시 수리를 내 영지 전체에 듣게. 위 "즉시 수리 — 건물에 남는 유지보수 물자"에서 치트가 폰의 `currentRegion` 영지에만 듣는 것을 쟀다.
+
+### 구현
+- `features/build.lua`의 `maintainMyRegions`: 폰의 `currentRegion`을 읽어 두고, 내 영지 가운데 그 영지가 아닌 것마다 `pawn.currentRegion = 영지` 뒤 `MaintainAllBuildings()`를 부른다. 끝나면(치트가 실패해도) 원래 값으로 돌려놓고, 원래 영지가 내 것이면 그 영지에도 부른다. 원래 영지가 내 것이 아니면 그 영지에는 부르지 않는다. `currentRegion`을 읽지 못하면 예전처럼 한 번만 부른다.
+- 한 번의 게임 스레드 호출 안에서 바꾸고 되돌린다.
+
+### 검증 (saveGame_1, 즉시 수리만 켬, 저장 없이 종료)
+- 두 영지의 유지보수 대상 건물이 모두 1.00이 됐다: Himmelreich 9채(일꾼이 없어 원래 방식으로는 유지보수되지 않던 종류 18, 89, 7 포함), Im Graben 2채. Im Graben의 벌목장에 남아 있던 도구도 사라졌다.
+- 같은 동작을 Lab으로 한 번 실행: 전후 모두 `currentRegion` = Himmelreich, `regionUnderCursor` = Himmelreich, `RegionPanelTarget` = Himmelreich. 12초 뒤까지 같았고 화면 위쪽의 영지 이름과 카메라 위치도 같았다(캡처 비교).
+- 실행 중에 기능을 켜고 38초(tick 네 번): `currentRegion` 그대로, 화면 그대로, 로그 오류 0.
+- 불러올 때부터 켠 경우를 두 번 봤다.
+  - 첫 번째: 불러온 직후 `currentRegion`이 Himmelreich였다가 6초 뒤 Tuefelsberg(내 영지가 아님)였고, 화면도 Tuefelsberg의 숲이었다.
+  - 두 번째(같은 조건): 0초에 `regionUnderCursor`만 Tuefelsberg였고 5초 뒤 Himmelreich, `currentRegion`은 계속 Himmelreich, 화면은 Himmelreich의 풀밭.
+  - 기능을 끈 채 켠 한 번: 계속 Himmelreich.
+  - 첫 번째가 왜 달랐는지는 확인하지 못했다. 불러온 직후 카메라가 Tuefelsberg 쪽에서 시작해 내 영지로 옮겨 가는 것으로 보이는데(두 번째의 0초 값), 첫 번째에서는 옮겨 가지 않았다. 모드의 코드는 읽어 둔 값을 그대로 되돌리므로 게임이 갖고 있지 않던 값을 넣지는 않는다.
+- 테스트: .NET·Lua 107개, 네이티브 225개 통과.
+
+### 확인하지 못한 것
+- 다른 영주의 영지를 보고 있을 때(스펙 `instant_repair_never_runs_on_a_region_that_is_not_mine`으로만 확인).
+- 영지가 셋 이상일 때.

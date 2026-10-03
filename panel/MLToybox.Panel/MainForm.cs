@@ -58,7 +58,7 @@ public sealed class MainForm : Form
     private readonly CheckBox _instantBuild = new() { Text = "즉시 완공 (네이티브 DLL)", AutoSize = true };
     private readonly CheckBox _instantRepair = new() { Text = "즉시 수리", AutoSize = true };
     private readonly CheckBox _noMaterials = new() { Text = "자재 불필요 (건설 자재 없이 공사)", AutoSize = true };
-    private readonly CheckBox _noRegionLimit = new() { Text = "지역당 개수 제한 해제 (영주 저택 모듈·세금 징수소·장작/식량 수레. 끈 뒤에는 게임을 다시 켜야 원래대로)", AutoSize = true };
+    private readonly CheckBox _noRegionLimit = new() { Text = "지역당 개수 제한 해제 (영주 저택 모듈·세금 징수소·장작/식량 수레)", AutoSize = true };
 
     private readonly CheckBox _upgradeEnabled = new() { Text = "업그레이드 조건·비용·해금 무시", AutoSize = true };
 
