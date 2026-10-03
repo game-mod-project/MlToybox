@@ -24,8 +24,12 @@ void HookManager::installAll(std::span<const uint8_t> text, uintptr_t textAddres
         }
         if (!missing.empty()) { e.state.error = "layout check failed: " + missing; continue; }
         void* target = reinterpret_cast<void*>(textAddress + r.offset);
-        std::string err;
-        if (!backend.create(target, e.spec.detour, e.spec.original, err)) { e.state.error = err; continue; }
+        if (!e.spec.detour) {
+            *e.spec.original = target;
+        } else {
+            std::string err;
+            if (!backend.create(target, e.spec.detour, e.spec.original, err)) { e.state.error = err; continue; }
+        }
         e.target = target;
         e.state.installed = true;
     }
@@ -36,6 +40,7 @@ void HookManager::sync(const NativeControl& control, HookBackend& backend) {
         if (!e.state.installed) continue;
         bool want = e.spec.wanted(control);
         if (want == e.state.active) continue;
+        if (!e.spec.detour) { e.state.active = want; continue; }   // 주소만 찾은 항목: 켜고 끌 후킹이 없다
         std::string err;
         if (backend.setEnabled(e.target, want, err)) { e.state.active = want; e.state.error.clear(); }
         else e.state.error = err;

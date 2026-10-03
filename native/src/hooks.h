@@ -10,6 +10,7 @@ namespace mlt {
 struct HookSpec {
     std::string name;
     std::string pattern;
+    // detour 가 nullptr 이면 후킹하지 않고 주소만 찾는다(다른 detour 가 직접 부를 게임 함수). 찾은 주소는 *original 에 들어간다.
     void* detour;
     void** original;
     bool (*wanted)(const NativeControl&);
