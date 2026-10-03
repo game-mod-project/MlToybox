@@ -10,9 +10,12 @@ local function row(generic, large, pantry)
   return { storageLimitGeneric = generic, storageLimitLarge = large, storageLimitPantry = pantry }
 end
 
+-- 게임의 건물에는 저장 문제 항목을 다시 검사하는 verifyStorageProblems() 가 있다(실측 2026-10-03). 부른 횟수를 센다
 local function building(type, generic, large, pantry)
   local b = F.object(row(generic, large, pantry))
   b.GetType = function() return type end
+  b.verified = 0
+  b.verifyStorageProblems = function(self) self.verified = self.verified + 1 end
   return b
 end
 
@@ -110,6 +113,28 @@ T.run({
     game.playerRegions = function() error("must not look at the game while the map is going away") end
     storage.disable({ leaving = true }, {})
     T.eq(a.storageLimitGeneric, 5000, "left as it was"); T.eq(storage.trackedCount(), 0, "nothing remembered")
+  end,
+  changing_a_limit_asks_the_game_to_recheck_the_buildings_storage_problems = function()
+    -- 실측: 한도를 올려도 영지의 문제 목록에 든 "저장실 가득 참" 항목은 남는다. 건물의 verifyStorageProblems() 를 부르면 바로 사라진다
+    local camp, other = building(4, 0, 28, 0), building(4, 0, 28, 0)
+    local farm = building(69, 1200, 0, 1200)
+    setup({ camp, other, farm })
+    storage.tick({}, on({ ["4"] = { large = 100 } }))
+    T.eq(camp.verified, 1, "rechecked once after the change"); T.eq(other.verified, 1, "every camp"); T.eq(farm.verified, 0, "untouched building is not rechecked")
+    storage.tick({}, on({ ["4"] = { large = 100 } }))
+    T.eq(camp.verified, 1, "nothing changed, no recheck")
+    storage.tick({}, on({ ["4"] = { large = 100 }, ["69"] = { generic = 3000, pantry = 6000 } }))
+    T.eq(farm.verified, 1, "one recheck even when two storages change")
+  end,
+  giving_back_rechecks_the_storage_problems_too = function()
+    local camp = building(4, 0, 28, 0)
+    setup({ camp })
+    storage.tick({}, on({ ["4"] = { large = 100 } }))
+    storage.tick({}, on({}))
+    T.eq(camp.storageLimitLarge, 28, "given back"); T.eq(camp.verified, 2, "rechecked after giving back")
+    storage.tick({}, on({ ["4"] = { large = 100 } }))
+    storage.disable({}, {})
+    T.eq(camp.verified, 4, "rechecked when turned off")
   end,
   removing_a_setting_gives_that_types_limits_back = function()
     local a, granary = building(99, 2500, 0, 0), building(68, 0, 0, 2500)
