@@ -99,6 +99,29 @@ local function supplySite(opts)
   game.playerRegions = function() return { region } end
   local cheat = { MaintainAllBuildings = function() end }
   game.cheat = function() return cheat end
+  game.pawn = function() return nil end
+  return site
+end
+-- 내 영지 둘(a, b)과 다른 영주의 영지(theirs). 치트는 부를 때의 pawn.currentRegion 을 적는다. opts.viewing 이 화면의 영지다
+local function repairSite(opts)
+  local regions = {}
+  for _, name in ipairs({ "a", "b", "theirs" }) do
+    local r = F.object({ label = name })
+    r.GetBuildings = function() return {} end
+    regions[name] = r
+  end
+  local pawn = F.object({ currentRegion = opts.viewing and regions[opts.viewing] or F.invalid() })
+  local site = { regions = regions, pawn = pawn, calls = {} }
+  local cheat = {}
+  cheat.MaintainAllBuildings = function()
+    local r = pawn.currentRegion
+    local label = (r and r.label) or "none"
+    if label == opts.failOn then error("cheat failed") end
+    site.calls[#site.calls + 1] = label
+  end
+  game.pawn = function() return pawn end
+  game.cheat = function() return cheat end
+  game.playerRegions = function() return { regions.a, regions.b } end
   return site
 end
 T.run({
@@ -222,8 +245,10 @@ T.run({
     T.eq(#rows["3"].constructionGoods, 1, "goods option is off")
     build.configure({}, { enabled = true, noRegionLimit = true, noMaterials = true })
     T.eq(#rows["3"].constructionGoods, 0, "turned on from the panel")
-  end,  instant_repair_maintains_on_tick = function()
+  end,
+  instant_repair_maintains_on_tick = function()
     local _, _, _, cheat = setup()
+    game.pawn = function() return nil end   -- 폰을 못 찾으면 예전처럼 한 번만 부른다
     build.tick({}, { enabled = true, instantRepair = true })
     T.eq(cheat.maintained, 1, "maintained")
     build.tick({}, { enabled = true, instantRepair = false })
@@ -338,6 +363,31 @@ T.run({
     site.camp.MaintenanceComponent = F.invalid()
     build.tick({}, { enabled = true, instantRepair = true })
     T.eq(#site.consumed, 0, "no component: nothing to go by")
+  end,
+  -- 게임의 유지보수 치트는 폰의 currentRegion 인 영지에만 듣는다(실측 2026-10-03). 내 영지를 하나씩 현재 영지로 두고 부른 뒤 돌려놓는다
+  instant_repair_maintains_every_region_of_mine_and_puts_the_current_region_back = function()
+    local site = repairSite({ viewing = "a" })
+    build.tick({}, { enabled = true, instantRepair = true })
+    T.eq(table.concat(site.calls, ","), "b,a", "the other region first, then the one on screen")
+    T.eq(site.pawn.currentRegion, site.regions.a, "the current region is what it was")
+  end,
+  instant_repair_never_runs_on_a_region_that_is_not_mine = function()
+    -- 다른 영주의 영지를 보고 있을 때: 그 영지에는 부르지 않는다
+    local site = repairSite({ viewing = "theirs" })
+    build.tick({}, { enabled = true, instantRepair = true })
+    T.eq(table.concat(site.calls, ","), "a,b", "only my regions")
+    T.eq(site.pawn.currentRegion, site.regions.theirs, "put back")
+  end,
+  the_current_region_is_put_back_even_when_the_cheat_fails = function()
+    local site = repairSite({ viewing = "a", failOn = "b" })
+    local ok = pcall(build.tick, {}, { enabled = true, instantRepair = true })
+    T.eq(ok, false, "the error reaches the registry")
+    T.eq(site.pawn.currentRegion, site.regions.a, "put back")
+  end,
+  without_a_current_region_the_cheat_runs_once_as_before = function()
+    local site = repairSite({ viewing = nil })
+    build.tick({}, { enabled = true, instantRepair = true })
+    T.eq(#site.calls, 1, "one call"); T.eq(site.calls[1], "none", "whatever the game has")
   end,
   tick_without_cheat_is_noop = function()
     setup()
