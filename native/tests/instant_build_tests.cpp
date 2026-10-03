@@ -131,13 +131,61 @@ TEST(fill_does_not_read_the_owner_when_its_offsets_are_not_verified) {
     CHECK(getF(s.a.bytes, instant_build::kPartHpOffset) == 100.f);
 }
 
-TEST(instant_build_registers_the_hook_and_the_finish_function) {
+TEST(instant_build_registers_the_hook_the_finish_function_and_the_two_setup_hooks) {
     HookManager m;
     instant_build::registerHook(m);
     auto s = m.states();
-    CHECK(s.size() == 2);
+    CHECK(s.size() == 4);
     CHECK(s[0].name == "instant_build");
     CHECK(s[1].name == "instant_finish");
+    CHECK(s[2].name == "instant_setup");
+    CHECK(s[3].name == "instant_convert");
+}
+
+namespace {
+// 엔진의 디버그 플래그 목록(TArray<FName>): 개수만 본다
+struct FakeEngine {
+    alignas(8) uint8_t bytes[0x10D0]{};
+    void setFlags(int32_t n) { std::memcpy(bytes + instant_build::kEngineFlagsNumOffset, &n, sizeof n); }
+    int32_t flags() const { int32_t n; std::memcpy(&n, bytes + instant_build::kEngineFlagsNumOffset, sizeof n); return n; }
+};
+}
+
+TEST(another_lords_building_is_one_whose_owner_is_set_and_is_not_the_main_player) {
+    // 플래그(instaBuild)는 게임 전체에 하나라, 내가 배치하는 동안 AI 영주가 놓는 건물도 완공 상태로 생긴다. 주인으로 가른다
+    Site s;
+    CHECK(!instant_build::ownedByAnotherLord(s.m.bytes));        // 내 건물
+    s.owner.bytes[instant_build::kPawnIsMainPlayerOffset] = 0;
+    CHECK(instant_build::ownedByAnotherLord(s.m.bytes));
+    s.setOwner(nullptr);
+    CHECK(!instant_build::ownedByAnotherLord(s.m.bytes));        // 주인이 아직 없으면 건드리지 않는다
+    CHECK(!instant_build::ownedByAnotherLord(nullptr));
+}
+
+TEST(hide_flags_empties_the_list_and_restore_puts_the_count_back) {
+    FakeEngine e;
+    e.setFlags(2);
+    const int32_t saved = instant_build::hideFlags(e.bytes);
+    CHECK(saved == 2 && e.flags() == 0);
+    instant_build::restoreFlags(e.bytes, saved);
+    CHECK(e.flags() == 2);
+}
+
+TEST(hide_flags_changes_nothing_when_the_list_is_empty_or_already_hidden) {
+    // 플래그가 없을 때(대부분의 시간)와, 안쪽 호출이 겹쳤을 때: 바꾸지 않았으면 되돌리지도 않는다
+    FakeEngine e;
+    const int32_t outer = instant_build::hideFlags(e.bytes);
+    CHECK(outer < 0 && e.flags() == 0);
+    e.setFlags(1);
+    const int32_t first = instant_build::hideFlags(e.bytes);
+    const int32_t nested = instant_build::hideFlags(e.bytes);
+    CHECK(first == 1 && nested < 0);
+    instant_build::restoreFlags(e.bytes, nested);
+    CHECK(e.flags() == 0);                                       // 안쪽이 끝나도 바깥이 끝날 때까지 숨겨져 있다
+    instant_build::restoreFlags(e.bytes, first);
+    CHECK(e.flags() == 1);
+    CHECK(instant_build::hideFlags(nullptr) < 0);
+    instant_build::restoreFlags(nullptr, 3);
 }
 
 TEST(complete_parts_ignores_null_and_bad_counts) {
