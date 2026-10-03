@@ -15,6 +15,12 @@ function M.enable(state)
   state.resources = {}
 end
 
+-- 꺼져 있는 동안 registry 가 부른다. [자원] 탭이 영지 목록과 현재 값을 보이도록 읽기만 한다(목표가 없으면 tick 은 아무것도 주지 않는다)
+function M.observe(state)
+  state.resourceIds = state.resourceIds or catalog.ids()
+  M.tick(state, nil)
+end
+
 -- 영지 식별자: regionUniqueTag(세이브 간 고정, 예 "hof"), 표시 이름: regionName(플레이어가 바꿀 수 있음)
 local function regionKey(r)
   local ok, tag = pcall(function() return r.regionUniqueTag:ToString() end)
