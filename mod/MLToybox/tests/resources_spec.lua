@@ -78,6 +78,17 @@ T.run({
     T.eq(st.resourceIds[1], "RegionalWealth", "special first")
     T.eq(#st.resourceIds, #catalog.special + #catalog.items, "all ids")
   end,
+  -- 꺼져 있는 동안: 자원 탭이 영지 목록과 현재 값을 보이도록 읽기만 한다
+  observe_reports_regions_and_stock_without_granting = function()
+    local hof = named(region({ [16] = 100 }, 5), "hof", "Klainau")
+    world({ regions = { hof } })
+    local st = {}
+    resources.observe(st, { enabled = false, targets = { Timber = 500, RegionalWealth = 900 }, regionTargets = { hof = { Timber = 2000 } } })
+    T.eq(#hof.grants, 0, "nothing granted"); T.eq(hof.stock[16], 100, "stock untouched"); T.eq(hof.regionalWealth, 5, "wealth untouched")
+    T.eq(#st.regions, 1, "region listed"); T.eq(st.regions[1].key, "hof", "key"); T.eq(st.regions[1].name, "Klainau", "name")
+    T.eq(st.regions[1].values.Timber, 100, "stock reported"); T.eq(st.resources.Timber, 100, "total reported")
+    T.eq(#st.resourceIds, #catalog.special + #catalog.items, "ids for the table")
+  end,
   tops_up_shortfall_per_region = function()
     local r1, r2 = region({ [16] = 100 }), region({ [16] = 450 })
     world({ regions = { r1, r2 } })

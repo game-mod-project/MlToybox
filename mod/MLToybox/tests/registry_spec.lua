@@ -85,6 +85,37 @@ T.run({
     r:apply({ a = { enabled = false } }); r:tick(103)
     T.eq(polls, 3, "stops with the feature")
   end,
+  -- observe 는 기능이 꺼져 있는 동안 게임 안에서 tick 의 간격으로 돈다: 읽기만 하는 일(features/resources.lua 의 영지와 현재 값)
+  observe_runs_in_game_while_the_feature_is_off = function()
+    local r = registry.new()
+    local seen, ticks = 0, 0
+    local a = { name = "a", observe = function(state) seen = seen + 1; state.seen = true end, tick = function() ticks = ticks + 1 end }
+    r:add(a)
+    r:tick(98)
+    T.eq(seen, 0, "not in the menu")
+    r:setInGame(true)
+    r:tick(100); r:tick(101); r:tick(102)
+    T.eq(seen, 2, "t=100 and t=102"); T.eq(ticks, 0, "tick stays off"); T.eq(r.state.seen, true, "observe gets the state")
+    r:apply({ a = { enabled = true } })
+    r:tick(103); r:tick(104)
+    T.eq(seen, 2, "tick takes over while the feature is on"); T.eq(ticks, 1, "ticked")
+    r:apply({ a = { enabled = false, intervalSec = 5 } })
+    r:tick(105); r:tick(108)
+    T.eq(seen, 3, "back to observe, on the interval in the settings: t=108")
+  end,
+  observe_stops_once_it_trips = function()
+    safe.setThreshold(2)
+    local r = registry.new()
+    local seen = 0
+    local bad = { name = "bad", intervalSec = 1, observe = function() seen = seen + 1; error("observe failed") end }
+    local good = fake("good")
+    r:add(bad); r:add(good); r:setInGame(true)
+    r:apply({ good = { enabled = true, intervalSec = 1 } })
+    for t = 1, 5 do r:tick(t) end
+    T.eq(seen, 2, "stopped at the threshold"); T.eq(r.tripped.bad, true, "tripped")
+    T.eq(count(good, "tick"), 5, "the others keep ticking")
+    safe.setThreshold(5)
+  end,
   trip_disables_only_that_feature = function()
     safe.setThreshold(3)
     local r = registry.new(); local bad, good = fake("bad", { fail = "tick" }), fake("good"); r:add(bad); r:add(good)
