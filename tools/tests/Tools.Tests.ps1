@@ -41,6 +41,16 @@ function Set-FakeModSource([string]$name) {
         Set-Content (Join-Path $src 'main.lua') '-- placeholder created by test'
     }
 }
+function New-DotJunk {
+    # 도구가 모드 소스 폴더에 남기는 점 폴더(.omc 등)를 흉내 낸다. 부른 테스트가 끝날 때 지운다
+    $junk = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'mod\MLToybox\Scripts\features\.mltb-test'
+    New-Item -ItemType Directory -Force (Join-Path $junk 'state') | Out-Null
+    Set-Content (Join-Path $junk 'state\x.json') '{}'
+    return $junk
+}
+function Get-DotEntries([string]$dir) {
+    @(Get-ChildItem $dir -Recurse -Force | Where-Object { $_.Name -like '.*' } | ForEach-Object { $_.FullName.Substring($dir.Length) })
+}
 
 Test-Case 'deploy installs, registers once, preserves bridge' {
     Set-FakeModSource 'MLToybox'
@@ -72,6 +82,20 @@ Test-Case 'deploy -Remove unregisters and deletes' {
     $json = Get-Content -Raw "$mods\mods.json" | ConvertFrom-Json
     Assert-Equal (@($json | Where-Object mod_name -eq 'MLToybox').Count) 0 'mods.json clean'
     Assert-Equal (@($json).Count) 8 'other entries intact'
+}
+
+Test-Case 'deploy leaves out dot folders and clears the ones an older deploy copied' {
+    Set-FakeModSource 'MLToybox'
+    $junk = New-DotJunk
+    try {
+        $g = New-FakeGame
+        $scripts = Join-Path $g 'ManorLords\Binaries\Win64\ue4ss\Mods\MLToybox\Scripts'
+        New-Item -ItemType Directory -Force (Join-Path $scripts 'features\.omc\state') | Out-Null
+        Set-Content (Join-Path $scripts 'features\.omc\state\old.json') '{}'
+        & "$PSScriptRoot\..\deploy.ps1" -Mod MLToybox -GameDir $g | Out-Null
+        Assert-True (Test-Path "$scripts\features\spawn_squads.lua") 'scripts copied'
+        Assert-Equal ((Get-DotEntries $scripts) -join ', ') '' 'dot entries in the deployed Scripts'
+    } finally { Remove-Item $junk -Recurse -Force }
 }
 
 Test-Case 'deploy MLToyboxLab creates lab folder and registers' {
@@ -129,6 +153,7 @@ Test-Case 'package.ps1 makes an installable zip that carries no settings' {
         if (-not (Test-Path $dll)) { New-Item -ItemType Directory -Force (Split-Path $dll) | Out-Null; Set-Content $dll 'fake'; $made += $dll }
     }
     $out = Join-Path $env:TEMP "mltb-pkg-$(Get-Random)"
+    $junk = New-DotJunk
     try {
         $zip = & "$PSScriptRoot\..\package.ps1" -Version '0.0.0-test' -OutDir $out -NoPanel
         Assert-Equal (Split-Path $zip -Leaf) 'MLToybox-0.0.0-test.zip' 'zip name'
@@ -145,8 +170,10 @@ Test-Case 'package.ps1 makes an installable zip that carries no settings' {
         foreach ($bad in 'control.json', 'status.json', 'overlay.json', 'overlay_status.json') { Assert-True ($names -notcontains $bad) "no $bad" }
         Assert-True (-not (Test-Path "$x\MLToybox\tests")) 'no tests folder'
         Assert-True (-not (Test-Path "$x\MLToyboxLab")) 'no lab mod'
+        # 도구가 소스 폴더에 남긴 점 폴더(.omc 등)도 넣지 않는다
+        Assert-Equal ((Get-DotEntries $x) -join ', ') '' 'dot entries in the zip'
         Assert-True ((Get-Content "$x\INSTALL.txt" -Raw) -match 'MLToybox : 1') 'install notes name the mods.txt line'
-    } finally { $made | ForEach-Object { Remove-Item $_ } }
+    } finally { $made | ForEach-Object { Remove-Item $_ }; Remove-Item $junk -Recurse -Force }
 }
 
 if ($script:failed -gt 0) { throw "$script:failed test(s) failed" }
