@@ -71,6 +71,11 @@ void drawPopulationTab(TabContext& ctx) {
     ImGui::SameLine();
     changed |= numberField("##multiplier", p.multiplier, 1, 10, scaled(50.0f));
 
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("집의 수용 가족 수 배율(배):");
+    ImGui::SameLine();
+    changed |= numberField("##houseCapacity", p.houseCapacity, 1, 10, scaled(50.0f));
+
     changed |= drawTarget(p);
     if (changed) {
         a.control.setPopulation(p);
@@ -90,6 +95,8 @@ void drawPopulationTab(TabContext& ctx) {
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("월 가족 수와 배율은 내 영지의 자연 이민을 바꿉니다(영지 창의 인구 증가 숫자도 따라 바뀝니다). 월 가족 수는 지지율과 무관하게 매달 그만큼, 배율은 게임의 값에 곱합니다. 월 가족 수를 넣으면 배율은 쓰이지 않습니다.");
     ImGui::TextDisabled("자연 이민은 그 달에 고르게 나눠 하루 한 가족까지 오고, 빈 주거 공간이 없거나 집 없는 가족이 있으면 오지 않습니다(게임의 규칙).");
+    ImGui::TextDisabled("수용 배율은 내 집이 받을 수 있는 가족 수(1·2레벨 1, 3레벨 2, 4레벨 3, 확장이 있으면 +1)에 곱합니다. 늘어난 자리는 자연 이민으로 찹니다. 가족 추가와 최소 가족 수는 집당 2가족까지만 들입니다.");
+    ImGui::TextDisabled("배율을 낮추거나 꺼도 이미 들어온 가족은 그 집에 그대로 삽니다(세이브를 불러와도 같습니다). 새 가족만 더 들어오지 않습니다.");
     ImGui::TextDisabled("가족 추가는 선택한 영지에, 공통이면 빈 자리가 많은 영지부터 들입니다.");
     ImGui::TextDisabled("빈 집(가족 0 → 1 → 2 순)에 들어오며 미배치 가족으로 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.");
     ImGui::Spacing();

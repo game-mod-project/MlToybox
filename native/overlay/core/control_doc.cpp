@@ -242,6 +242,7 @@ PopulationSettings ControlDoc::population() const {
     v.enabled = boolOr(f, "enabled", false);
     v.multiplier = intOr(f, "multiplier", 2);
     v.monthlyFamilies = intOr(f, "monthlyFamilies", 0);
+    v.houseCapacity = intOr(f, "houseCapacity", 1);
     v.targetFamilies = intOr(f, "targetFamilies", 0);
     v.regionTargets = readIntMap(objectAt(f, "regionTargets"));
     return v;
@@ -252,6 +253,7 @@ void ControlDoc::setPopulation(const PopulationSettings& v) {
     f["enabled"] = v.enabled;
     f["multiplier"] = v.multiplier;
     f["monthlyFamilies"] = v.monthlyFamilies;
+    f["houseCapacity"] = v.houseCapacity;
     f["targetFamilies"] = v.targetFamilies;
     f["regionTargets"] = writeIntMap(v.regionTargets);
 }
