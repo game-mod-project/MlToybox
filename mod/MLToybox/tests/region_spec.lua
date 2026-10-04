@@ -177,6 +177,56 @@ T.run({
     region.tick(state, { enabled = true })
     T.eq(state.region.regions[1].deposits[1].amount, 118, "fresh minerals shown")
   end,
+  -- 풍부 여부는 리플렉션에 없다. 네이티브가 매장지의 주소와 함께 알려 주고, 덩어리형(돌)은 그 주소로 견준다
+  rich_flags_come_from_the_native_list_by_node_address = function()
+    local eich = makeRegion("eich")
+    local stone = clumpNode(eich, "Stone", false, { { 39, 0 } })
+    local plain = clumpNode(eich, "Stone", false, { { 12, 0 } })
+    local fish = clumpNode(eich, "res_fish", true, { { 20, 33 } })
+    world({ eich }, { stone, plain, fish })
+    local state = {}
+    region.tick(state, { enabled = true })
+    T.eq(state.region.regions[1].deposits[1].rich, nil, "unknown until the native list is fresh")
+    native.nodes = {
+      { node = hex(stone), region = hex(eich), type = 7, amount = 0, rich = true },
+      { node = hex(plain), region = hex(eich), type = 7, amount = 0, rich = false },
+      { node = "BEEF", region = hex(eich), type = 2, amount = 1154, rich = true },
+      { node = "F00D", region = hex(eich), type = 3, amount = 25 },   -- 풍부 여부의 자리를 확인하지 못한 네이티브: rich 가 없다
+    }
+    native.nodesDay = 1
+    region.tick(state, { enabled = true })
+    local d = state.region.regions[1].deposits
+    T.eq(#d, 5, "stone deposits with clumps are not listed twice")
+    T.eq(d[1].kind, "Iron", "iron")
+    T.eq(d[1].rich, true, "rich iron")
+    T.eq(d[2].kind, "Clay", "clay")
+    T.eq(d[2].rich, nil, "clay: not known")
+    T.eq(d[3].amount, 39, "first stone deposit")
+    T.eq(d[3].rich, true, "rich stone")
+    T.eq(d[4].amount, 12, "second stone deposit")
+    T.eq(d[4].rich, false, "plain stone")
+    T.eq(d[5].kind, "Fish", "fish")
+    T.eq(d[5].rich, nil, "fish has no rich flag here")
+  end,
+  -- 풍부한 돌 매장지는 덩어리를 다 캐도 남는다(채석장이 캔다). 덩어리가 없어 Lua 는 종류를 모른다: 네이티브의 목록으로 싣는다
+  a_stone_deposit_with_no_clumps_left_is_listed_from_the_native_list = function()
+    local eich = makeRegion("eich")
+    local spent = mineralNode()
+    world({ eich }, { spent })
+    local state = {}
+    region.tick(state, { enabled = true })
+    native.nodes = {
+      { node = hex(spent), region = hex(eich), type = 7, amount = 0, rich = true },
+      { node = "DEAD", region = hex(eich), type = 7, amount = 0, rich = true },   -- 그사이 게임이 없앤 매장지
+    }
+    native.nodesDay = 1
+    region.tick(state, { enabled = true })
+    local d = state.region.regions[1].deposits
+    T.eq(#d, 1, "only the deposit that still exists")
+    T.eq(d[1].kind, "Stone", "stone")
+    T.eq(d[1].amount, 0, "nothing left on the surface")
+    T.eq(d[1].rich, true, "rich")
+  end,
   -- 손으로 고친 설정: 영지 목표가 숫자가 아니거나 음수면 그 종류는 공통 목표를 따른다(네이티브와 게임 안 창도 그렇게 읽는다)
   a_malformed_region_target_falls_back_to_the_common_one = function()
     local imm, hof = makeRegion("imm"), makeRegion("hof")

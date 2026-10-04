@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-// [영지] 탭: 가축 상인 대기와 매장량 표. 줄은 매장지의 종류, 칸은 지금 값과 최소 유지 목표다.
+// [영지] 탭: 가축 상인 대기와 매장량 표. 줄은 매장지의 종류, 칸은 지금 값(풍부한 매장지는 표시)과 최소 유지 목표다.
 // 목표는 매장지 하나의 양이다. 덩어리형(돌·물고기·장어·열매·버섯)은 모드의 Lua 가(features/region.lua),
 // 광물(소금·철·점토)은 네이티브 DLL 이 날짜가 넘어갈 때 채운다. ImGui 에 의존하지 않아 단위 테스트한다.
 namespace mlt::ov {
@@ -25,7 +25,7 @@ struct DepositRow {
     std::string key;
     std::string label;
     bool mineral = false;
-    std::string current;            // 지금 값. 공통: "547 (3곳)", 영지: "1,154" / "629 / 640" / "8, 500", 없으면 "-"
+    std::string current;            // 지금 값. 공통: "547 (3곳)" / "547 (3곳, 풍부 1)", 영지: "1,154 풍부" / "629 / 640" / "8, 500", 없으면 "-"
     std::optional<int> target;      // 이 범위(공통 또는 고른 영지)에 넣은 목표
     std::optional<int> inherited;   // 영지를 골랐을 때 그 종류의 공통 목표(영지 칸이 비어 있으면 이 값을 따른다)
 };
@@ -39,6 +39,6 @@ std::vector<DepositRow> buildDepositRows(const RegionSettings& settings, const R
 void setDepositTarget(RegionSettings& settings, const std::optional<std::string>& scope, const std::string& kind, std::optional<int> value);
 // "가축 상인: Wilde Wand 방문까지 7일 · Krumme Leite 지금 주문 가능"
 std::string livestockLine(const RegionStatus* status);
-// 네이티브 DLL 이 광물을 맡지 못할 때의 안내. 다 맡았거나 아직 모르면 빈 글
+// 네이티브 DLL 이 광물이나 풍부 표시를 맡지 못할 때의 안내. 다 맡았거나 아직 모르면 빈 글
 std::string depositNativeNote(const NativeStatus* native);
 }

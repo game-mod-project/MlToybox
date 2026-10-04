@@ -12,7 +12,7 @@ using namespace mlt::ov;
 
 TEST(overlay_region_defaults_change_nothing) {
     const RegionSettings r = ControlDoc().region();
-    CHECK(!r.enabled && r.intervalSec == 5 && !r.noLivestockWait && r.targets.empty() && r.regionTargets.empty());
+    CHECK(!r.enabled && r.intervalSec == 5 && !r.noLivestockWait && !r.richDeposits && r.targets.empty() && r.regionTargets.empty());
 }
 
 TEST(overlay_region_settings_round_trip_and_reach_the_native_dll) {
@@ -21,17 +21,18 @@ TEST(overlay_region_settings_round_trip_and_reach_the_native_dll) {
     RegionSettings r;
     r.enabled = true;
     r.noLivestockWait = true;
+    r.richDeposits = true;
     r.targets["Iron"] = 1000;
     r.targets["Fish"] = 400;
     r.regionTargets["imm"]["Iron"] = 3000;
     r.regionTargets["eich"]["Clay"] = 0;   // 0 = 그 영지는 채우지 않는다. 값으로 남는다
     doc.setRegion(r);
     const RegionSettings back = ControlDoc::parse(doc.dump()).region();
-    CHECK(back.enabled && back.noLivestockWait && back.intervalSec == 5);
+    CHECK(back.enabled && back.noLivestockWait && back.richDeposits && back.intervalSec == 5);
     CHECK(back.targets == r.targets && back.regionTargets == r.regionTargets);
-    // 네이티브 DLL(src/control.cpp)은 같은 글에서 광물 목표만 읽는다
+    // 네이티브 DLL(src/control.cpp)은 같은 글에서 광물 목표와 "풍부하게"를 읽는다
     const auto native = mlt::parseControl(doc.dump());
-    CHECK(native.has_value() && native->region.enabled);
+    CHECK(native.has_value() && native->region.enabled && native->region.rich);
     CHECK((native->region.common == mlt::MineralTargets{ 0, 1000, 0 }));
     CHECK(native->region.regions.size() == 2);
     // 다른 기능과 모르는 키는 그대로
@@ -45,11 +46,14 @@ TEST(overlay_region_settings_round_trip_and_reach_the_native_dll) {
 
 TEST(overlay_region_status_lists_wait_and_deposits) {
     const auto s = parseStatus(R"({"heartbeat":5,"inGame":true,"region":{"regions":[
-        {"key":"eich","name":"Wilde Wand","livestockWait":7,"deposits":[{"kind":"Salt","amount":119},{"kind":"Mushrooms","amount":629,"capacity":640,"clumps":16}]},
+        {"key":"eich","name":"Wilde Wand","livestockWait":7,"deposits":[{"kind":"Salt","amount":119},{"kind":"Mushrooms","amount":629,"capacity":640,"clumps":16},
+            {"kind":"Iron","amount":1154,"rich":true},{"kind":"Clay","amount":25,"rich":false},{"kind":"Stone","amount":39,"rich":"x"}]},
         {"key":"hof","name":"Obere Wiese","livestockWait":0,"deposits":[]},7]}})");
     CHECK(s.has_value() && s->region.has_value() && s->region->regions.size() == 2);
     const RegionState& eich = s->region->regions[0];
-    CHECK(eich.key == "eich" && eich.name == "Wilde Wand" && eich.livestockWait == 7 && eich.deposits.size() == 2);
+    CHECK(eich.key == "eich" && eich.name == "Wilde Wand" && eich.livestockWait == 7 && eich.deposits.size() == 5);
+    // 풍부 여부: 네이티브가 알 때만 실린다. 없거나 참·거짓이 아니면 모르는 것이다
+    CHECK(!eich.deposits[0].rich && eich.deposits[2].rich == std::optional<bool>(true) && eich.deposits[3].rich == std::optional<bool>(false) && !eich.deposits[4].rich);
     CHECK(eich.deposits[0].kind == "Salt" && eich.deposits[0].amount == 119 && !eich.deposits[0].capacity);
     CHECK(eich.deposits[1].kind == "Mushrooms" && eich.deposits[1].amount == 629 && eich.deposits[1].capacity == 640);
     CHECK(s->region->regions[1].deposits.empty());
@@ -116,6 +120,27 @@ TEST(overlay_region_rows_show_the_current_amounts_for_the_chosen_scope) {
     CHECK(rows.size() == 8 && rowOf(rows, "Iron").current == "-" && rowOf(rows, "Iron").target == 1000);
 }
 
+TEST(overlay_region_rows_mark_the_rich_deposits) {
+    RegionStatus st = sampleStatus();
+    st.regions[0].deposits[1].rich = false;   // eich 점토
+    st.regions[1].deposits[0].rich = true;    // imm 철
+    st.regions[1].deposits[1].rich = false;   // imm 돌 8
+    st.regions[1].deposits[2].rich = true;    // imm 돌 500
+    st.regions[1].deposits.push_back({ "Stone", 0, 0, true });   // 덩어리를 다 캔 풍부한 돌
+    const RegionSettings s;
+    // 공통: 합과 매장지 수 뒤에 풍부한 곳의 수(없으면 적지 않는다)
+    std::vector<DepositRow> rows = buildDepositRows(s, &st, std::nullopt);
+    CHECK(rowOf(rows, "Iron").current == "1,154 (1곳, 풍부 1)");
+    CHECK(rowOf(rows, "Stone").current == "547 (4곳, 풍부 2)");
+    CHECK(rowOf(rows, "Clay").current == "25 (1곳)");
+    CHECK(rowOf(rows, "Salt").current == "119 (1곳)");
+    // 영지: 풍부한 매장지 뒤에 "풍부"
+    rows = buildDepositRows(s, &st, "imm");
+    CHECK(rowOf(rows, "Iron").current == "1,154 풍부");
+    CHECK(rowOf(rows, "Stone").current == "8, 500 풍부, 0 풍부");
+    CHECK(rowOf(buildDepositRows(s, &st, "eich"), "Clay").current == "25");
+}
+
 TEST(overlay_region_targets_are_set_per_scope_and_dropped_when_cleared) {
     RegionSettings s;
     setDepositTarget(s, std::nullopt, "Iron", 1000);
@@ -153,10 +178,12 @@ TEST(overlay_region_native_note_says_what_is_missing) {
     NativeStatus n;
     n.loaded = true;
     CHECK(depositNativeNote(&n).empty());   // 항목 목록을 아직 못 받았다: 모르는 것을 "못 맡았다"고 하지 않는다
-    for (const char* name : { "deposits_day", "deposits_nodes", "deposits_amount", "deposits_owner", "region_name", "region_tag" }) n.features[name].installed = true;
+    for (const char* name : { "deposits_day", "deposits_nodes", "deposits_amount", "deposits_owner", "deposits_rich", "region_name", "region_tag" }) n.features[name].installed = true;
     CHECK(depositNativeNote(&n).empty());
+    n.features["deposits_rich"].installed = false;
+    CHECK(depositNativeNote(&n).find("풍부") != std::string::npos && depositNativeNote(&n).find("영지별 목표") == std::string::npos);
     n.features["region_name"].installed = false;
-    CHECK(depositNativeNote(&n).find("영지별 목표") != std::string::npos);
+    CHECK(depositNativeNote(&n).find("영지별 목표") != std::string::npos && depositNativeNote(&n).find("풍부") != std::string::npos);   // 둘 다 알린다
     n.features["deposits_amount"].installed = false;
     CHECK(depositNativeNote(&n).find("소금·철·점토") != std::string::npos);
     n.stale = true;
@@ -180,6 +207,19 @@ TEST(overlay_region_tab_sits_after_mood_and_its_two_checkboxes_work) {
         found = f.a.control.region().noLivestockWait;
     }
     CHECK(found && f.a.control.region().enabled);
+}
+
+TEST(overlay_region_tab_has_a_checkbox_that_makes_the_deposits_rich) {
+    TabFrames f;
+    f.frame(drawRegionTab);
+    // 표 아래의 체크박스를 찾아 누른다(왼쪽 가장자리의 표 칸과 글은 눌러도 아무 일도 없다)
+    bool found = false;
+    for (float y = 80.0f; y < 560.0f && !found; y += 4.0f) {
+        f.click(drawRegionTab, 20.0f, y);
+        found = f.a.control.region().richDeposits;
+    }
+    CHECK(found && f.a.dirty);
+    CHECK(!f.a.control.region().enabled && !f.a.control.region().noLivestockWait && f.a.control.region().targets.empty());
 }
 
 TEST(overlay_region_tab_draws_the_table_with_values_from_the_game) {

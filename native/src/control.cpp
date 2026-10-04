@@ -79,6 +79,7 @@ static RegionControl regionControl(const Json* features) {
     if (!enabled(features, "region")) return r;
     r.enabled = true;
     const Json* section = features->get("region");
+    r.rich = flag(features, "region", "richDeposits");
     r.common = mineralTargets(section->get("targets"), 0);
     const Json* regions = section->get("regionTargets");
     if (regions && regions->type == Json::Type::Object && regions->o) {

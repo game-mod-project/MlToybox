@@ -113,6 +113,7 @@ struct DepositInfo {
     std::string kind;
     int amount = 0;
     std::optional<int> capacity;   // 덩어리형만. 다시 차지 않는 것(돌)은 0
+    std::optional<bool> rich;      // 풍부 여부(소금·철·점토·돌). 네이티브 DLL 이 알 때만 있다
 };
 
 // 내 영지 하나의 가축 상인 대기일과 매장지

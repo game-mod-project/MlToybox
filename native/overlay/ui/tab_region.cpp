@@ -100,6 +100,7 @@ void drawRegionTab(TabContext& ctx) {
     g_scope = scopes[static_cast<size_t>(scope)].key;   // 골라 둔 영지가 사라졌으면 공통으로 돌아간다
 
     changed |= drawTable(g_rows.get(RowsKey{ liveKey, g_scope, r }, [&] { return buildDepositRows(r, live, g_scope); }), r);
+    changed |= ImGui::Checkbox("소금·철·점토·돌 매장지를 풍부하게 (무한 지하 매장지)", &r.richDeposits);
     if (changed) {
         a.control.setRegion(r);
         markDirty(a);
@@ -111,6 +112,8 @@ void drawRegionTab(TabContext& ctx) {
     ImGui::TextDisabled("영지를 고르면 그 영지의 목표를 따로 넣습니다. 빈칸이면 공통 목표(흐린 숫자)를 따르고, 0 이면 그 영지는 채우지 않습니다. 공통에서는 0 이 빈칸과 같습니다.");
     ImGui::TextDisabled("돌·물고기·장어·열매·버섯은 몇 초 안에 채웁니다. 소금·철·점토는 게임의 날짜가 넘어갈 때 채우고, 지금 값도 그때 갱신됩니다(게임에 들어온 뒤 하루가 지나야 보입니다).");
     ImGui::TextDisabled("목표를 낮추거나 꺼도 이미 채운 양은 줄지 않습니다. 동물(사슴, 작은 사냥감)과 새 매장지 추가는 다루지 않습니다.");
+    ImGui::TextDisabled("\"풍부하게\"는 내 영지 전체의 풍부하지 않은 소금·철·점토·돌 매장지를 날짜가 넘어갈 때 풍부한 매장지로 바꿉니다. 풍부한 매장지는 다 캐도 없어지지 않고, 지하 광산(채굴지의 업그레이드)과 채석장이 끝없이 캡니다. 지도의 표시는 세이브를 다시 불러와야 바뀔 수 있습니다.");
+    ImGui::TextDisabled("바꾼 매장지는 저장하면 세이브에 남습니다. 꺼도 되돌리지 않습니다(더 바꾸지 않을 뿐입니다). 이미 없어진 매장지는 되살리지 못합니다.");
     if (!header.note.empty()) ImGui::TextColored(ImVec4(1.00f, 0.65f, 0.20f, 1.0f), "%s", header.note.c_str());
     ImGui::PopTextWrapPos();
 }
