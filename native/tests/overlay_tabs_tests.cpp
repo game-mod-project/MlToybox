@@ -1,62 +1,12 @@
 #include "test.h"
 #include "overlay/ui/app.h"
 #include "overlay/ui/tabs.h"
+#include "tab_frames.h"
 #include <imgui.h>
 #include <string>
 #include <vector>
 
 using namespace mlt::ov;
-
-// 탭을 실제 ImGui 프레임으로 그리고 마우스 클릭을 넣어 본다(그래픽 장치 없음).
-namespace {
-struct TabFrames {
-    App& a = app();
-
-    TabFrames() {
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
-        io.IniFilename = nullptr;
-        io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
-        a.control = ControlDoc();
-        a.dirty = false;
-    }
-    ~TabFrames() {
-        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
-            tex->SetTexID(ImTextureID_Invalid);
-            tex->SetStatus(ImTextureStatus_Destroyed);
-        }
-        ImGui::DestroyContext();
-        a.control = ControlDoc();
-        a.dirty = false;
-    }
-    void frame(void (*draw)(TabContext&)) {
-        ImGuiIO& io = ImGui::GetIO();
-        io.DisplaySize = ImVec2(800.0f, 600.0f);
-        io.DeltaTime = 0.5f;   // 이어지는 클릭이 두 번 누르기로 묶이지 않게
-        ImGui::NewFrame();
-        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-        ImGui::SetNextWindowSize(ImVec2(800.0f, 600.0f));
-        ImGui::Begin("test", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-        TabContext ctx{ a, nullptr, false, 0 };
-        draw(ctx);
-        ImGui::End();
-        ImGui::Render();
-        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
-            if (tex->Status == ImTextureStatus_WantCreate) tex->SetTexID(static_cast<ImTextureID>(1));
-            if (tex->Status == ImTextureStatus_WantCreate || tex->Status == ImTextureStatus_WantUpdates) tex->SetStatus(ImTextureStatus_OK);
-        }
-    }
-    void click(void (*draw)(TabContext&), float x, float y) {
-        ImGuiIO& io = ImGui::GetIO();
-        io.AddMousePosEvent(x, y);
-        frame(draw);
-        io.AddMouseButtonEvent(0, true);
-        frame(draw);
-        io.AddMouseButtonEvent(0, false);
-        frame(draw);
-    }
-};
-}
 
 // 업그레이드(건물 업그레이드의 조건·비용·해금)는 건물 기능이라 건설 탭에 있다. 따로 탭을 두지 않는다
 TEST(overlay_tabs_upgrade_lives_in_the_build_tab) {

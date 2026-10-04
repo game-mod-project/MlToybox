@@ -5,6 +5,7 @@
 #include "features/upgrade_scope.h"
 #include "features/immigration.h"
 #include "features/house_capacity.h"
+#include "features/region_scope.h"
 #include "features/mood.h"
 #include "features/deposits.h"
 
@@ -16,6 +17,7 @@ void registerFeatures(HookManager& manager) {
     upgrade_scope::registerHook(manager);
     immigration::registerHook(manager);
     house_capacity::registerHook(manager);
+    region_scope::registerHook(manager);
     mood::registerHook(manager);
     deposits::registerHook(manager);
 }

@@ -13,11 +13,7 @@ const std::vector<DepositKind>& depositKinds() {
 }
 
 std::vector<ScopeOption> regionScopeOptions(const RegionStatus* status) {
-    std::vector<ScopeOption> options = { { std::nullopt, "공통 (모든 내 영지)" } };
-    if (status) {
-        for (const RegionState& r : status->regions) options.push_back({ r.key, regionLabel(r.name, r.key) });
-    }
-    return options;
+    return commonAndRegionOptions(status ? &status->regions : nullptr);
 }
 
 namespace {
@@ -88,7 +84,8 @@ std::vector<DepositRow> buildDepositRows(const RegionSettings& settings, const R
 void setDepositTarget(RegionSettings& settings, const std::optional<std::string>& scope, const std::string& kind, std::optional<int> value) {
     if (value) value = std::clamp(*value, 0, kDepositTargetMax);
     if (!scope) {
-        if (value) settings.targets[kind] = *value;
+        // 공통 목표의 0 은 "채우지 않는다"와 같다: 키를 지운다(1 로 맞춰 "1 을 유지"가 되지 않게)
+        if (value && *value > 0) settings.targets[kind] = *value;
         else settings.targets.erase(kind);
         return;
     }
@@ -115,15 +112,14 @@ std::string livestockLine(const RegionStatus* status) {
 }
 
 std::string depositNativeNote(const NativeStatus* native) {
-    if (!native) return "";
-    const auto installed = [native](const char* name) {
-        const auto it = native->features.find(name);
-        return native->loaded && it != native->features.end() && it->second.installed;
-    };
-    if (!installed("deposits_day") || !installed("deposits_nodes") || !installed("deposits_amount") || !installed("deposits_owner")) {
+    const std::optional<bool> hooks = nativeInstalled(native, { "deposits_day", "deposits_nodes", "deposits_amount", "deposits_owner" });
+    if (!hooks) return "";
+    if (!*hooks) {
         return "네이티브 DLL 이 광물 매장지를 맡지 못했습니다(게임이 업데이트됐을 수 있습니다). 소금·철·점토는 채워지지 않고 지금 값도 보이지 않습니다. 나머지 종류는 그대로 동작합니다.";
     }
-    if (!installed("deposits_region_name")) return "영지를 가리는 게임 함수를 찾지 못해 소금·철·점토의 영지별 목표는 쓰이지 않고 공통 목표가 적용됩니다.";
+    if (nativeInstalled(native, { "region_name", "region_tag" }) == false) {
+        return "영지를 가리는 게임 코드를 찾지 못해 소금·철·점토의 영지별 목표는 쓰이지 않고 공통 목표가 적용됩니다.";
+    }
     return "";
 }
 

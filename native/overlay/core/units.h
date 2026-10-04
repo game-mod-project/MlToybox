@@ -25,6 +25,16 @@ struct ScopeOption {
 
 // "Mandlach (gold)"
 std::string regionLabel(const std::string& name, const std::string& key);
+// 범위 선택지: 첫 줄은 공통(특정 영지가 아님), 이어서 영지마다 한 줄. regions 는 key 와 name 을 가진 것들의 목록이고, 없으면 공통 줄만
+inline constexpr const char* kCommonScopeLabel = "공통 (모든 내 영지)";
+template <class Regions>
+std::vector<ScopeOption> commonAndRegionOptions(const Regions* regions, const char* commonLabel = kCommonScopeLabel) {
+    std::vector<ScopeOption> options = { { std::nullopt, commonLabel } };
+    if (regions) {
+        for (const auto& r : *regions) options.push_back({ r.key, regionLabel(r.name, r.key) });
+    }
+    return options;
+}
 // key 가 있는 줄의 번호. 없으면 0(첫 줄)
 int indexOfKey(const std::vector<ScopeOption>& options, const std::optional<std::string>& key);
 }

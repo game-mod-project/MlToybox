@@ -1,4 +1,5 @@
 #pragma once
+#include "features/region_scope.h"
 #include "hooks.h"
 #include <cstddef>
 #include <cstdint>
@@ -15,11 +16,10 @@ constexpr const char* kMonthlyChangePattern =
 constexpr const char* kLivingSpacePattern =
     "40 53 48 83 EC 40 33 C0 48 89 74 24 58 48 8B B1 58 06 00 00 48 8B DA 4C 89 74 24 38 48 89 02 48 63 81 60 06 00 00";
 // 영지의 주인과 그 주인이 플레이어인지를 읽는 영지 함수(0x144BC2ED0). 두 오프셋을 확인하려고 주소만 찾는다.
-constexpr const char* kOwnerCheckPattern =
-    "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 54 41 56 41 57 48 83 EC 20 4C 8D A1 68 0D 00 00";
+constexpr const char* kOwnerCheckPattern = region_scope::kOwnerCheckPattern;
 
-constexpr std::ptrdiff_t kRegionOwnerOffset = 0x350;        // APawnCPP* ARegion::ownerPawn
-constexpr std::ptrdiff_t kPawnIsMainPlayerOffset = 0x34C;   // bool APawnCPP::isMainPlayer
+constexpr std::ptrdiff_t kRegionOwnerOffset = region_scope::kRegionOwnerOffset;
+constexpr std::ptrdiff_t kPawnIsMainPlayerOffset = region_scope::kPawnIsMainPlayerOffset;
 constexpr int32_t kMaxPerMonth = 31;      // 게임은 하루에 한 가족까지만 들인다
 constexpr int32_t kMaxMultiplier = 10;
 

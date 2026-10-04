@@ -1,4 +1,5 @@
 #pragma once
+#include "features/region_scope.h"
 #include "hooks.h"
 #include <cstddef>
 #include <cstdint>
@@ -19,12 +20,6 @@ constexpr const char* kNodeLayoutPattern = "48 89 5C 24 08 48 89 6C 24 10 48 89 
 // cmp dword [r8+2B8h],0; jg; cmp dword [r8+2C8h],0; jne; mov [r8+310h],edx. 함수의 시작이 아니라 이 자리를 찾아 세 오프셋을 확인한다
 constexpr const char* kAmountWritePattern =
     "41 83 B8 B8 02 00 00 00 0F 8F ?? ?? ?? ?? 41 83 B8 C8 02 00 00 00 0F 85 ?? ?? ?? ?? 41 89 90 10 03 00 00";
-// 영지의 주인과 그 주인이 플레이어인지를 읽는 영지 함수(0x144BC2ED0). 두 오프셋을 확인하려고 주소만 찾는다
-constexpr const char* kOwnerCheckPattern =
-    "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 54 41 56 41 57 48 83 EC 20 4C 8D A1 68 0D 00 00";
-// bool FName == const char* (구현 0x14124BB30). 영지의 태그를 설정의 영지 키와 견줄 때 부른다. 주소만 찾는다
-constexpr const char* kNameEqualsPattern =
-    "48 89 5C 24 18 48 89 74 24 20 57 48 83 EC 20 48 8B F2 48 8B D9 48 85 D2 0F 84 ?? ?? ?? ?? 48 C7 C7 FF FF FF FF 48 FF C7 80 3C 3A 00";
 
 constexpr std::ptrdiff_t kWeatherEngineOffset = 0x2A8;     // 날씨 객체가 든 엔진 포인터
 constexpr std::ptrdiff_t kEngineNodesOffset = 0x700;       // 엔진의 매장지 목록(TArray<AResourceNode*>: 포인터, +8 에 개수)
@@ -33,9 +28,8 @@ constexpr std::ptrdiff_t kNodeRegionOffset = 0x2B0;        // ARegion*
 constexpr std::ptrdiff_t kNodeSquadOffset = 0x2B8;         // 동물 무리 번호(무리가 아니면 0 이하)
 constexpr std::ptrdiff_t kNodeClumpCountOffset = 0x2C8;    // resourceClumps 의 개수
 constexpr std::ptrdiff_t kNodeAmountOffset = 0x310;        // 남은 양(int32). 덩어리가 없고 무리가 아닌 매장지만 쓴다
-constexpr std::ptrdiff_t kRegionOwnerOffset = 0x350;       // APawnCPP* ARegion::ownerPawn
-constexpr std::ptrdiff_t kPawnIsMainPlayerOffset = 0x34C;  // bool APawnCPP::isMainPlayer
-constexpr std::ptrdiff_t kRegionTagOffset = 0x2B0;         // FName ARegion::regionUniqueTag
+constexpr std::ptrdiff_t kRegionOwnerOffset = region_scope::kRegionOwnerOffset;             // deposits_owner 항목으로 확인한다
+constexpr std::ptrdiff_t kPawnIsMainPlayerOffset = region_scope::kPawnIsMainPlayerOffset;
 constexpr int32_t kSalt = 1, kIron = 2, kClay = 3;         // ENodeType
 constexpr int kMaxTarget = 1000000;
 constexpr int32_t kMaxNodes = 4096;                        // 이보다 많은 매장지는 레이아웃이 바뀐 것으로 본다
@@ -63,8 +57,9 @@ using IsRegionFn = std::function<bool(const uint8_t* region, const std::string& 
 // 목록의 개수나 포인터가 말이 안 되면 아무것도 하지 않고 false
 bool process(const uint8_t* engine, const RegionControl& control, const IsRegionFn& isRegion, std::vector<NodeInfo>& out);
 
-// native_status.json 에 끼울 조각: "nodes":[{"region":"<주소 16진수>","type":2,"amount":1154},…]. 매장지가 없으면 빈 글
-std::string renderNodes(const std::vector<NodeInfo>& nodes);
+// native_status.json 에 끼울 조각: "nodesDay":7,"nodes":[{"region":"<주소 16진수>","type":2,"amount":1154},…]. 매장지가 없으면 빈 글.
+// day 는 모을 때마다 1 씩 오르는 번호다. 영지는 주소로만 적히므로, Lua 는 맵에 들어온 뒤 이 번호가 바뀐 것(그 맵에서 모은 것)만 쓴다
+std::string renderNodes(const std::vector<NodeInfo>& nodes, long long day);
 // 마지막으로 날짜가 넘어갔을 때 모은 것을 위 꼴로. 기능이 꺼져 있으면 빈 글
 std::string snapshotJson();
 

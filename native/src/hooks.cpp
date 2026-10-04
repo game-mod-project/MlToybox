@@ -48,6 +48,18 @@ void HookManager::sync(const NativeControl& control, HookBackend& backend) {
     }
 }
 
+std::string HookManager::extras() const {
+    std::string out;
+    for (auto& e : entries_) {
+        if (!e.state.installed || !e.spec.status) continue;
+        const std::string part = e.spec.status();
+        if (part.empty()) continue;
+        if (!out.empty()) out += ",";
+        out += part;
+    }
+    return out;
+}
+
 std::vector<FeatureState> HookManager::states() const {
     std::vector<FeatureState> out;
     for (auto& e : entries_) out.push_back(e.state);

@@ -1,6 +1,7 @@
 #pragma once
 #include "status_doc.h"
 #include "units.h"
+#include <initializer_list>
 #include <optional>
 #include <string>
 #include <vector>
@@ -25,6 +26,29 @@ std::string retinueLabel(const RetinueSquad& squad);
 std::vector<ScopeOption> populationScopeOptions(const PopulationStatus* population);
 // 현재 상태 두 줄(정보가 없으면 한 줄). regionKey 가 없거나 그 영지를 모르면 모든 영지 합계
 std::vector<std::string> populationInfo(const PopulationStatus* population, const std::optional<std::string>& regionKey);
+
+// 네이티브 DLL 이 그 항목들을 모두 설치했는가. 값 없음 = 아직 모른다(상태를 못 받았거나 오래됐거나 항목 목록이 없다).
+// DLL 을 올리지 못했으면 false
+std::optional<bool> nativeInstalled(const NativeStatus* native, std::initializer_list<const char*> names);
+
+// 화면에 보일 것을 재료가 바뀔 때만 다시 만든다(탭은 프레임마다 그려지고 재료는 1초에 한 번쯤 바뀐다).
+// get(key, make): key 가 지난번과 같으면 지난 값을, 다르면 make() 의 값을 돌려준다
+template <class Key, class Value>
+class Memo {
+public:
+    template <class Make>
+    const Value& get(const Key& key, Make&& make) {
+        if (!key_ || !(*key_ == key)) {
+            value_ = make();
+            key_ = key;
+        }
+        return value_;
+    }
+
+private:
+    std::optional<Key> key_;
+    Value value_{};
+};
 
 // [자격·질서] 범위: "공통 (모든 내 영지)"과 영지들
 std::vector<ScopeOption> moodScopeOptions(const MoodStatus* mood);

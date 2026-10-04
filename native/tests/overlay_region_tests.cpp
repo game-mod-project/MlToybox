@@ -5,6 +5,7 @@
 #include "overlay/core/status_doc.h"
 #include "overlay/ui/app.h"
 #include "overlay/ui/tabs.h"
+#include "tab_frames.h"
 #include <imgui.h>
 
 using namespace mlt::ov;
@@ -129,6 +130,11 @@ TEST(overlay_region_targets_are_set_per_scope_and_dropped_when_cleared) {
     CHECK(s.regionTargets.empty());   // 비게 된 영지는 뺀다
     setDepositTarget(s, std::nullopt, "Iron", 99999999);
     CHECK(s.targets.at("Iron") == kDepositTargetMax);
+    // 공통 목표에 0 을 넣으면 끈 것이다(1 로 맞춰져 "1 을 유지"가 되지 않는다). 영지에서는 0 이 값으로 남는다
+    setDepositTarget(s, std::nullopt, "Iron", 0);
+    CHECK(s.targets.empty());
+    setDepositTarget(s, "imm", "Iron", 0);
+    CHECK(s.regionTargets.at("imm").at("Iron") == 0);
 }
 
 TEST(overlay_region_scope_options_and_livestock_lines) {
@@ -146,77 +152,31 @@ TEST(overlay_region_native_note_says_what_is_missing) {
     CHECK(depositNativeNote(nullptr).empty());
     NativeStatus n;
     n.loaded = true;
-    for (const char* name : { "deposits_day", "deposits_nodes", "deposits_amount", "deposits_owner", "deposits_region_name" }) n.features[name].installed = true;
+    CHECK(depositNativeNote(&n).empty());   // 항목 목록을 아직 못 받았다: 모르는 것을 "못 맡았다"고 하지 않는다
+    for (const char* name : { "deposits_day", "deposits_nodes", "deposits_amount", "deposits_owner", "region_name", "region_tag" }) n.features[name].installed = true;
     CHECK(depositNativeNote(&n).empty());
-    n.features["deposits_region_name"].installed = false;
+    n.features["region_name"].installed = false;
     CHECK(depositNativeNote(&n).find("영지별 목표") != std::string::npos);
     n.features["deposits_amount"].installed = false;
     CHECK(depositNativeNote(&n).find("소금·철·점토") != std::string::npos);
+    n.stale = true;
+    CHECK(depositNativeNote(&n).empty());   // 오래된 상태로는 판단하지 않는다
+    n.stale = false;
     n.loaded = false;
     CHECK(depositNativeNote(&n).find("소금·철·점토") != std::string::npos);
 }
 
-namespace {
-struct RegionFrames {
-    App& a = app();
-
-    RegionFrames() {
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
-        io.IniFilename = nullptr;
-        io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
-        a.control = ControlDoc();
-        a.dirty = false;
-    }
-    ~RegionFrames() {
-        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
-            tex->SetTexID(ImTextureID_Invalid);
-            tex->SetStatus(ImTextureStatus_Destroyed);
-        }
-        ImGui::DestroyContext();
-        a.control = ControlDoc();
-        a.dirty = false;
-    }
-    void frame(const StatusDoc* status) {
-        ImGuiIO& io = ImGui::GetIO();
-        io.DisplaySize = ImVec2(800.0f, 600.0f);
-        io.DeltaTime = 0.5f;
-        ImGui::NewFrame();
-        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-        ImGui::SetNextWindowSize(ImVec2(800.0f, 600.0f));
-        ImGui::Begin("test", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-        TabContext ctx{ a, status, status != nullptr, 0 };
-        drawRegionTab(ctx);
-        ImGui::End();
-        ImGui::Render();
-        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
-            if (tex->Status == ImTextureStatus_WantCreate) tex->SetTexID(static_cast<ImTextureID>(1));
-            if (tex->Status == ImTextureStatus_WantCreate || tex->Status == ImTextureStatus_WantUpdates) tex->SetStatus(ImTextureStatus_OK);
-        }
-    }
-    void click(const StatusDoc* status, float x, float y) {
-        ImGuiIO& io = ImGui::GetIO();
-        io.AddMousePosEvent(x, y);
-        frame(status);
-        io.AddMouseButtonEvent(0, true);
-        frame(status);
-        io.AddMouseButtonEvent(0, false);
-        frame(status);
-    }
-};
-}
-
 TEST(overlay_region_tab_sits_after_mood_and_its_two_checkboxes_work) {
     CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "자격·질서", "영지", "상태", "로그" }));
-    RegionFrames f;
-    f.frame(nullptr);
+    TabFrames f;
+    f.frame(drawRegionTab);
     CHECK(!f.a.control.region().enabled && !f.a.dirty);
-    f.click(nullptr, 20.0f, 18.0f);   // 첫 줄: 기능 사용
+    f.click(drawRegionTab, 20.0f, 18.0f);   // 첫 줄: 기능 사용
     CHECK(f.a.control.region().enabled && !f.a.control.region().noLivestockWait && f.a.dirty);
     // 둘째 줄을 찾아 누른다: 가축 상인 대기 없음
     bool found = false;
     for (float y = 30.0f; y < 80.0f && !found; y += 4.0f) {
-        f.click(nullptr, 20.0f, y);
+        f.click(drawRegionTab, 20.0f, y);
         found = f.a.control.region().noLivestockWait;
     }
     CHECK(found && f.a.control.region().enabled);
@@ -226,13 +186,13 @@ TEST(overlay_region_tab_draws_the_table_with_values_from_the_game) {
     const auto status = parseStatus(R"({"heartbeat":5,"inGame":true,"region":{"regions":[
         {"key":"eich","name":"Wilde Wand","livestockWait":7,"deposits":[{"kind":"Salt","amount":119},{"kind":"Mushrooms","amount":629,"capacity":640,"clumps":16}]}]}})");
     CHECK(status.has_value());
-    RegionFrames f;
+    TabFrames f;
     RegionSettings r;
     r.enabled = true;
     r.targets["Iron"] = 1000;
     f.a.control.setRegion(r);
-    f.frame(&*status);
-    f.frame(&*status);
+    f.frame(drawRegionTab, &*status);
+    f.frame(drawRegionTab, &*status);
     CHECK(!f.a.dirty);   // 그리기만 해서는 설정이 바뀌지 않는다
     CHECK(f.a.control.region().targets.at("Iron") == 1000);
 }

@@ -119,6 +119,8 @@ struct RegionSettings {
     bool noLivestockWait = false;                                     // 가축을 주문한 뒤의 대기("상인 방문까지")를 없앤다
     std::map<std::string, int> targets;                               // 종류 이름 → 매장지 하나의 최소 양. 키가 없으면 채우지 않는다
     std::map<std::string, std::map<std::string, int>> regionTargets;  // 영지 키 → 종류별 값(0 = 그 영지는 채우지 않는다). 없는 종류는 공통을 따른다
+
+    bool operator==(const RegionSettings&) const = default;
 };
 
 struct MercSettings {
