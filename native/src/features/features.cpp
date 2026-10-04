@@ -5,6 +5,7 @@
 #include "features/upgrade_scope.h"
 #include "features/immigration.h"
 #include "features/house_capacity.h"
+#include "features/mood.h"
 
 namespace mlt {
 void registerFeatures(HookManager& manager) {
@@ -14,5 +15,6 @@ void registerFeatures(HookManager& manager) {
     upgrade_scope::registerHook(manager);
     immigration::registerHook(manager);
     house_capacity::registerHook(manager);
+    mood::registerHook(manager);
 }
 }

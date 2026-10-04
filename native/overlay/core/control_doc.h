@@ -87,6 +87,30 @@ struct StorageSettings {
     std::map<std::string, StorageLimits> limits;   // 키 = 건물 종류 번호(게임의 건물 표의 행 이름)
 };
 
+// 자격·공공질서 가운데 한 값의 설정. 모두 기본값이면 게임 그대로다
+struct MoodValue {
+    int fixed = 0;     // 고정값(1~100). 0 = 고정하지 않는다
+    int good = 1;      // 오르는 요인 배율(1~10)
+    int bad = 100;     // 깎이는 요인 비율(0~100 %)
+
+    bool neutral() const { return fixed == 0 && good == 1 && bad == 100; }
+    bool operator==(const MoodValue&) const = default;
+};
+
+struct MoodPair {
+    MoodValue approval;   // 자격(Approval)
+    MoodValue order;      // 공공질서
+
+    bool operator==(const MoodPair&) const = default;
+};
+
+// 자격·공공질서. 네이티브 DLL(src/control.cpp)이 같은 설정을 읽는다. 패널에는 화면이 없고 설정만 보존한다(Panel.Core 의 MoodControl)
+struct MoodSettings {
+    bool enabled = false;
+    MoodPair common;                           // 내 영지 전체
+    std::map<std::string, MoodPair> regions;   // 키 = 영지 키. 있으면 그 영지는 공통 대신 이 설정을 쓴다
+};
+
 struct MercSettings {
     bool enabled = false;
     bool refund = true;       // 내 용병단 고용비 환급 + 유지비 0
@@ -122,6 +146,8 @@ public:
     void setMercenaries(const MercSettings& v);
     StorageSettings storage() const;
     void setStorage(const StorageSettings& v);
+    MoodSettings mood() const;
+    void setMood(const MoodSettings& v);
 
     void setCommands(const std::vector<Json>& commands);
 

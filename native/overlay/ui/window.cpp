@@ -16,7 +16,7 @@ struct Tab {
     const char* name;
     void (*draw)(TabContext&);
 };
-// 패널과 같은 이름·순서. 다만 패널의 "업그레이드" 탭은 건설 탭 안에 있다(건물 기능이라 합쳤다). "로그"는 오버레이에만 있다
+// 패널과 같은 이름·순서. 다만 패널의 "업그레이드" 탭은 건설 탭 안에 있다(건물 기능이라 합쳤다). "자격·질서"와 "로그"는 오버레이에만 있다
 const Tab kTabs[] = {
     { "자원", drawResourcesTab },
     { "영주", drawLordTab },
@@ -24,6 +24,7 @@ const Tab kTabs[] = {
     { "군사", drawMilitaryTab },
     { "용병", drawMercenariesTab },
     { "인구", drawPopulationTab },
+    { "자격·질서", drawMoodTab },
     { "상태", drawStatusTab },
     { "로그", drawLogTab },
 };

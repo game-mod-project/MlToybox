@@ -141,6 +141,7 @@ function M.new()
       resources = (type(st.resources) == "table" and next(st.resources)) and st.resources or nil,
       population = st.population,
       mercenaries = st.mercenaries,
+      mood = st.mood,
       regions = (type(st.regions) == "table" and #st.regions > 0) and st.regions or nil,
     }
   end

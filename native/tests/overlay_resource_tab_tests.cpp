@@ -276,7 +276,7 @@ TEST(overlay_log_tab_copies_the_shown_lines) {
 }
 
 TEST(overlay_tabs_include_the_log_tab) {
-    CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "상태", "로그" }));
+    CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "자격·질서", "상태", "로그" }));
 }
 
 // "지우기"는 두 번 눌러야 지운다(한 번에 여러 목표가 사라진다). 검색으로 추린 동안에는 보이는 줄의 목표만 지운다

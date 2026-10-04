@@ -129,6 +129,16 @@ static MercenaryStatus readMercenaries(const Json& v) {
     return m;
 }
 
+static MoodStatus readMood(const Json& v) {
+    MoodStatus m;
+    if (const Json* regions = arrayAt(&v, "regions")) {
+        for (const Json& r : *regions) {
+            if (r.is_object()) m.regions.push_back({ stringOr(&r, "key"), stringOr(&r, "name"), intOr(&r, "approval", 0), intOr(&r, "order", 0) });
+        }
+    }
+    return m;
+}
+
 std::optional<StatusDoc> parseStatus(std::string_view text) {
     Json root = Json::parse(text.begin(), text.end(), nullptr, false);
     if (root.is_discarded() || !root.is_object()) return std::nullopt;
@@ -211,6 +221,7 @@ std::optional<StatusDoc> parseStatus(std::string_view text) {
     if (const Json* retinue = objectAt(&root, "retinue")) s.retinue = readRetinue(*retinue);
     if (const Json* population = objectAt(&root, "population")) s.population = readPopulation(*population);
     if (const Json* mercenaries = objectAt(&root, "mercenaries")) s.mercenaries = readMercenaries(*mercenaries);
+    if (const Json* mood = objectAt(&root, "mood")) s.mood = readMood(*mood);
 
     s.raw = std::move(root);
     return s;
