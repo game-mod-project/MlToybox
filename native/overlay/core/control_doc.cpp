@@ -434,6 +434,7 @@ RegionSettings ControlDoc::region() const {
     v.enabled = boolOr(f, "enabled", false);
     v.intervalSec = intOr(f, "intervalSec", 5);
     v.noLivestockWait = boolOr(f, "noLivestockWait", false);
+    v.richDeposits = boolOr(f, "richDeposits", false);
     v.targets = readIntMap(objectAt(f, "targets"));
     if (const Json* regions = objectAt(f, "regionTargets")) {
         for (auto it = regions->begin(); it != regions->end(); ++it) {
@@ -448,6 +449,7 @@ void ControlDoc::setRegion(const RegionSettings& v) {
     f["enabled"] = v.enabled;
     f["intervalSec"] = v.intervalSec;
     f["noLivestockWait"] = v.noLivestockWait;
+    f["richDeposits"] = v.richDeposits;
     f["targets"] = writeIntMap(v.targets);
     Json regions = Json::object();
     for (const auto& [key, targets] : v.regionTargets) regions[key] = writeIntMap(targets);

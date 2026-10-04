@@ -11,6 +11,10 @@ bool isMineral(int32_t type) {
     return type == kSalt || type == kIron || type == kClay;
 }
 
+bool canBeUnderground(int32_t type) {
+    return isMineral(type) || type == kStone;
+}
+
 namespace {
 int pickKind(const MineralTargets& t, int32_t type) {
     switch (type) {
@@ -36,7 +40,7 @@ int32_t topUp(int32_t amount, int target) {
     return std::max<int32_t>(amount, std::min(target, kMaxTarget));
 }
 
-bool process(const uint8_t* engine, const RegionControl& control, const IsRegionFn& isRegion, std::vector<NodeInfo>& out) {
+bool process(const uint8_t* engine, const RegionControl& control, const IsRegionFn& isRegion, bool richKnown, std::vector<NodeInfo>& out) {
     out.clear();
     if (!engine) return false;
     const uint8_t* list = mem::readPtr(engine, kEngineNodesOffset);
@@ -49,11 +53,26 @@ bool process(const uint8_t* engine, const RegionControl& control, const IsRegion
         auto* node = const_cast<uint8_t*>(mem::readPtr(list, static_cast<std::ptrdiff_t>(i) * 8));
         if (!node) continue;
         const int32_t type = mem::read<int32_t>(node, kNodeTypeOffset);
-        if (!isMineral(type)) continue;
-        // 게임이 남은 양을 두는 매장지만: 덩어리가 없고 동물 무리가 아니다
-        if (mem::read<int32_t>(node, kNodeSquadOffset) > 0 || mem::read<int32_t>(node, kNodeClumpCountOffset) != 0) continue;
+        if (!canBeUnderground(type)) continue;
+        // 광물은 게임이 남은 양을 두는 매장지만: 덩어리가 없고 동물 무리가 아니다. 돌은 양이 덩어리에 있다
+        const bool mineral = isMineral(type);
+        if (mem::read<int32_t>(node, kNodeSquadOffset) > 0) continue;
+        if (mineral && mem::read<int32_t>(node, kNodeClumpCountOffset) != 0) continue;
         const uint8_t* region = mem::readPtr(node, kNodeRegionOffset);
         if (!region_scope::ownedByMainPlayer(region)) continue;
+        NodeInfo info{ reinterpret_cast<std::uintptr_t>(node), reinterpret_cast<std::uintptr_t>(region), type, 0, std::nullopt };
+        if (richKnown) {
+            bool rich = mem::read<uint8_t>(node, kNodeRichOffset) != 0;
+            if (!rich && control.rich) {
+                mem::write<uint8_t>(node, kNodeRichOffset, 1);
+                rich = true;
+            }
+            info.rich = rich;
+        }
+        if (!mineral) {
+            out.push_back(info);
+            continue;
+        }
         const MineralTargets* own = nullptr;
         if (isRegion) {
             for (const auto& [key, targets] : control.regions) {
@@ -63,7 +82,8 @@ bool process(const uint8_t* engine, const RegionControl& control, const IsRegion
         const int32_t amount = mem::read<int32_t>(node, kNodeAmountOffset);
         const int32_t next = topUp(amount, targetOf(control.common, own, type));
         if (next != amount) mem::write<int32_t>(node, kNodeAmountOffset, next);
-        out.push_back({ reinterpret_cast<std::uintptr_t>(region), type, next });
+        info.amount = next;
+        out.push_back(info);
     }
     return true;
 }
@@ -72,10 +92,14 @@ std::string renderNodes(const std::vector<NodeInfo>& nodes, long long day) {
     if (nodes.empty()) return "";
     std::string out = "\"nodesDay\":" + std::to_string(day) + ",\"nodes\":[";
     for (size_t i = 0; i < nodes.size(); ++i) {
-        char region[32];
+        char node[32], region[32];
+        std::snprintf(node, sizeof node, "%llX", static_cast<unsigned long long>(nodes[i].node));
         std::snprintf(region, sizeof region, "%llX", static_cast<unsigned long long>(nodes[i].region));
         if (i) out += ",";
-        out += std::string("{\"region\":\"") + region + "\",\"type\":" + std::to_string(nodes[i].type) + ",\"amount\":" + std::to_string(nodes[i].amount) + "}";
+        out += std::string("{\"node\":\"") + node + "\",\"region\":\"" + region + "\",\"type\":" + std::to_string(nodes[i].type) +
+               ",\"amount\":" + std::to_string(nodes[i].amount);
+        if (nodes[i].rich) out += *nodes[i].rich ? ",\"rich\":true" : ",\"rich\":false";
+        out += "}";
     }
     out += "]";
     return out;
@@ -87,6 +111,7 @@ NewDayFn g_newDay = nullptr;
 void* g_nodeLayout = nullptr;
 void* g_amountWrite = nullptr;
 void* g_ownerCheck = nullptr;
+void* g_richLayout = nullptr;
 
 // 작업 스레드가 설정을 바꾸고 상태를 읽는다. 게임 스레드의 detour 는 하루에 한 번 설정을 읽고 모은 것을 넣는다
 std::mutex g_mutex;
@@ -110,7 +135,8 @@ void __fastcall NewDayDetour(void* weather) {
     IsRegionFn isRegion;
     if (region_scope::canTellRegions()) isRegion = &region_scope::tagIs;
     std::vector<NodeInfo> nodes;
-    if (!process(mem::readPtr(static_cast<const uint8_t*>(weather), kWeatherEngineOffset), *control, isRegion, nodes)) return;
+    // 풍부 여부의 자리(deposits_rich)를 확인하지 못했으면 그 자리는 읽지도 쓰지도 않는다
+    if (!process(mem::readPtr(static_cast<const uint8_t*>(weather), kWeatherEngineOffset), *control, isRegion, g_richLayout != nullptr, nodes)) return;
     std::lock_guard lock(g_mutex);
     g_snapshot = std::move(nodes);
     ++g_snapshotDay;
@@ -160,6 +186,16 @@ void registerHook(HookManager& manager) {
     owner.bodyChecks = { region_scope::kOwnerCheckBody };   // 영지의 주인과 isMainPlayer 를 읽는 명령
     owner.bodyWindow = region_scope::kOwnerCheckWindow;
     manager.add(owner);
+
+    HookSpec rich{ "deposits_rich", kFiniteCheckPattern, nullptr, &g_richLayout, &wanted };
+    rich.bodyChecks = {
+        "80 BA 2C 03 00 00 00",                  // cmp byte [rdx+32Ch],0          첫 덩어리가 철마다 다시 차는가
+        "80 B9 AC 02 00 00 00",                  // cmp byte [rcx+2ACh],0          매장지의 풍부 여부
+        "44 8B 83 A8 02 00 00",                  // mov r8d,[rbx+2A8h]             매장지의 종류(그 종류의 설정을 얻는다)
+        "80 7C 24 21 00",                        // cmp byte [rsp+21h],0           그 종류가 풍부하면 지하 매장지가 되는가
+    };
+    rich.bodyWindow = 0xB0;
+    manager.add(rich);
     // 영지를 설정의 영지 키와 견주는 것은 features/region_scope 의 region_name, region_tag 가 맡는다
 }
 

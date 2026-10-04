@@ -19,6 +19,14 @@ static std::string stringOr(const Json* obj, const char* key) {
     return optString(obj, key).value_or("");
 }
 
+// 참·거짓일 때만 값이 있다
+static std::optional<bool> optBool(const Json* obj, const char* key) {
+    if (!obj || !obj->is_object()) return std::nullopt;
+    const auto it = obj->find(key);
+    if (it == obj->end() || !it->is_boolean()) return std::nullopt;
+    return it->get<bool>();
+}
+
 // { "이름": 수 } 꼴. 객체 자리에 온 배열(Lua 의 빈 표)은 빈 것으로 본다
 static std::map<std::string, double> readNumberMap(const Json& v) {
     std::map<std::string, double> out;
@@ -150,7 +158,7 @@ static RegionStatus readRegion(const Json& v) {
             region.livestockWait = intOr(&r, "livestockWait", 0);
             if (const Json* deposits = arrayAt(&r, "deposits")) {
                 for (const Json& d : *deposits) {
-                    if (d.is_object()) region.deposits.push_back({ stringOr(&d, "kind"), intOr(&d, "amount", 0), optInt(&d, "capacity") });
+                    if (d.is_object()) region.deposits.push_back({ stringOr(&d, "kind"), intOr(&d, "amount", 0), optInt(&d, "capacity"), optBool(&d, "rich") });
                 }
             }
             out.regions.push_back(std::move(region));

@@ -22,10 +22,13 @@ std::optional<int> find(const std::map<std::string, int>& map, const std::string
     return it == map.end() ? std::nullopt : std::optional<int>(it->second);
 }
 
-// 매장지 하나: 다시 차는 것은 "양 / 용량", 나머지는 양
+bool isRich(const DepositInfo& d) { return d.rich && *d.rich; }
+
+// 매장지 하나: 다시 차는 것은 "양 / 용량", 나머지는 양. 풍부한 매장지는 뒤에 "풍부"
 std::string one(const DepositInfo& d) {
     std::string text = formatThousands(d.amount);
     if (d.capacity && *d.capacity > 0) text += " / " + formatThousands(*d.capacity);
+    if (isRich(d)) text += " 풍부";
     return text;
 }
 
@@ -44,16 +47,17 @@ std::string currentOf(const RegionStatus* status, const std::optional<std::strin
         return text.empty() ? "-" : text;
     }
     long long sum = 0;
-    int count = 0;
+    int count = 0, rich = 0;
     for (const RegionState& r : status->regions) {
         for (const DepositInfo& d : r.deposits) {
             if (d.kind != kind) continue;
             sum += d.amount;
             ++count;
+            if (isRich(d)) ++rich;
         }
     }
     if (count == 0) return "-";
-    return formatThousands(sum) + " (" + std::to_string(count) + "곳)";
+    return formatThousands(sum) + " (" + std::to_string(count) + "곳" + (rich > 0 ? ", 풍부 " + std::to_string(rich) : std::string()) + ")";
 }
 }
 
@@ -117,10 +121,15 @@ std::string depositNativeNote(const NativeStatus* native) {
     if (!*hooks) {
         return "네이티브 DLL 이 광물 매장지를 맡지 못했습니다(게임이 업데이트됐을 수 있습니다). 소금·철·점토는 채워지지 않고 지금 값도 보이지 않습니다. 나머지 종류는 그대로 동작합니다.";
     }
+    std::string note;
     if (nativeInstalled(native, { "region_name", "region_tag" }) == false) {
-        return "영지를 가리는 게임 코드를 찾지 못해 소금·철·점토의 영지별 목표는 쓰이지 않고 공통 목표가 적용됩니다.";
+        note = "영지를 가리는 게임 코드를 찾지 못해 소금·철·점토의 영지별 목표는 쓰이지 않고 공통 목표가 적용됩니다.";
     }
-    return "";
+    if (nativeInstalled(native, { "deposits_rich" }) == false) {
+        if (!note.empty()) note += " ";
+        note += "매장지의 풍부 여부를 확인하는 게임 코드를 찾지 못해 \"풍부하게\"는 동작하지 않고 풍부 표시도 보이지 않습니다.";
+    }
+    return note;
 }
 
 }

@@ -108,17 +108,19 @@ public class BridgeClientTests
     {
         var c = NewClient(out var dir);
         Directory.CreateDirectory(dir);
-        File.WriteAllText(c.ControlPath, "{\"version\":1,\"seq\":3,\"features\":{\"region\":{\"enabled\":true,\"intervalSec\":5,\"noLivestockWait\":true,"
+        File.WriteAllText(c.ControlPath, "{\"version\":1,\"seq\":3,\"features\":{\"region\":{\"enabled\":true,\"intervalSec\":5,\"noLivestockWait\":true,\"richDeposits\":true,"
             + "\"targets\":{\"Iron\":1000,\"Fish\":400},\"regionTargets\":{\"imm\":{\"Iron\":3000},\"eich\":{\"Clay\":0}}}},\"commands\":[]}");
         var doc = c.LoadControl();
         Assert.True(doc.Features.Region.Enabled);
         Assert.True(doc.Features.Region.NoLivestockWait);
+        Assert.True(doc.Features.Region.RichDeposits);
         doc.Features.Build.Enabled = true;
         c.SaveControl(doc);
         using var json = JsonDocument.Parse(File.ReadAllText(c.ControlPath));
         var region = json.RootElement.GetProperty("features").GetProperty("region");
         Assert.True(region.GetProperty("enabled").GetBoolean());
         Assert.True(region.GetProperty("noLivestockWait").GetBoolean());
+        Assert.True(region.GetProperty("richDeposits").GetBoolean());
         Assert.Equal(5, region.GetProperty("intervalSec").GetInt32());
         Assert.Equal(1000, region.GetProperty("targets").GetProperty("Iron").GetInt32());
         Assert.Equal(400, region.GetProperty("targets").GetProperty("Fish").GetInt32());
@@ -128,6 +130,7 @@ public class BridgeClientTests
         var fresh = new ControlDocument();
         Assert.False(fresh.Features.Region.Enabled);
         Assert.False(fresh.Features.Region.NoLivestockWait);
+        Assert.False(fresh.Features.Region.RichDeposits);
         Assert.Equal(5, fresh.Features.Region.IntervalSec);
         Assert.Empty(fresh.Features.Region.Targets);
         Assert.Empty(fresh.Features.Region.RegionTargets);
