@@ -83,9 +83,13 @@ static void reloadSettingsIfChangedOutside(App& a, const Bridge& bridge, std::fi
     known = written;
     auto text = readFileShared(bridge.settingsPath());
     if (!text) return;
+    // 읽을 수 없는 내용(편집기가 쓰는 도중이거나 문법이 틀렸다)이면 지금 설정을 그대로 둔다.
+    // 기본값으로 바꾸면 여닫는 키와 창 위치가 돌아가고, 다음 저장이 그 기본값으로 파일을 덮는다
+    auto parsed = tryParseSettings(*text);
+    if (!parsed) return;
     std::lock_guard<std::mutex> lock(a.mutex);
     if (a.settingsDirty) return;
-    a.settings = parseSettings(*text);
+    a.settings = std::move(*parsed);
     syncSettingsAtoms(a);
     a.applyWindowRect = true;
     if (a.settings.startOpen) a.visible = true;
@@ -149,7 +153,10 @@ void runOverlayWorker(void* selfModule) {
     App& a = app();
     {
         std::lock_guard<std::mutex> lock(a.mutex);
-        a.settings = parseSettings(readFileShared(bridge.settingsPath()).value_or(""));
+        // overlay.json 이 있는데 읽지 못했으면 기본값으로 뜬다. 그 기본값이 파일을 덮기 전에 사본을 남긴다
+        LoadedSettings settings = bridge.loadSettingsChecked();
+        if (settings.unreadable) bridge.backupSettings();
+        a.settings = std::move(settings.settings);
         syncSettingsAtoms(a);
         a.visible = a.settings.startOpen;
         // control.json 이 있는데 읽지 못했으면(손으로 고치다 문법을 틀린 경우) 기본값으로 덮기 전에 사본을 남긴다

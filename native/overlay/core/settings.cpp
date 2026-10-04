@@ -38,9 +38,13 @@ static bool knownKey(const std::string& name) {
 }
 
 OverlaySettings parseSettings(std::string_view text) {
+    return tryParseSettings(text).value_or(OverlaySettings());
+}
+
+std::optional<OverlaySettings> tryParseSettings(std::string_view text) {
     OverlaySettings s;
     Json root = Json::parse(text.begin(), text.end(), nullptr, false);
-    if (root.is_discarded() || !root.is_object()) return s;
+    if (root.is_discarded() || !root.is_object()) return std::nullopt;
     if (auto key = optString(&root, "toggleKey"); key && knownKey(*key)) s.toggleKey = *key;
     if (auto scale = optNumber(&root, "scale"); scale && std::isfinite(*scale)) {
         s.scale = std::clamp(static_cast<float>(*scale), kScaleMin, kScaleMax);

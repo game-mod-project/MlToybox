@@ -95,6 +95,20 @@ std::optional<long long> Bridge::saveControl(ControlDoc& doc) const {
     return std::nullopt;
 }
 
+LoadedSettings Bridge::loadSettingsChecked() const {
+    LoadedSettings loaded;
+    auto text = readFileShared(settingsPath());
+    if (!text) return loaded;
+    if (auto settings = tryParseSettings(*text)) loaded.settings = std::move(*settings);
+    else loaded.unreadable = true;
+    return loaded;
+}
+
+bool Bridge::backupSettings() const {
+    std::error_code ec;
+    return std::filesystem::copy_file(settingsPath(), settingsBackupPath(), std::filesystem::copy_options::overwrite_existing, ec);
+}
+
 std::optional<StatusDoc> Bridge::readStatus() const {
     auto text = readFileShared(statusPath());
     if (!text) return std::nullopt;
