@@ -129,6 +129,36 @@ static MercenaryStatus readMercenaries(const Json& v) {
     return m;
 }
 
+static MoodStatus readMood(const Json& v) {
+    MoodStatus m;
+    if (const Json* regions = arrayAt(&v, "regions")) {
+        for (const Json& r : *regions) {
+            if (r.is_object()) m.regions.push_back({ stringOr(&r, "key"), stringOr(&r, "name"), intOr(&r, "approval", 0), intOr(&r, "order", 0) });
+        }
+    }
+    return m;
+}
+
+static RegionStatus readRegion(const Json& v) {
+    RegionStatus out;
+    if (const Json* regions = arrayAt(&v, "regions")) {
+        for (const Json& r : *regions) {
+            if (!r.is_object()) continue;
+            RegionState region;
+            region.key = stringOr(&r, "key");
+            region.name = stringOr(&r, "name");
+            region.livestockWait = intOr(&r, "livestockWait", 0);
+            if (const Json* deposits = arrayAt(&r, "deposits")) {
+                for (const Json& d : *deposits) {
+                    if (d.is_object()) region.deposits.push_back({ stringOr(&d, "kind"), intOr(&d, "amount", 0), optInt(&d, "capacity") });
+                }
+            }
+            out.regions.push_back(std::move(region));
+        }
+    }
+    return out;
+}
+
 std::optional<StatusDoc> parseStatus(std::string_view text) {
     Json root = Json::parse(text.begin(), text.end(), nullptr, false);
     if (root.is_discarded() || !root.is_object()) return std::nullopt;
@@ -211,6 +241,8 @@ std::optional<StatusDoc> parseStatus(std::string_view text) {
     if (const Json* retinue = objectAt(&root, "retinue")) s.retinue = readRetinue(*retinue);
     if (const Json* population = objectAt(&root, "population")) s.population = readPopulation(*population);
     if (const Json* mercenaries = objectAt(&root, "mercenaries")) s.mercenaries = readMercenaries(*mercenaries);
+    if (const Json* mood = objectAt(&root, "mood")) s.mood = readMood(*mood);
+    if (const Json* region = objectAt(&root, "region")) s.region = readRegion(*region);
 
     s.raw = std::move(root);
     return s;

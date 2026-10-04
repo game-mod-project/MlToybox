@@ -1,4 +1,5 @@
 #include "control_doc.h"
+#include <algorithm>
 #include <cmath>
 
 namespace mlt::ov {
@@ -369,6 +370,88 @@ void ControlDoc::setStorage(const StorageSettings& v) {
         limits[id] = std::move(item);
     }
     f["limits"] = std::move(limits);
+}
+
+// 손으로 고친 값은 범위 안으로 맞춰 읽는다(네이티브 DLL 도 같은 범위로 읽는다)
+static MoodValue readMoodValue(const Json* obj) {
+    MoodValue v;
+    v.fixed = std::clamp(intOr(obj, "fixed", v.fixed), 0, 100);
+    v.good = std::clamp(intOr(obj, "good", v.good), 1, 10);
+    v.bad = std::clamp(intOr(obj, "bad", v.bad), 0, 100);
+    return v;
+}
+
+static MoodPair readMoodPair(const Json* obj) {
+    return { readMoodValue(objectAt(obj, "approval")), readMoodValue(objectAt(obj, "order")) };
+}
+
+MoodSettings ControlDoc::mood() const {
+    const Json* f = findFeature("mood");
+    MoodSettings v;
+    v.enabled = boolOr(f, "enabled", false);
+    v.common = readMoodPair(f);
+    if (const Json* regions = objectAt(f, "regions")) {
+        for (auto it = regions->begin(); it != regions->end(); ++it) {
+            if (it.key().empty() || !it.value().is_object()) continue;   // 손으로 고친 설정의 이상한 항목은 건너뛴다
+            v.regions[it.key()] = readMoodPair(&it.value());
+        }
+    }
+    return v;
+}
+
+static void writeMoodValue(Json& obj, const char* key, const MoodValue& v) {
+    if (!obj.contains(key) || !obj[key].is_object()) obj[key] = Json::object();
+    Json& out = obj[key];
+    out["fixed"] = v.fixed;
+    out["good"] = v.good;
+    out["bad"] = v.bad;
+}
+
+static void writeMoodPair(Json& obj, const MoodPair& pair) {
+    writeMoodValue(obj, "approval", pair.approval);
+    writeMoodValue(obj, "order", pair.order);
+}
+
+void ControlDoc::setMood(const MoodSettings& v) {
+    Json& f = feature("mood");
+    f["enabled"] = v.enabled;
+    writeMoodPair(f, v.common);
+    // 영지 항목 안의 모르는 키를 남긴다: 같은 영지의 예전 항목에서 시작한다
+    const Json* previous = objectAt(&f, "regions");
+    Json regions = Json::object();
+    for (const auto& [key, pair] : v.regions) {
+        const Json* kept = objectAt(previous, key.c_str());
+        Json item = kept ? *kept : Json::object();
+        writeMoodPair(item, pair);
+        regions[key] = std::move(item);
+    }
+    f["regions"] = std::move(regions);
+}
+
+RegionSettings ControlDoc::region() const {
+    const Json* f = findFeature("region");
+    RegionSettings v;
+    v.enabled = boolOr(f, "enabled", false);
+    v.intervalSec = intOr(f, "intervalSec", 5);
+    v.noLivestockWait = boolOr(f, "noLivestockWait", false);
+    v.targets = readIntMap(objectAt(f, "targets"));
+    if (const Json* regions = objectAt(f, "regionTargets")) {
+        for (auto it = regions->begin(); it != regions->end(); ++it) {
+            if (it.value().is_object()) v.regionTargets[it.key()] = readIntMap(&it.value());
+        }
+    }
+    return v;
+}
+
+void ControlDoc::setRegion(const RegionSettings& v) {
+    Json& f = feature("region");
+    f["enabled"] = v.enabled;
+    f["intervalSec"] = v.intervalSec;
+    f["noLivestockWait"] = v.noLivestockWait;
+    f["targets"] = writeIntMap(v.targets);
+    Json regions = Json::object();
+    for (const auto& [key, targets] : v.regionTargets) regions[key] = writeIntMap(targets);
+    f["regionTargets"] = std::move(regions);
 }
 
 void ControlDoc::setCommands(const std::vector<Json>& commands) {

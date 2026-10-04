@@ -57,6 +57,21 @@ T.run({
     T.eq(s.loaded, true, "loaded"); T.eq(s.stale, false, "fresh"); T.eq(s.heartbeat, 100, "hb")
     T.eq(s.features.instant_build.installed, true, "feature")
   end,
+  -- 네이티브가 날짜가 넘어갈 때 적는 광물 매장지 목록. status.json 에 그대로 실리지 않게 따로 둔다(영지 기능이 읽는다)
+  status_keeps_the_mineral_nodes_aside_and_drops_them_when_stale = function()
+    local p = TEST_TMP .. "\\ns_nodes.json"
+    write(p, '{"version":1,"heartbeat":100,"appliedSeq":3,"nodes":[{"region":"20E9D490010","type":3,"amount":500}]}')
+    local s = native.status(p, 102, true, nil)
+    T.eq(s.nodes, nil, "not part of the merged status")
+    T.eq(#native.nodes, 1, "kept aside")
+    T.eq(native.nodes[1].region, "20E9D490010", "region address")
+    T.eq(native.nodes[1].amount, 500, "amount")
+    native.status(p, 106, true, nil)
+    T.eq(native.nodes, nil, "stale: dropped")
+    write(p, '{"version":1,"heartbeat":100,"appliedSeq":3}')
+    native.status(p, 101, true, nil)
+    T.eq(native.nodes, nil, "no nodes in the file")
+  end,
   status_marks_stale_heartbeat = function()
     local p = TEST_TMP .. "\\ns2.json"
     write(p, '{"version":1,"heartbeat":100,"appliedSeq":-1}')

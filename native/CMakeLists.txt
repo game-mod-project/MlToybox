@@ -24,7 +24,9 @@ add_library(mlt_core STATIC
     src/features/militia_guard.cpp
     src/features/upgrade_scope.cpp
     src/features/immigration.cpp
-    src/features/house_capacity.cpp)
+    src/features/house_capacity.cpp
+    src/features/mood.cpp
+    src/features/deposits.cpp)
 target_include_directories(mlt_core PUBLIC src third_party/minhook/include)
 target_link_libraries(mlt_core PUBLIC minhook)
 
@@ -49,6 +51,7 @@ add_library(overlay_core STATIC
     overlay/core/merc_rules.cpp
     overlay/core/resources.cpp
     overlay/core/storage.cpp
+    overlay/core/region.cpp
     overlay/core/log_tail.cpp
     overlay/core/view.cpp
     overlay/core/hangul.cpp)
@@ -83,6 +86,8 @@ add_library(overlay_impl STATIC
     overlay/ui/tab_lord.cpp
     overlay/ui/tab_military.cpp
     overlay/ui/tab_population.cpp
+    overlay/ui/tab_mood.cpp
+    overlay/ui/tab_region.cpp
     overlay/ui/tab_resources.cpp
     overlay/ui/tab_storage.cpp
     overlay/ui/tab_mercenaries.cpp
@@ -96,7 +101,7 @@ target_link_libraries(mltoybox_overlay PRIVATE overlay_impl)
 
 enable_testing()
 add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_tests.cpp
-    tests/json_tests.cpp tests/control_tests.cpp tests/status_tests.cpp tests/hooks_tests.cpp tests/instant_build_tests.cpp tests/probe_tests.cpp tests/placement_tests.cpp tests/pin_tests.cpp tests/militia_guard_tests.cpp tests/upgrade_scope_tests.cpp tests/immigration_tests.cpp tests/house_capacity_tests.cpp tests/hook_gate_tests.cpp tests/memory_tests.cpp
+    tests/json_tests.cpp tests/control_tests.cpp tests/status_tests.cpp tests/hooks_tests.cpp tests/instant_build_tests.cpp tests/probe_tests.cpp tests/placement_tests.cpp tests/pin_tests.cpp tests/militia_guard_tests.cpp tests/upgrade_scope_tests.cpp tests/immigration_tests.cpp tests/house_capacity_tests.cpp tests/hook_gate_tests.cpp tests/memory_tests.cpp tests/mood_tests.cpp tests/deposits_tests.cpp
     tests/overlay_text_tests.cpp
     tests/overlay_control_doc_tests.cpp
     tests/overlay_status_doc_tests.cpp
@@ -118,6 +123,8 @@ add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_t
     tests/overlay_tabs_tests.cpp
     tests/overlay_resource_tab_tests.cpp
     tests/overlay_storage_tab_tests.cpp
+    tests/overlay_mood_tests.cpp
+    tests/overlay_region_tests.cpp
     tests/overlay_window_tests.cpp
     # 창 프로시저 후킹은 실제 창으로, 화면 출력 후킹은 실제 D3D12 스왑체인으로 시험한다(게임 없이). 입력 테스트가 먼저다
     tests/overlay_input_tests.cpp

@@ -235,6 +235,18 @@ T.run({
     r.state.mercenaries = { hiredMine = 2 }
     T.eq(r:status(1, nil, nil).mercenaries.hiredMine, 2, "present")
   end,
+  status_includes_mood_when_present = function()
+    local r = registry.new(); r:add(fake("a")); r:setInGame(true)
+    T.eq(r:status(1, nil, nil).mood, nil, "absent")
+    r.state.mood = { regions = { { key = "eich", approval = 91, order = 100 } } }
+    T.eq(r:status(1, nil, nil).mood.regions[1].approval, 91, "present")
+  end,
+  status_includes_region_when_present = function()
+    local r = registry.new(); r:add(fake("a")); r:setInGame(true)
+    T.eq(r:status(1, nil, nil).region, nil, "absent")
+    r.state.region = { regions = { { key = "eich", livestockWait = 7, deposits = {} } } }
+    T.eq(r:status(1, nil, nil).region.regions[1].livestockWait, 7, "present")
+  end,
   -- 영주 값은 main.lua 가 lord.read() 로 싣는다(기능이 꺼져 있어도 보고한다). 공유 상태에서 가져오지 않는다
   status_leaves_lord_values_to_main = function()
     local r = registry.new(); r:add(fake("a")); r:setInGame(true)

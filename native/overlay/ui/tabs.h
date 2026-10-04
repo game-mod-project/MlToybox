@@ -18,6 +18,8 @@ void drawLordTab(TabContext& ctx);
 void drawBuildTab(TabContext& ctx);
 void drawMilitaryTab(TabContext& ctx);
 void drawPopulationTab(TabContext& ctx);
+void drawMoodTab(TabContext& ctx);
+void drawRegionTab(TabContext& ctx);
 void drawResourcesTab(TabContext& ctx);
 void drawMercenariesTab(TabContext& ctx);
 void drawStatusTab(TabContext& ctx);

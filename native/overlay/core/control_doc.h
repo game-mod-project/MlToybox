@@ -87,6 +87,40 @@ struct StorageSettings {
     std::map<std::string, StorageLimits> limits;   // 키 = 건물 종류 번호(게임의 건물 표의 행 이름)
 };
 
+// 자격·공공질서 가운데 한 값의 설정. 모두 기본값이면 게임 그대로다
+struct MoodValue {
+    int fixed = 0;     // 고정값(1~100). 0 = 고정하지 않는다
+    int good = 1;      // 오르는 요인 배율(1~10)
+    int bad = 100;     // 깎이는 요인 비율(0~100 %)
+
+    bool neutral() const { return fixed == 0 && good == 1 && bad == 100; }
+    bool operator==(const MoodValue&) const = default;
+};
+
+struct MoodPair {
+    MoodValue approval;   // 자격(Approval)
+    MoodValue order;      // 공공질서
+
+    bool operator==(const MoodPair&) const = default;
+};
+
+// 자격·공공질서. 네이티브 DLL(src/control.cpp)이 같은 설정을 읽는다. 패널에는 화면이 없고 설정만 보존한다(Panel.Core 의 MoodControl)
+struct MoodSettings {
+    bool enabled = false;
+    MoodPair common;                           // 내 영지 전체
+    std::map<std::string, MoodPair> regions;   // 키 = 영지 키. 있으면 그 영지는 공통 대신 이 설정을 쓴다
+};
+
+// 영지: 가축 상인 대기와 자원 매장지의 최소 매장량. 패널에는 화면이 없고 설정만 보존한다(Panel.Core 의 RegionControl).
+// 광물(소금·철·점토)의 목표는 네이티브 DLL(src/control.cpp)이 같은 설정에서 읽는다
+struct RegionSettings {
+    bool enabled = false;
+    int intervalSec = 5;
+    bool noLivestockWait = false;                                     // 가축을 주문한 뒤의 대기("상인 방문까지")를 없앤다
+    std::map<std::string, int> targets;                               // 종류 이름 → 매장지 하나의 최소 양. 키가 없으면 채우지 않는다
+    std::map<std::string, std::map<std::string, int>> regionTargets;  // 영지 키 → 종류별 값(0 = 그 영지는 채우지 않는다). 없는 종류는 공통을 따른다
+};
+
 struct MercSettings {
     bool enabled = false;
     bool refund = true;       // 내 용병단 고용비 환급 + 유지비 0
@@ -122,6 +156,10 @@ public:
     void setMercenaries(const MercSettings& v);
     StorageSettings storage() const;
     void setStorage(const StorageSettings& v);
+    MoodSettings mood() const;
+    void setMood(const MoodSettings& v);
+    RegionSettings region() const;
+    void setRegion(const RegionSettings& v);
 
     void setCommands(const std::vector<Json>& commands);
 
