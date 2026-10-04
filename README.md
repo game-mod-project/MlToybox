@@ -44,6 +44,7 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
 - **즉시 반영**: "적용" 버튼이 없습니다. 체크는 바꾸는 즉시, 숫자 칸은 Enter를 누르거나 다른 곳을 누를 때 저장됩니다. 창 맨 위 줄이 "적용 대기 중"에서 "적용됨"으로 바뀌면 모드가 받은 것입니다.
 - **탭**: 자원, 영주, 건설, 군사, 용병, 인구, 상태, 로그. 패널의 탭과 같은 기능입니다(아래 "기능"). 패널의 "업그레이드" 탭은 건물 기능이라 건설 탭 안에 있습니다. "로그"는 오버레이에만 있습니다.
 - **자원 표**: 자원을 게임의 한글 이름과 분류(건설, 식량, 제작 재료, 일용품, 군사와 그 안의 묶음)로 보여 줍니다.
+  - "자원 목표값 유지"를 꺼 둔 동안에도 영지 목록과 현재 값은 보입니다(읽기만 하고 자원을 주지 않습니다). 영지 목표를 먼저 정해 두고 켤 수 있습니다.
   - 정렬: 헤더(자원, 분류, 현재, 목표)를 누르면 그 열로 정렬하고, 다시 누르면 방향이 바뀝니다. 처음에는 게임의 영지 창과 같은 순서입니다. 값으로 정렬한 순서는 헤더를 누른 때의 값 기준이고, 값이 바뀌어도 줄이 저절로 옮겨 가지 않습니다(다시 누르면 다시 정렬합니다).
   - 열 너비: 열 경계를 끌어 바꿉니다. 경계 위에 마우스를 올리면 좌우 화살표(↔)가 나타나고, 그때 누르고 끕니다. 바꾼 너비는 `bridge/overlay.json`의 `resourceColumns`에 저장돼 다음 실행에도 남습니다.
   - 분류: "분류" 목록에서 하나를 고르면 그 분류만 보입니다.
@@ -85,7 +86,7 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
 ### 건설
 - **배치 제한 무시**(영지 경계 안, 건물만): 네이티브 DLL이 담당합니다. 도로·성벽 배치에는 적용되지 않습니다. 성벽도 같은 플래그를 쓰는데, 지우면 크래시가 납니다.
 - **즉시 완공**: 새로 놓는 건물은 놓는 순간 완공됩니다(거주 구획 포함). 이미 공사 중인 건물과 **업그레이드**는 2초쯤 뒤 완공됩니다. 건설 자재를 기다리지 않고, 인부가 없어도 됩니다.
-  - 새로 놓는 건물: 게임의 디버그 플래그 `instaBuild`를 씁니다. 이 플래그는 AI 영주의 건물에도 적용되므로, 모드는 내가 건물이나 구획을 배치하는 동안만 플래그를 켭니다(1초마다 확인).
+  - 새로 놓는 건물: 게임의 디버그 플래그 `instaBuild`를 씁니다. 이 플래그는 AI 영주의 건물에도 적용되므로, 모드는 내가 건물이나 구획을 배치하는 동안만 플래그를 켭니다(1초마다 확인). 그동안 다른 영주가 놓는 건물이 완공 상태로 생기지 않도록, 네이티브 DLL이 다른 영주의 건물에 대해서는 플래그를 감춥니다([상태] 탭의 `instant_setup`, `instant_convert`).
   - 공사 중인 건물과 업그레이드: 모드가 1초마다 내 영지의 미완공 건물을 찾고, 네이티브 DLL이 진행도를 채운 뒤 게임의 완공 처리 함수를 부릅니다(인부가 일을 마쳤을 때 게임이 부르는 함수). 내 건물에만 적용하고(다른 영주의 공사 현장은 진행도도 채우지 않습니다), 막 생긴 현장은 한 번(1초) 건너뜁니다. 배치 모드에 들어간 직후 플래그가 켜지기 전에 놓은 건물도 이 방식으로 완공됩니다.
   - 네이티브 DLL이 완공 처리 함수를 찾지 못하면([상태] 탭의 `instant_finish`) 진행도만 채우고 완공 처리는 인부가 합니다.
 - **자재 불필요**: 영지에 건설 자재가 없어도 건물을 놓을 수 있고, 놓은 건물은 자재를 기다리지 않습니다. 인부는 필요합니다.
@@ -187,8 +188,9 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
 ## 네이티브 계층
 - **빌드**: `pwsh tools/build-native.ps1 -Test`를 실행하면 `native/build/mltoybox_native.dll`과 `mltoybox_overlay.dll`이 만들어집니다.
 - **배포**: `pwsh tools/deploy.ps1 -Mod MLToybox`가 두 DLL을 `Mods/MLToybox/native/`에 복사합니다. 게임 실행 중에는 DLL이 잠겨 경고만 남깁니다.
-- **기능**: `instant_build`, `instant_finish`, `placement`, `building_row`, `placement_rows`, `militia_guard`, `militia_guard_2`, `upgrade_row`, `upgrade_can`, `upgrade_pay`, `upgrade_cost`, `upgrade_wealth`, `upgrade_residential`. 모두 패턴이 정확히 1곳에서 찾아지고 레이아웃 검사(`bodyChecks`)를 통과할 때만 설치됩니다.
+- **기능**: `instant_build`, `instant_finish`, `instant_setup`, `instant_convert`, `placement`, `building_row`, `placement_rows`, `militia_guard`, `militia_guard_2`, `upgrade_row`, `upgrade_can`, `upgrade_pay`, `upgrade_cost`, `upgrade_wealth`, `upgrade_residential`. 모두 패턴이 정확히 1곳에서 찾아지고 레이아웃 검사(`bodyChecks`)를 통과할 때만 설치됩니다.
   - `upgrade_` 항목: 업그레이드 판정(`upgrade_can`), 비용 지불(`upgrade_pay`), 자재 비용(`upgrade_cost`), 지역 자산 비용(`upgrade_wealth`), 주거 요구(`upgrade_residential`)의 후킹과, 이들이 부를 업그레이드 표의 행 함수(`upgrade_row`, 주소만 찾음).
+  - `instant_setup`, `instant_convert`: 게임이 `instaBuild` 플래그를 읽는 두 함수(건물 설정, 청사진 변환)의 후킹. 주인이 다른 영주인 건물에 대한 호출 동안만 플래그 목록을 비워 보입니다. "즉시 완공"이 켜져 있을 때 켜집니다.
   - 후킹이 아니라 주소만 찾는 항목: `instant_finish`(`instant_build`가 부를 완공 처리 함수), `building_row`(`placement`가 부를 건물 표의 행 함수), `placement_rows`(`placement`가 고치는 행의 오프셋을 배치 함수의 본문으로 확인).
   - `placement`는 "배치 제한 무시", "자재 불필요", "지역당 개수 제한 해제" 가운데 하나라도 켜져 있으면 켜집니다.
 - **분석 도구**: `dotnet run --project tools/re/MLToybox.Re -- <exec|disasm|sig|count|strings|xrefs> ...`
