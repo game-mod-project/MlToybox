@@ -54,7 +54,10 @@ end
 registry:apply(config.defaults)
 
 RegisterLoadMapPreHook(function()
-  safe.call("core", function() registry:setInGame(false) end)
+  safe.call("core", function()
+    registry:setInGame(false)
+    lord.forget()   -- 모드가 바꿔 둔 국고의 기억은 이 맵의 것이다
+  end)
 end)
 
 RegisterInitGameStatePostHook(function(context)

@@ -235,11 +235,11 @@ T.run({
     r.state.mercenaries = { hiredMine = 2 }
     T.eq(r:status(1, nil, nil).mercenaries.hiredMine, 2, "present")
   end,
-  status_includes_lord_values_when_present = function()
+  -- 영주 값은 main.lua 가 lord.read() 로 싣는다(기능이 꺼져 있어도 보고한다). 공유 상태에서 가져오지 않는다
+  status_leaves_lord_values_to_main = function()
     local r = registry.new(); r:add(fake("a")); r:setInGame(true)
-    T.eq(r:status(1, nil, nil).lord, nil, "absent")
     r.state.lord = { treasury = 5, kingsFavour = 2 }
-    T.eq(r:status(1, nil, nil).lord.kingsFavour, 2, "present")
+    T.eq(r:status(1, nil, nil).lord, nil, "not taken from the shared state")
   end,
   status_includes_per_region_resources_when_present = function()
     local r = registry.new(); r:add(fake("a")); r:setInGame(true)
