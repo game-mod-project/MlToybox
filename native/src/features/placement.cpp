@@ -11,6 +11,8 @@ template <class T> void write(uint8_t* base, std::ptrdiff_t off, T v) { std::mem
 
 bool allowPlacement(uint8_t* pawn) {
     if (!pawn) return false;
+    // 다른 영주의 폰도 이 후킹을 지난다(원본은 AI 폰이면 바로 돌아간다). 그 폰의 판정은 건드리지 않는다
+    if (pawn[kPawnIsAiOffset] != 0) return false;
     // 경계 밖 배치는 어느 지역에도 속하지 않는 건물이 되므로 허용하지 않는다
     if (pawn[kInsideBordersOffset] == 0) return false;
     // 도로·성벽 배치 함수(0x144B03460)도 이 플래그로 "지점이 어느 영지에도 없음"을 표시하고 뒤 처리를 건너뛴다.

@@ -23,7 +23,8 @@ constexpr const char* kRowFunctionPattern =
 constexpr std::ptrdiff_t kRowGoodsNumOffset = 0x298;       // FStat::constructionGoods(+0x290, TArray<FGood>)::Num
 constexpr std::ptrdiff_t kRowMaxInRegionOffset = 0x2D8;    // int32 FStat::maxInRegion (0 = 제한 없음)
 
-// 건물 배치 중이고 영지 경계 안이면 배치 불가 플래그를 지운다. 지웠으면 true.
+// 영지 경계 안이고 도로·성벽 배치가 아니면 배치 불가 플래그를 지운다. 지웠으면 true. 다른 영주(AI)의 폰은 건드리지 않는다.
+// 배치 모드는 가리지 않는다: 건물(placeBuilding)과 밭·구획(placeFieldMode) 모두 원본이 쓴 판정을 지운다(v1.0.0 부터의 동작).
 bool allowPlacement(uint8_t* pawn);
 
 // 플레이어가 건물을 배치하는 중인가(행을 고쳐도 되는 호출인가).

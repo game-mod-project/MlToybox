@@ -95,6 +95,16 @@ TEST(placement_keeps_flag_outside_borders) {
     CHECK(p.bytes[placement::kInvalidFlagOffset] == 1);
 }
 
+// 다른 영주의 폰도 이 후킹을 지난다(원본은 AI 폰이면 바로 돌아간다). 그 폰의 판정은 건드리지 않는다
+TEST(placement_leaves_the_pawn_of_another_lord_alone) {
+    FakePawn p;
+    p.bytes[placement::kInsideBordersOffset] = 1;
+    p.bytes[placement::kPawnIsAiOffset] = 1;
+    p.bytes[placement::kInvalidFlagOffset] = 1;
+    CHECK(placement::allowPlacement(p.bytes) == false);
+    CHECK(p.bytes[placement::kInvalidFlagOffset] == 1);
+}
+
 TEST(placement_ignores_null) {
     CHECK(placement::allowPlacement(nullptr) == false);
 }
