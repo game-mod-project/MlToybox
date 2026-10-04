@@ -5,6 +5,7 @@
 ## GitHub 릴리스
 | 판 | 올린 날 | `main` 커밋 | 처음 들어간 항목 |
 |---|---|---|---|
+| [v1.0.7](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.7) | 2026-10-04 | b997cc5 | 2026-10-04 「인구: 집의 수용 가족 수 배율」 |
 | [v1.0.6](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.6) | 2026-10-04 | dbf0b2e | 2026-10-04 「인구: 월 자연 이민 가족 수와 이민 속도 배율」 |
 | [v1.0.5](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.5) | 2026-10-04 | 8c88804 | 2026-10-04 「인구 탭: 기능을 꺼 둔 동안에도 현재 값이 갱신됨」 |
 | [v1.0.4](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.4) | 2026-10-04 | f0f2a54 | 2026-10-04 「릴리스 전 전체 점검과 리뷰, 오버레이 건설 탭의 안내 문구」, 「즉시 완공: 내가 배치하는 동안 다른 영주의 건물이 완공되던 것」, 「자원 탭: 기능을 꺼 둔 동안에도 영지와 현재 값이 보임」 |
