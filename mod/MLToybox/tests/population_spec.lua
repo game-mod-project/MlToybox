@@ -133,6 +133,35 @@ T.run({
     T.eq(p.regions[2].families, 4, "sel families"); T.eq(p.regions[1].unassigned, 0, "unassigned")
     T.eq(p.unassigned, 0, "total unassigned reported")
   end,
+  -- 꺼져 있는 동안: [인구] 탭이 지금 값을 보이도록 읽기만 한다
+  observe_reports_numbers_without_adding_families = function()
+    local hof, sel = table.unpack(world(region("hof", { 0, 1, 2 }, 10), region("sel", { 2 }, 4)))
+    local st = {}
+    population.observe(st, { enabled = false, multiplier = 3, targetFamilies = 50, regionTargets = { sel = 99 } })
+    T.eq(hof.spawned + sel.spawned, 0, "nobody moved in")
+    local p = st.population
+    T.eq(p.families, 14, "total families"); T.eq(p.population, 42, "total population"); T.eq(p.freeSlots, 3, "total free")
+    T.eq(#p.regions, 2, "two regions"); T.eq(p.regions[2].key, "sel", "key"); T.eq(p.regions[2].name, "SEL", "name")
+    T.eq(p.regions[2].families, 4, "sel families"); T.eq(p.regions[1].freeSlots, 3, "hof free")
+    T.eq(p.natural, 0, "no session count yet"); T.eq(p.multiplied, 0, "no session count yet")
+  end,
+  -- 켰다 끈 뒤: 값은 계속 따라가고 세션 누계는 그대로 보인다. 꺼져 있는 동안 늘어난 가족에는 다시 켜도 배율을 걸지 않는다
+  observe_follows_the_game_after_the_feature_is_turned_off = function()
+    local hof = world(region("hof", { 0, 0, 0, 0 }))[1]
+    local st = {}
+    population.enable(st, {})
+    population.tick(st, { enabled = true, multiplier = 3 })   -- 기준선
+    hof.natural = 1
+    population.tick(st, { enabled = true, multiplier = 3 })
+    T.eq(hof.spawned, 2, "multiplied while on")
+    hof.natural = 2                                            -- 끈 뒤의 자연 이민
+    population.observe(st, { enabled = false, multiplier = 3 })
+    T.eq(hof.spawned, 2, "nothing added while off"); T.eq(st.population.families, 14, "follows the game")
+    T.eq(st.population.natural, 1, "session count kept"); T.eq(st.population.multiplied, 2, "session count kept")
+    population.enable(st, {})                                  -- 다시 켬
+    population.tick(st, { enabled = true, multiplier = 3 })
+    T.eq(hof.spawned, 2, "growth while off is the new baseline")
+  end,
   command_validates_and_targets_region = function()
     local hof, sel = table.unpack(world(region("hof", { 1 }), region("sel", { 1, 1 })))
     T.eq(population.command({ count = 0 }, IN_GAME).ok, false, "zero")
