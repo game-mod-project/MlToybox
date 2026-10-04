@@ -80,6 +80,41 @@ std::vector<std::string> populationInfo(const PopulationStatus* population, cons
     };
 }
 
+std::vector<ScopeOption> moodScopeOptions(const MoodStatus* mood) {
+    std::vector<ScopeOption> options = { { std::nullopt, "공통 (모든 내 영지)" } };
+    if (mood) {
+        for (const MoodRegion& r : mood->regions) options.push_back({ r.key, regionLabel(r.name, r.key) });
+    }
+    return options;
+}
+
+std::vector<std::string> moodLines(const MoodStatus* mood) {
+    if (!mood) return { "현재: - (게임에 들어가면 표시됩니다)" };
+    if (mood->regions.empty()) return { "현재: 내 영지가 없습니다" };
+    std::vector<std::string> lines;
+    for (const MoodRegion& r : mood->regions) {
+        lines.push_back("현재 " + r.name + ": 자격 " + std::to_string(r.approval) + " · 공공질서 " + std::to_string(r.order));
+    }
+    return lines;
+}
+
+std::string moodNativeNote(const NativeStatus* native) {
+    if (!native) return "";
+    const auto installed = [native](const char* name) {
+        const auto it = native->features.find(name);
+        return native->loaded && it != native->features.end() && it->second.installed;
+    };
+    // 계산 함수 둘을 맡지 못하면 배율을 걸 수 없다. 고정값은 Lua 가 써 넣어 유지한다
+    if (!installed("mood_approval") || !installed("mood_order")) {
+        return "네이티브 DLL 이 게임의 계산을 맡지 못했습니다(게임이 업데이트됐을 수 있습니다). 배율은 적용되지 않고 고정값만 모드가 써 넣어 유지합니다. "
+               "게임이 하루에 한 번 다시 계산할 때 잠깐 게임의 값이 보일 수 있습니다.";
+    }
+    std::string note;
+    if (!installed("mood_region_name")) note += "영지를 가리는 게임 함수를 찾지 못해 영지별 설정이 온전히 적용되지 않습니다(게임이 다시 계산할 때는 공통 설정이 쓰입니다). ";
+    if (!installed("mood_problem_add") || !installed("mood_problem_remove")) note += "\"자격 낮음\" 문제 표시는 게임이 계산한 값을 따릅니다.";
+    return note;
+}
+
 std::vector<std::string> mercStatusLines(const MercenaryStatus* m) {
     if (!m) return { "고용 창: - (용병 기능이 꺼져 있거나 게임 밖)" };
     std::string slots;

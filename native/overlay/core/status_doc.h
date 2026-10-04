@@ -96,6 +96,18 @@ struct PopulationStatus {
     std::vector<PopulationRegion> regions;
 };
 
+// 내 영지의 지금 자격·공공질서
+struct MoodRegion {
+    std::string key;
+    std::string name;
+    int approval = 0;
+    int order = 0;
+};
+
+struct MoodStatus {
+    std::vector<MoodRegion> regions;
+};
+
 struct MercSlot {
     std::string name;
     int cost = 0;
@@ -133,6 +145,7 @@ struct StatusDoc {
     std::optional<RetinueStatus> retinue;
     std::optional<PopulationStatus> population;
     std::optional<MercenaryStatus> mercenaries;
+    std::optional<MoodStatus> mood;
     Json raw;
 };
 

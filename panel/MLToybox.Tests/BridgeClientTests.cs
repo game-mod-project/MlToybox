@@ -70,6 +70,38 @@ public class BridgeClientTests
         Assert.Empty(fresh.Features.Storage.Limits);
     }
 
+    // 자격·공공질서도 게임 안 창에서만 고친다. 패널이 저장해도 공통 설정과 영지별 설정이 그대로 남아야 한다
+    [Fact]
+    public void SaveControl_KeepsTheMoodSettingsSetInTheOverlay()
+    {
+        var c = NewClient(out var dir);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(c.ControlPath, "{\"version\":1,\"seq\":3,\"features\":{\"mood\":{\"enabled\":true,"
+            + "\"approval\":{\"fixed\":0,\"good\":3,\"bad\":25},\"order\":{\"fixed\":90,\"good\":1,\"bad\":100},"
+            + "\"regions\":{\"eich\":{\"approval\":{\"fixed\":100,\"good\":1,\"bad\":100},\"order\":{\"fixed\":0,\"good\":1,\"bad\":0}}}}},\"commands\":[]}");
+        var doc = c.LoadControl();
+        Assert.True(doc.Features.Mood.Enabled);
+        Assert.Equal(3, doc.Features.Mood.Approval.Good);
+        doc.Features.Build.Enabled = true;
+        c.SaveControl(doc);
+        using var json = JsonDocument.Parse(File.ReadAllText(c.ControlPath));
+        var mood = json.RootElement.GetProperty("features").GetProperty("mood");
+        Assert.True(mood.GetProperty("enabled").GetBoolean());
+        Assert.Equal(3, mood.GetProperty("approval").GetProperty("good").GetInt32());
+        Assert.Equal(25, mood.GetProperty("approval").GetProperty("bad").GetInt32());
+        Assert.Equal(90, mood.GetProperty("order").GetProperty("fixed").GetInt32());
+        var eich = mood.GetProperty("regions").GetProperty("eich");
+        Assert.Equal(100, eich.GetProperty("approval").GetProperty("fixed").GetInt32());
+        Assert.Equal(0, eich.GetProperty("order").GetProperty("bad").GetInt32());
+        // 설정이 없던 파일에는 "게임 그대로"인 기본값이 쓰인다
+        var fresh = new ControlDocument();
+        Assert.False(fresh.Features.Mood.Enabled);
+        Assert.Equal(0, fresh.Features.Mood.Approval.Fixed);
+        Assert.Equal(1, fresh.Features.Mood.Approval.Good);
+        Assert.Equal(100, fresh.Features.Mood.Order.Bad);
+        Assert.Empty(fresh.Features.Mood.Regions);
+    }
+
     [Fact]
     public void LoadControl_CorruptFile_ReturnsDefault()
     {

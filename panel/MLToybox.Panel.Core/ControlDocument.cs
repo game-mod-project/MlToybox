@@ -20,6 +20,30 @@ public sealed class FeaturesControl
     public MercenariesControl Mercenaries { get; set; } = new();
     public PopulationControl Population { get; set; } = new();
     public StorageControl Storage { get; set; } = new();
+    public MoodControl Mood { get; set; } = new();
+}
+
+// 자격·공공질서. 게임 안 창의 "자격·질서" 탭에서 고친다. 패널에는 화면이 없고, 저장할 때 설정을 그대로 남긴다
+public sealed class MoodControl
+{
+    public bool Enabled { get; set; }
+    public MoodValue Approval { get; set; } = new();   // 공통(내 영지 전체)
+    public MoodValue Order { get; set; } = new();
+    public Dictionary<string, MoodRegion> Regions { get; set; } = new();   // 키 = 영지 키. 있으면 그 영지는 공통 대신 이 설정을 쓴다
+}
+
+public sealed class MoodRegion
+{
+    public MoodValue Approval { get; set; } = new();
+    public MoodValue Order { get; set; } = new();
+}
+
+// 모두 기본값이면 게임 그대로다
+public sealed class MoodValue
+{
+    public int Fixed { get; set; }          // 고정값(1~100). 0 = 고정하지 않는다
+    public int Good { get; set; } = 1;      // 오르는 요인 배율(1~10)
+    public int Bad { get; set; } = 100;     // 깎이는 요인 비율(0~100 %)
 }
 
 // 건물의 저장 용량(건물 종류별 한도). 게임 안 창의 건설 탭에서 고친다. 패널에는 화면이 없고, 저장할 때 설정을 그대로 남긴다

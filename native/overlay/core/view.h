@@ -26,6 +26,13 @@ std::vector<ScopeOption> populationScopeOptions(const PopulationStatus* populati
 // 현재 상태 두 줄(정보가 없으면 한 줄). regionKey 가 없거나 그 영지를 모르면 모든 영지 합계
 std::vector<std::string> populationInfo(const PopulationStatus* population, const std::optional<std::string>& regionKey);
 
+// [자격·질서] 범위: "공통 (모든 내 영지)"과 영지들
+std::vector<ScopeOption> moodScopeOptions(const MoodStatus* mood);
+// 영지마다 지금 값 한 줄: "현재 Wilde Wand: 자격 100 · 공공질서 96"
+std::vector<std::string> moodLines(const MoodStatus* mood);
+// 네이티브 DLL 이 맡지 못한 일이 있을 때의 안내. 다 맡았거나 아직 모르면(native 없음) 빈 글
+std::string moodNativeNote(const NativeStatus* native);
+
 // [용병] 고용 창 상태. "고용 창: …", "고용 중: …", "띄우지 못함: 이름 — 이유", "참고: …"
 std::vector<std::string> mercStatusLines(const MercenaryStatus* mercenaries);
 }
