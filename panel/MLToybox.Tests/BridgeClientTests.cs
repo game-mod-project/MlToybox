@@ -82,6 +82,50 @@ public class BridgeClientTests
     }
 
     [Fact]
+    public void LoadControlChecked_TellsAnUnreadableFileFromAMissingOne()
+    {
+        var c = NewClient(out var dir);
+        Assert.False(c.LoadControlChecked().Unreadable);   // 파일이 없다: 첫 실행
+        Directory.CreateDirectory(dir);
+        // 정수 자리에 소수를 넣은 손 편집. 문법은 맞지만 패널은 읽지 못한다
+        File.WriteAllText(c.ControlPath, "{\"version\":1,\"seq\":4,\"features\":{\"resources\":{\"targets\":{\"Timber\":100.5}}}}");
+        var loaded = c.LoadControlChecked();
+        Assert.True(loaded.Unreadable);
+        Assert.Equal(0, loaded.Document.Seq);
+        File.WriteAllText(c.ControlPath, "{\"version\":1,\"seq\":4,\"features\":{}}");
+        Assert.False(c.LoadControlChecked().Unreadable);
+    }
+
+    // 읽지 못한 control.json 으로 패널을 켜면 기본값으로 뜬다. 그대로 "적용"하면 기본값이 파일을 덮으므로,
+    // 덮기 전에 control.json.bak 으로 사본을 남긴다(게임 안 창과 같다)
+    [Fact]
+    public void SaveControl_KeepsACopyOfAnUnreadableFile()
+    {
+        var c = NewClient(out var dir);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(c.ControlPath, "{broken");
+        Assert.Equal(1, c.SaveControl(c.LoadControl()));
+        Assert.Equal("{broken", File.ReadAllText(c.BackupPath));
+        File.Delete(c.BackupPath);
+        Assert.Equal(2, c.SaveControl(c.LoadControl()));    // 읽을 수 있는 파일은 사본을 만들지 않는다
+        Assert.False(File.Exists(c.BackupPath));
+    }
+
+    // 모드(Lua 의 io.open)와 네이티브 DLL 은 control.json 을 삭제 공유 없이 연다. 그 순간과 겹치면 덮어쓰기가 실패하고,
+    // 잠깐 뒤에 다시 하면 된다. 실패가 어떤 예외로 오든(공유 위반, 접근 거부) 다시 해야 한다
+    [Fact]
+    public void SaveControl_RetriesWhileAnotherProgramHoldsTheFile()
+    {
+        var c = NewClient(out _);
+        Assert.Equal(1, c.SaveControl(new ControlDocument()));
+        var held = new FileStream(c.ControlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);   // 삭제 공유 없음
+        var release = Task.Run(async () => { await Task.Delay(60); held.Dispose(); });
+        Assert.Equal(2, c.SaveControl(c.LoadControl()));
+        release.Wait();
+        Assert.Equal(2, c.LoadControl().Seq);
+    }
+
+    [Fact]
     public void ReadStatus_MissingOrCorrupt_ReturnsNull()
     {
         var c = NewClient(out var dir);
