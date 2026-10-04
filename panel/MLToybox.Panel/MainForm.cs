@@ -72,6 +72,7 @@ public sealed class MainForm : Form
     private readonly CheckBox _popEnabled = new() { Text = "인구 기능 사용", AutoSize = true };
     private readonly NumericUpDown _popMultiplier = new() { Minimum = 1, Maximum = 10, Value = 2, Width = 50 };
     private readonly NumericUpDown _popMonthly = new() { Minimum = 0, Maximum = 31, Value = 0, Width = 50 };
+    private readonly NumericUpDown _popHouseCapacity = new() { Minimum = 1, Maximum = 10, Value = 1, Width = 50 };
     private readonly NumericUpDown _popTarget = new() { Minimum = 0, Maximum = 1000, Value = 0, Width = 70 };
     private readonly NumericUpDown _popAddCount = new() { Minimum = 1, Maximum = 20, Value = 3, Width = 50 };
     private readonly Label _popInfo = new() { AutoSize = true, Text = "현재: -" };
@@ -161,9 +162,10 @@ public sealed class MainForm : Form
             Row(new Label { Text = "영지:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popRegion),
             Row(new Label { Text = "월 자연 이민 가족 수(0 = 게임 그대로):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popMonthly,
                 new Label { Text = "이민 속도 배율(배):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popMultiplier),
+            Row(new Label { Text = "집의 수용 가족 수 배율(배):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popHouseCapacity),
             Row(_popTargetLabel, _popTarget, _popOverride),
             Row(new Label { Text = "지금 바로 들일 가족 수:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popAddCount, addFamilies),
-            new Label { Text = "월 가족 수와 배율은 내 영지의 자연 이민을 바꿉니다(영지 창의 인구 증가 숫자도 따라 바뀝니다). 월 가족 수는 지지율과 무관하게 매달 그만큼, 배율은 게임의 값에 곱합니다." + Environment.NewLine + "월 가족 수를 넣으면 배율은 쓰이지 않습니다. 자연 이민은 하루 한 가족까지 오고, 빈 주거 공간이 없거나 집 없는 가족이 있으면 오지 않습니다(게임의 규칙)." + Environment.NewLine + "가족 추가는 선택한 영지에, 공통이면 빈 자리가 많은 영지부터 들입니다." + Environment.NewLine + "빈 집(가족 0 → 1 → 2 순)에 들어오며 미배치 가족으로 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.", AutoSize = true },
+            new Label { Text = "월 가족 수와 배율은 내 영지의 자연 이민을 바꿉니다(영지 창의 인구 증가 숫자도 따라 바뀝니다). 월 가족 수는 지지율과 무관하게 매달 그만큼, 배율은 게임의 값에 곱합니다." + Environment.NewLine + "월 가족 수를 넣으면 배율은 쓰이지 않습니다. 자연 이민은 하루 한 가족까지 오고, 빈 주거 공간이 없거나 집 없는 가족이 있으면 오지 않습니다(게임의 규칙)." + Environment.NewLine + "수용 배율은 내 집이 받을 수 있는 가족 수(1·2레벨 1, 3레벨 2, 4레벨 3, 확장이 있으면 +1)에 곱합니다. 늘어난 자리는 자연 이민으로 찹니다(가족 추가와 최소 가족 수는 집당 2가족까지)." + Environment.NewLine + "배율을 낮추거나 꺼도 이미 들어온 가족은 그 집에 그대로 삽니다(세이브를 불러와도 같습니다). 새 가족만 더 들어오지 않습니다." + Environment.NewLine + "가족 추가는 선택한 영지에, 공통이면 빈 자리가 많은 영지부터 들입니다." + Environment.NewLine + "빈 집(가족 0 → 1 → 2 순)에 들어오며 미배치 가족으로 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.", AutoSize = true },
             _popInfo));
         var statusPage = new TabPage("상태");
         statusPage.Controls.Add(_statusText);
@@ -308,6 +310,7 @@ public sealed class MainForm : Form
         _popEnabled.Checked = f.Population.Enabled;
         _popMultiplier.Value = Math.Clamp(f.Population.Multiplier, 1, 10);
         _popMonthly.Value = Math.Clamp(f.Population.MonthlyFamilies, 0, 31);
+        _popHouseCapacity.Value = Math.Clamp(f.Population.HouseCapacity, 1, 10);
         _popScope = null;
         _popRegionsKey = "";
         if (_popRegion.Items.Count > 0) { _popUpdating = true; _popRegion.SelectedIndex = 0; _popUpdating = false; }
@@ -389,6 +392,7 @@ public sealed class MainForm : Form
         f.Population.Enabled = _popEnabled.Checked;
         f.Population.Multiplier = (int)_popMultiplier.Value;
         f.Population.MonthlyFamilies = (int)_popMonthly.Value;
+        f.Population.HouseCapacity = (int)_popHouseCapacity.Value;
         StorePopTarget();
         try
         {

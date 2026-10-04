@@ -45,6 +45,7 @@ struct PopulationSettings {
     bool enabled = false;
     int multiplier = 2;                          // 이민 속도 배율(게임의 월간 인구 변화에 곱한다)
     int monthlyFamilies = 0;                     // 월 자연 이민 가족 수(0 = 게임 그대로. 넣으면 배율 대신 이 값이 쓰인다)
+    int houseCapacity = 1;                       // 집의 수용 가족 수 배율(1 = 게임 그대로)
     int targetFamilies = 0;                      // 영지마다 최소 가족 수(0 = 끔)
     std::map<std::string, int> regionTargets;    // 영지별 값(0 = 그 영지 끔). 키가 없으면 공통 값을 따른다
 };
