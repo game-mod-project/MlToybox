@@ -75,6 +75,7 @@ LoopAsync(config.pollIntervalMs, function()
   local ok, err = pcall(function()
     local control = bridge:poll()
     ExecuteInGameThread(function()
+      game.beginTick()   -- 이 호출 안에서는 내 영지를 한 번만 찾는다(core/game.lua)
       safe.call("core", function()
         local now = os.time()
         if control then
@@ -102,6 +103,7 @@ LoopAsync(config.pollIntervalMs, function()
         local wrote, werr = bridge:writeStatus(status)
         if not wrote then log.error("status write: %s", tostring(werr)) end
       end)
+      game.endTick()
     end)
   end)
   if not ok then log.error("loop: %s", tostring(err)) end
