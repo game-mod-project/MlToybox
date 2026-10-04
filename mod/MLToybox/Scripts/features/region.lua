@@ -1,0 +1,124 @@
+local game = require("core.game")
+local native = require("core.native")
+local safe = require("core.safe")
+
+-- 영지: 가축 상인 대기일과 자원 매장지의 최소 매장량(findings "가축 상인 대기일", "자원 매장지 — 구조와 값 쓰기 조사").
+-- 가축 상인 대기 없음: 게임은 가축을 주문하면 영지의 nextLivestockOrderIn 을 30 으로 하고 하루에 1 씩 줄이며, 0 보다 크면 주문을 받지 않는다
+--   (화면의 "상인 방문까지"). settings.noLivestockWait 이면 내 영지의 값을 0 으로 둔다.
+-- 매장량: 매장지 하나의 양이 목표보다 적으면 목표까지 채운다.
+--   덩어리형(돌·물고기·장어·열매·버섯)은 덩어리(AResource)마다의 amt·capacity 가 리플렉션에 있어 여기서 채운다.
+--   광물(소금·철·점토)의 남은 양은 리플렉션에 없어 네이티브 DLL 이 날짜가 넘어갈 때 채우고(native/src/features/deposits),
+--   그때의 값을 native_status.json 의 nodes 로 알려 준다. 여기서는 그 값을 상태에 합치기만 한다.
+-- 설정: { noLivestockWait, targets = { [종류] = 양 }, regionTargets = { [영지 키] = { [종류] = 양 } } }.
+--   영지 목표가 있는 종류는 공통 대신 그 값을 쓴다(0 = 그 영지는 채우지 않는다).
+local M = { name = "region", intervalSec = 5, MAX_TARGET = 1000000 }
+
+-- 덩어리의 resType → 종류 이름
+M.CLUMP_KINDS = { Stone = "Stone", res_fish = "Fish", res_eel = "Eel", berries = "Berries", mushrooms = "Mushrooms" }
+-- 네이티브가 알려 주는 광물의 종류 번호(ENodeType) → 종류 이름
+M.MINERAL_KINDS = { [1] = "Salt", [2] = "Iron", [3] = "Clay" }
+-- 상태에 적는 순서(게임 안 창의 표와 같다)
+M.ORDER = { Salt = 1, Iron = 2, Clay = 3, Stone = 4, Fish = 5, Eel = 6, Berries = 7, Mushrooms = 8 }
+
+local function text(v)
+  local ok, s = pcall(function() return v:ToString() end)
+  return ok and s or nil
+end
+
+-- 그 영지의 그 종류 목표(1 이상). 없으면 nil
+local function targetFor(settings, key, kind)
+  local own = type(settings.regionTargets) == "table" and settings.regionTargets[key]
+  local v = type(own) == "table" and own[kind] or nil
+  if v == nil then v = type(settings.targets) == "table" and settings.targets[kind] or nil end
+  v = tonumber(v)
+  if not v or v < 1 then return nil end
+  return math.min(math.floor(v), M.MAX_TARGET)
+end
+
+-- 매장지 목록. 맵마다 한 번 찾아 공유 상태에 둔다(맵을 떠나면 registry 가 상태를 비운다). 사라진 매장지가 있으면 다음에 다시 찾는다
+local function nodesOf(state)
+  if not state.regionNodes then state.regionNodes = game.find.all("ResourceNode") end
+  return state.regionNodes
+end
+
+-- 덩어리들의 양과 용량의 합
+local function totals(clumps, count)
+  local amount, capacity = 0, 0
+  for j = 1, count do
+    local c = clumps[j]
+    if safe.valid(c) then amount = amount + c.amt; capacity = capacity + c.capacity end
+  end
+  return amount, capacity
+end
+
+-- 덩어리마다 목표의 고른 몫까지 채운다. 철마다 다시 차는 덩어리는 용량도 그만큼 둔다(용량보다 많은 양을 두지 않는다)
+local function fill(clumps, count, target)
+  local share = math.ceil(target / count)
+  for j = 1, count do
+    local c = clumps[j]
+    if safe.valid(c) then
+      if c.bSeasonal and c.capacity < share then c.capacity = share end
+      if c.amt < share then c.amt = share end
+    end
+  end
+end
+
+local function run(state, settings)
+  local entries, byAddress, byHex = {}, {}, {}
+  for _, r in ipairs(game.playerRegions()) do
+    local key = game.regionKey(r)
+    if key then
+      if settings and settings.noLivestockWait and r.nextLivestockOrderIn > 0 then r.nextLivestockOrderIn = 0 end
+      local e = { key = key, name = game.regionName(r) or key, livestockWait = r.nextLivestockOrderIn, deposits = {} }
+      entries[#entries + 1] = e
+      byAddress[r:GetAddress()] = e
+      byHex[string.format("%X", r:GetAddress())] = e
+    end
+  end
+
+  -- 덩어리형 매장지
+  for _, n in ipairs(nodesOf(state)) do
+    if not safe.valid(n) then
+      state.regionNodes = nil
+    else
+      local clumps = n.resourceClumps
+      local count = #clumps
+      local first = count > 0 and clumps[1] or nil
+      if safe.valid(first) and safe.valid(first.Region) then
+        local kind, e = M.CLUMP_KINDS[text(first.resType) or ""], byAddress[first.Region:GetAddress()]
+        if kind and e then
+          local amount, capacity = totals(clumps, count)
+          local target = settings and targetFor(settings, e.key, kind)
+          if target and amount < target then
+            fill(clumps, count, target)
+            amount, capacity = totals(clumps, count)
+          end
+          e.deposits[#e.deposits + 1] = { kind = kind, amount = amount, capacity = capacity, clumps = count }
+        end
+      end
+    end
+  end
+
+  -- 광물 매장지: 네이티브가 날짜가 넘어갈 때 적어 둔 값
+  for _, node in ipairs(native.nodes or {}) do
+    local kind, e = M.MINERAL_KINDS[tonumber(node.type) or 0], byHex[tostring(node.region)]
+    if kind and e then e.deposits[#e.deposits + 1] = { kind = kind, amount = tonumber(node.amount) or 0 } end
+  end
+
+  for _, e in ipairs(entries) do
+    table.sort(e.deposits, function(a, b)
+      if M.ORDER[a.kind] ~= M.ORDER[b.kind] then return M.ORDER[a.kind] < M.ORDER[b.kind] end
+      return a.amount > b.amount
+    end)
+  end
+  state.region = { regions = entries }
+end
+
+function M.tick(state, settings) run(state, settings) end
+M.enable = M.tick
+M.configure = M.tick
+
+-- 꺼져 있는 동안 registry 가 부른다. 탭이 지금 값을 보이도록 읽기만 한다
+function M.observe(state) run(state, nil) end
+
+return M

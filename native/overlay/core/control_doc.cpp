@@ -428,6 +428,32 @@ void ControlDoc::setMood(const MoodSettings& v) {
     f["regions"] = std::move(regions);
 }
 
+RegionSettings ControlDoc::region() const {
+    const Json* f = findFeature("region");
+    RegionSettings v;
+    v.enabled = boolOr(f, "enabled", false);
+    v.intervalSec = intOr(f, "intervalSec", 5);
+    v.noLivestockWait = boolOr(f, "noLivestockWait", false);
+    v.targets = readIntMap(objectAt(f, "targets"));
+    if (const Json* regions = objectAt(f, "regionTargets")) {
+        for (auto it = regions->begin(); it != regions->end(); ++it) {
+            if (it.value().is_object()) v.regionTargets[it.key()] = readIntMap(&it.value());
+        }
+    }
+    return v;
+}
+
+void ControlDoc::setRegion(const RegionSettings& v) {
+    Json& f = feature("region");
+    f["enabled"] = v.enabled;
+    f["intervalSec"] = v.intervalSec;
+    f["noLivestockWait"] = v.noLivestockWait;
+    f["targets"] = writeIntMap(v.targets);
+    Json regions = Json::object();
+    for (const auto& [key, targets] : v.regionTargets) regions[key] = writeIntMap(targets);
+    f["regionTargets"] = std::move(regions);
+}
+
 void ControlDoc::setCommands(const std::vector<Json>& commands) {
     Json list = Json::array();
     for (const auto& c : commands) list.push_back(c);

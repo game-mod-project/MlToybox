@@ -6,6 +6,7 @@
 #include "features/immigration.h"
 #include "features/house_capacity.h"
 #include "features/mood.h"
+#include "features/deposits.h"
 
 namespace mlt {
 void registerFeatures(HookManager& manager) {
@@ -16,5 +17,6 @@ void registerFeatures(HookManager& manager) {
     immigration::registerHook(manager);
     house_capacity::registerHook(manager);
     mood::registerHook(manager);
+    deposits::registerHook(manager);
 }
 }
