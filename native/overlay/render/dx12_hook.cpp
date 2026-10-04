@@ -5,6 +5,7 @@
 #include "overlay/core/frame_gate.h"
 #include "overlay/ui/app.h"
 #include "overlay/ui/window.h"
+#include "runtime.h"
 #include <MinHook.h>
 #include <atomic>
 #include <d3d12.h>
@@ -431,7 +432,11 @@ bool hook(void* target, void* detour, void** original, const char* name, std::st
         err = std::string(name) + ": " + MH_StatusToString(created);
         return false;
     }
-    const MH_STATUS enabled = MH_EnableHook(target);
+    MH_STATUS enabled;
+    {
+        HookGate gate;   // 네이티브 DLL 의 MinHook 과 같은 때에 스레드를 멈추지 않는다(runtime.h)
+        enabled = MH_EnableHook(target);
+    }
     if (enabled != MH_OK) {
         err = std::string(name) + ": " + MH_StatusToString(enabled);
         return false;
@@ -445,6 +450,7 @@ bool installRenderHooks(std::string& err) {
     void* resize = nullptr;
     void* execute = nullptr;
     if (!findVTables(&present, &resize, &execute, err)) return false;
+    // 이 DLL 의 MinHook 은 네이티브 DLL 의 것과 다른 사본이다. 이미 초기화돼 있는 경우는 같은 프로세스에서 두 번 부르는 테스트뿐이다
     const MH_STATUS init = MH_Initialize();
     if (init != MH_OK && init != MH_ERROR_ALREADY_INITIALIZED) {
         err = std::string("minhook: ") + MH_StatusToString(init);
