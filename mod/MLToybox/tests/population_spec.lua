@@ -70,6 +70,20 @@ T.run({
     T.eq(#r.houses[1].occupantFamilyIDs, 1, "half-full house untouched")
     T.eq(#r.houses[2].occupantFamilyIDs, 1, "empty 1"); T.eq(#r.houses[3].occupantFamilyIDs, 1, "empty 2")
   end,
+  -- 집의 가족 목록은 리플렉션으로 읽는다. 가족 하나를 들일 때마다 모든 집을 다시 읽으면 집과 가족이 많을 때 게임이 멈칫한다
+  add_families_does_not_reread_every_house_for_every_family = function()
+    local r = world(region("hof", { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }))[1]
+    local reads = 0
+    for _, h in ipairs(r.houses) do
+      local ids = h.occupantFamilyIDs
+      h.occupantFamilyIDs = nil
+      setmetatable(h, { __index = function(_, k) if k == "occupantFamilyIDs" then reads = reads + 1; return ids end end })
+    end
+    T.eq(population.addFamilies(10), 10, "added")
+    for _, h in ipairs(r.houses) do T.eq(#h.occupantFamilyIDs, 1, "one family in each empty house") end
+    -- 처음에 집마다 한 번(10) + 들일 때마다 그 집만(가짜 집이 스스로 읽는 3번 포함). 예전에는 가족마다 모든 집을 다시 읽어 200번을 넘었다
+    T.truthy(reads <= 80, "reads follow the families added, not families x houses: " .. reads)
+  end,
   add_families_stops_when_full = function()
     local r = world(region("hof", { 1, 2 }))[1]
     T.eq(population.addFamilies(5), 1, "only one free slot")
