@@ -5,6 +5,7 @@
 #include "overlay/core/view.h"
 #include "overlay/ui/app.h"
 #include "overlay/ui/tabs.h"
+#include "tab_frames.h"
 #include <imgui.h>
 
 using namespace mlt::ov;
@@ -114,73 +115,27 @@ TEST(overlay_mood_native_note_says_what_works_without_the_hooks) {
     CHECK(moodNativeNote(nullptr).empty());   // 아직 모른다(게임 밖)
     NativeStatus n;
     n.loaded = true;
-    for (const char* name : { "mood_approval", "mood_order", "mood_problem_add", "mood_problem_remove", "mood_region_name" }) n.features[name].installed = true;
+    CHECK(moodNativeNote(&n).empty());        // 항목 목록을 아직 못 받았다(게임을 켠 직후): 모르는 것을 "못 맡았다"고 하지 않는다
+    for (const char* name : { "mood_approval", "mood_order", "mood_problem_add", "mood_problem_remove", "region_name", "region_tag" }) n.features[name].installed = true;
     CHECK(moodNativeNote(&n).empty());
-    n.features["mood_region_name"].installed = false;
+    n.features["region_tag"].installed = false;
     CHECK(moodNativeNote(&n).find("영지별 설정") != std::string::npos);
     n.features["mood_order"].installed = false;
     CHECK(moodNativeNote(&n).find("배율") != std::string::npos);
+    CHECK(moodNativeNote(&n).find("알림") != std::string::npos);   // 고정값만 Lua 가 유지할 때의 부작용도 알린다
+    n.stale = true;
+    CHECK(moodNativeNote(&n).empty());        // 오래된 상태로는 판단하지 않는다
+    n.stale = false;
     n.loaded = false;
-    CHECK(moodNativeNote(&n).find("배율") != std::string::npos);
-}
-
-namespace {
-// 탭을 실제 ImGui 프레임으로 그리고 마우스 클릭을 넣어 본다(그래픽 장치 없음)
-struct MoodFrames {
-    App& a = app();
-
-    MoodFrames() {
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
-        io.IniFilename = nullptr;
-        io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
-        a.control = ControlDoc();
-        a.dirty = false;
-    }
-    ~MoodFrames() {
-        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
-            tex->SetTexID(ImTextureID_Invalid);
-            tex->SetStatus(ImTextureStatus_Destroyed);
-        }
-        ImGui::DestroyContext();
-        a.control = ControlDoc();
-        a.dirty = false;
-    }
-    void frame(const StatusDoc* status) {
-        ImGuiIO& io = ImGui::GetIO();
-        io.DisplaySize = ImVec2(800.0f, 600.0f);
-        io.DeltaTime = 0.5f;
-        ImGui::NewFrame();
-        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-        ImGui::SetNextWindowSize(ImVec2(800.0f, 600.0f));
-        ImGui::Begin("test", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-        TabContext ctx{ a, status, status != nullptr, 0 };
-        drawMoodTab(ctx);
-        ImGui::End();
-        ImGui::Render();
-        for (ImTextureData* tex : ImGui::GetPlatformIO().Textures) {
-            if (tex->Status == ImTextureStatus_WantCreate) tex->SetTexID(static_cast<ImTextureID>(1));
-            if (tex->Status == ImTextureStatus_WantCreate || tex->Status == ImTextureStatus_WantUpdates) tex->SetStatus(ImTextureStatus_OK);
-        }
-    }
-    void click(const StatusDoc* status, float x, float y) {
-        ImGuiIO& io = ImGui::GetIO();
-        io.AddMousePosEvent(x, y);
-        frame(status);
-        io.AddMouseButtonEvent(0, true);
-        frame(status);
-        io.AddMouseButtonEvent(0, false);
-        frame(status);
-    }
-};
+    CHECK(moodNativeNote(&n).find("배율") != std::string::npos);   // DLL 을 올리지 못했다
 }
 
 TEST(overlay_mood_tab_sits_after_population_and_its_first_checkbox_turns_the_feature_on) {
     CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "자격·질서", "영지", "상태", "로그" }));
-    MoodFrames f;
-    f.frame(nullptr);
+    TabFrames f;
+    f.frame(drawMoodTab);
     CHECK(!f.a.control.mood().enabled && !f.a.dirty);
-    f.click(nullptr, 20.0f, 18.0f);   // 맨 위 줄의 체크 상자
+    f.click(drawMoodTab, 20.0f, 18.0f);   // 맨 위 줄의 체크 상자
     CHECK(f.a.control.mood().enabled);
     CHECK(f.a.dirty);                 // 바꾸면 바로 저장 대상이 된다
     CHECK(f.a.control.mood().common.approval.neutral() && f.a.control.mood().regions.empty());   // 다른 값은 그대로다
@@ -190,13 +145,13 @@ TEST(overlay_mood_tab_draws_with_regions_from_the_game) {
     const auto status = parseStatus(R"({"heartbeat":5,"inGame":true,"mood":{"regions":[
         {"key":"eich","name":"Wilde Wand","approval":100,"order":96},{"key":"imm","name":"Krumme Leite","approval":91,"order":100}]}})");
     CHECK(status.has_value());
-    MoodFrames f;
+    TabFrames f;
     MoodSettings m;
     m.enabled = true;
     m.regions["eich"].approval.fixed = 80;
     f.a.control.setMood(m);
-    f.frame(&*status);
-    f.frame(&*status);
+    f.frame(drawMoodTab, &*status);
+    f.frame(drawMoodTab, &*status);
     // 그리기만 해서는 설정이 바뀌지 않는다
     CHECK(!f.a.dirty);
     CHECK(f.a.control.mood().regions.at("eich").approval.fixed == 80);

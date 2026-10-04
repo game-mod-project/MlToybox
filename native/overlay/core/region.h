@@ -34,7 +34,8 @@ struct DepositRow {
 std::vector<ScopeOption> regionScopeOptions(const RegionStatus* status);
 // 표의 줄. status 가 없으면(게임 밖) 지금 값은 "-"
 std::vector<DepositRow> buildDepositRows(const RegionSettings& settings, const RegionStatus* status, const std::optional<std::string>& scope);
-// 칸 하나를 고친다. 값이 없으면 지운다(공통: 채우지 않는다, 영지: 공통을 따른다). 비게 된 영지는 설정에서 뺀다
+// 칸 하나를 고친다. 값이 없으면 지운다(공통: 채우지 않는다, 영지: 공통을 따른다). 비게 된 영지는 설정에서 뺀다.
+// 0 은 공통에서는 "채우지 않는다"(지운다), 영지에서는 "이 영지는 채우지 않는다"(0 으로 남긴다)
 void setDepositTarget(RegionSettings& settings, const std::optional<std::string>& scope, const std::string& kind, std::optional<int> value);
 // "가축 상인: Wilde Wand 방문까지 7일 · Krumme Leite 지금 주문 가능"
 std::string livestockLine(const RegionStatus* status);

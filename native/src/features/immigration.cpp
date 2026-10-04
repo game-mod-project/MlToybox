@@ -68,10 +68,8 @@ void registerHook(HookManager& manager) {
     manager.add(space);
 
     HookSpec owner{ "immigration_owner", kOwnerCheckPattern, nullptr, &g_ownerCheck, &wanted };
-    owner.bodyChecks = {
-        "48 8B 85 50 03 00 00 48 85 C0 74 10 80 B8 4C 03 00 00 00",   // mov rax,[rbp+350h]; test rax,rax; je; cmp byte [rax+34Ch],0   영지의 주인과 isMainPlayer
-    };
-    owner.bodyWindow = 0x140;
+    owner.bodyChecks = { region_scope::kOwnerCheckBody };   // 영지의 주인과 isMainPlayer 를 읽는 명령
+    owner.bodyWindow = region_scope::kOwnerCheckWindow;
     manager.add(owner);
 }
 

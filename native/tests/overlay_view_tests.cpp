@@ -134,3 +134,29 @@ TEST(overlay_view_mercenary_status_lines) {
     CHECK(lines[2] == "띄우지 못함: 궁수대 — unknown unit: foo");
     CHECK(lines[3] == "참고: rebuild produced 1 of 3 slots");
 }
+
+TEST(overlay_view_memo_rebuilds_only_when_the_key_changes) {
+    // 탭은 프레임마다 그려지지만 보일 것은 상태나 설정이 바뀔 때만 다시 만든다
+    Memo<int, std::string> memo;
+    int made = 0;
+    const auto make = [&made] { ++made; return std::string("value ") + std::to_string(made); };
+    CHECK(memo.get(1, make) == "value 1");
+    CHECK(memo.get(1, make) == "value 1" && made == 1);   // 같은 재료: 다시 만들지 않는다
+    CHECK(memo.get(2, make) == "value 2" && made == 2);
+    CHECK(memo.get(1, make) == "value 3" && made == 3);   // 지난 것 하나만 기억한다
+}
+
+TEST(overlay_view_native_installed_is_unknown_without_a_fresh_feature_list) {
+    CHECK(!nativeInstalled(nullptr, { "a" }).has_value());
+    NativeStatus n;
+    CHECK(nativeInstalled(&n, { "a" }) == false);          // DLL 을 올리지 못했다
+    n.loaded = true;
+    CHECK(!nativeInstalled(&n, { "a" }).has_value());      // 항목 목록이 아직 없다
+    n.features["a"].installed = true;
+    n.features["b"].installed = false;
+    CHECK(nativeInstalled(&n, { "a" }) == true);
+    CHECK(nativeInstalled(&n, { "a", "b" }) == false);
+    CHECK(nativeInstalled(&n, { "a", "missing" }) == false);
+    n.stale = true;
+    CHECK(!nativeInstalled(&n, { "a" }).has_value());      // 오래된 상태
+}

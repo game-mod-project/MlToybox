@@ -53,7 +53,8 @@ static MoodControl moodControl(const Json* features) {
         constexpr size_t kMaxRegions = 64, kMaxKey = 64;
         for (const auto& [key, value] : *regions->o) {
             if (m.regions.size() >= kMaxRegions) break;
-            if (key.empty() || key.size() > kMaxKey) continue;
+            // 객체가 아닌 항목은 없는 것으로 본다(그 영지는 공통 설정). Lua 와 오버레이도 그렇게 읽는다
+            if (key.empty() || key.size() > kMaxKey || value.type != Json::Type::Object) continue;
             m.regions.emplace_back(key, moodSet(&value));
         }
     }

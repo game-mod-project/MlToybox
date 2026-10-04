@@ -25,20 +25,19 @@ local function text(v)
   return ok and s or nil
 end
 
--- 그 영지의 그 종류 목표(1 이상). 없으면 nil
-local function targetFor(settings, key, kind)
-  local own = type(settings.regionTargets) == "table" and settings.regionTargets[key]
-  local v = type(own) == "table" and own[kind] or nil
-  if v == nil then v = type(settings.targets) == "table" and settings.targets[kind] or nil end
-  v = tonumber(v)
-  if not v or v < 1 then return nil end
-  return math.min(math.floor(v), M.MAX_TARGET)
+-- 표에 든 값. 0 이상의 수가 아니면(없음, 글자, 음수) nil. 네이티브 DLL 과 게임 안 창도 그런 값을 없는 것으로 읽는다
+local function entry(map, kind)
+  local v = type(map) == "table" and tonumber(map[kind]) or nil
+  if v and v >= 0 then return v end
+  return nil
 end
 
--- 매장지 목록. 맵마다 한 번 찾아 공유 상태에 둔다(맵을 떠나면 registry 가 상태를 비운다). 사라진 매장지가 있으면 다음에 다시 찾는다
-local function nodesOf(state)
-  if not state.regionNodes then state.regionNodes = game.find.all("ResourceNode") end
-  return state.regionNodes
+-- 그 영지의 그 종류 목표(1 이상). 없으면 nil. 영지 목표가 있으면 그것(0 = 이 영지는 채우지 않는다), 없으면 공통 목표
+local function targetFor(settings, key, kind)
+  local v = entry(type(settings.regionTargets) == "table" and settings.regionTargets[key], kind)
+  if v == nil then v = entry(settings.targets, kind) end
+  if not v or v < 1 then return nil end
+  return math.min(math.floor(v), M.MAX_TARGET)
 end
 
 -- 덩어리들의 양과 용량의 합
@@ -64,7 +63,7 @@ local function fill(clumps, count, target)
 end
 
 local function run(state, settings)
-  local entries, byAddress, byHex = {}, {}, {}
+  local entries, byAddress = {}, {}
   for _, r in ipairs(game.playerRegions()) do
     local key = game.regionKey(r)
     if key then
@@ -72,15 +71,12 @@ local function run(state, settings)
       local e = { key = key, name = game.regionName(r) or key, livestockWait = r.nextLivestockOrderIn, deposits = {} }
       entries[#entries + 1] = e
       byAddress[r:GetAddress()] = e
-      byHex[string.format("%X", r:GetAddress())] = e
     end
   end
 
-  -- 덩어리형 매장지
-  for _, n in ipairs(nodesOf(state)) do
-    if not safe.valid(n) then
-      state.regionNodes = nil
-    else
+  -- 덩어리형 매장지. 틱마다 새로 찾는다: 게임이 플레이 중에 매장지를 없앨 수 있어, 찾은 객체를 틱 사이에 쥐고 있지 않는다
+  for _, n in ipairs(game.find.all("ResourceNode")) do
+    if safe.valid(n) then
       local clumps = n.resourceClumps
       local count = #clumps
       local first = count > 0 and clumps[1] or nil
@@ -99,10 +95,15 @@ local function run(state, settings)
     end
   end
 
-  -- 광물 매장지: 네이티브가 날짜가 넘어갈 때 적어 둔 값
-  for _, node in ipairs(native.nodes or {}) do
-    local kind, e = M.MINERAL_KINDS[tonumber(node.type) or 0], byHex[tostring(node.region)]
-    if kind and e then e.deposits[#e.deposits + 1] = { kind = kind, amount = tonumber(node.amount) or 0 } end
+  -- 광물 매장지: 네이티브가 날짜가 넘어갈 때 적어 둔 값. 영지가 주소(16진수)로만 적혀 있어, 이 맵에 들어온 뒤에 새로 모은 것만 쓴다
+  -- (다른 세이브를 불러오면 새 영지가 예전 주소에 놓일 수 있다). 모을 때마다 번호(nodesDay)가 오른다
+  local day = native.nodesDay or 0
+  if state.regionNodesDay == nil then state.regionNodesDay = day end   -- 이 맵에서 처음 본 번호(맵을 떠나면 registry 가 상태를 비운다)
+  if day ~= state.regionNodesDay then
+    for _, node in ipairs(native.nodes or {}) do
+      local kind, e = M.MINERAL_KINDS[tonumber(node.type) or 0], byAddress[tonumber(tostring(node.region), 16) or 0]
+      if kind and e then e.deposits[#e.deposits + 1] = { kind = kind, amount = tonumber(node.amount) or 0 } end
+    end
   end
 
   for _, e in ipairs(entries) do

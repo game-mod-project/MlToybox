@@ -53,7 +53,7 @@ bool process(const uint8_t* engine, const RegionControl& control, const IsRegion
         // 게임이 남은 양을 두는 매장지만: 덩어리가 없고 동물 무리가 아니다
         if (mem::read<int32_t>(node, kNodeSquadOffset) > 0 || mem::read<int32_t>(node, kNodeClumpCountOffset) != 0) continue;
         const uint8_t* region = mem::readPtr(node, kNodeRegionOffset);
-        if (!mem::flagBehindPointer(region, kRegionOwnerOffset, kPawnIsMainPlayerOffset)) continue;
+        if (!region_scope::ownedByMainPlayer(region)) continue;
         const MineralTargets* own = nullptr;
         if (isRegion) {
             for (const auto& [key, targets] : control.regions) {
@@ -68,9 +68,9 @@ bool process(const uint8_t* engine, const RegionControl& control, const IsRegion
     return true;
 }
 
-std::string renderNodes(const std::vector<NodeInfo>& nodes) {
+std::string renderNodes(const std::vector<NodeInfo>& nodes, long long day) {
     if (nodes.empty()) return "";
-    std::string out = "\"nodes\":[";
+    std::string out = "\"nodesDay\":" + std::to_string(day) + ",\"nodes\":[";
     for (size_t i = 0; i < nodes.size(); ++i) {
         char region[32];
         std::snprintf(region, sizeof region, "%llX", static_cast<unsigned long long>(nodes[i].region));
@@ -83,9 +83,7 @@ std::string renderNodes(const std::vector<NodeInfo>& nodes) {
 
 namespace {
 using NewDayFn = void(__fastcall*)(void* weather);
-using NameEqualsFn = bool(__fastcall*)(uint64_t name, const char* text);
 NewDayFn g_newDay = nullptr;
-NameEqualsFn g_nameEquals = nullptr;
 void* g_nodeLayout = nullptr;
 void* g_amountWrite = nullptr;
 void* g_ownerCheck = nullptr;
@@ -94,6 +92,7 @@ void* g_ownerCheck = nullptr;
 std::mutex g_mutex;
 std::shared_ptr<const RegionControl> g_control = std::make_shared<const RegionControl>();
 std::vector<NodeInfo> g_snapshot;
+long long g_snapshotDay = 0;   // 모을 때마다 1 씩 오른다
 
 // 매장지와 영지의 오프셋은 세 함수의 본문으로 확인한다. 하나라도 못 찾았으면 게임의 메모리를 건드리지 않는다
 bool ready() { return g_nodeLayout != nullptr && g_amountWrite != nullptr && g_ownerCheck != nullptr; }
@@ -107,16 +106,14 @@ void __fastcall NewDayDetour(void* weather) {
         control = g_control;
     }
     if (!control->enabled) return;
+    // 영지를 가릴 수 없으면(features/region_scope) 공통 목표만 쓴다
     IsRegionFn isRegion;
-    if (g_nameEquals) {
-        isRegion = [](const uint8_t* region, const std::string& key) {
-            return g_nameEquals(mem::read<uint64_t>(region, kRegionTagOffset), key.c_str());
-        };
-    }
+    if (region_scope::canTellRegions()) isRegion = &region_scope::tagIs;
     std::vector<NodeInfo> nodes;
     if (!process(mem::readPtr(static_cast<const uint8_t*>(weather), kWeatherEngineOffset), *control, isRegion, nodes)) return;
     std::lock_guard lock(g_mutex);
     g_snapshot = std::move(nodes);
+    ++g_snapshotDay;
 }
 
 bool wanted(const NativeControl& c) { return c.region.enabled; }
@@ -131,12 +128,13 @@ void configure(const NativeControl& c) {
 
 std::string snapshotJson() {
     std::lock_guard lock(g_mutex);
-    return renderNodes(g_snapshot);
+    return renderNodes(g_snapshot, g_snapshotDay);
 }
 
 void registerHook(HookManager& manager) {
     HookSpec day{ "deposits_day", kNewDayPattern, reinterpret_cast<void*>(&NewDayDetour), reinterpret_cast<void**>(&g_newDay), &wanted };
     day.configure = &configure;
+    day.status = &snapshotJson;   // 모은 값을 native_status.json 에 싣는다
     day.bodyChecks = {
         "49 8B 86 A8 02 00 00",                  // mov rax,[r14+2A8h]             날씨 객체의 엔진
         "41 FF 8E 2C 04 00 00",                  // dec dword [r14+42Ch]           습격까지 남은 날을 하루 줄인다(날짜가 넘어갈 때의 함수라는 표시)
@@ -158,19 +156,11 @@ void registerHook(HookManager& manager) {
     HookSpec amount{ "deposits_amount", kAmountWritePattern, nullptr, &g_amountWrite, &wanted };
     manager.add(amount);
 
-    HookSpec owner{ "deposits_owner", kOwnerCheckPattern, nullptr, &g_ownerCheck, &wanted };
-    owner.bodyChecks = {
-        "48 8B 85 50 03 00 00 48 85 C0 74 10 80 B8 4C 03 00 00 00",   // mov rax,[rbp+350h]; test rax,rax; je; cmp byte [rax+34Ch],0   영지의 주인과 isMainPlayer
-    };
-    owner.bodyWindow = 0x140;
+    HookSpec owner{ "deposits_owner", region_scope::kOwnerCheckPattern, nullptr, &g_ownerCheck, &wanted };
+    owner.bodyChecks = { region_scope::kOwnerCheckBody };   // 영지의 주인과 isMainPlayer 를 읽는 명령
+    owner.bodyWindow = region_scope::kOwnerCheckWindow;
     manager.add(owner);
-
-    HookSpec name{ "deposits_region_name", kNameEqualsPattern, nullptr, reinterpret_cast<void**>(&g_nameEquals), &wanted };
-    name.bodyChecks = {
-        "80 3A 5F",                              // cmp byte [rdx],5Fh             글자열의 첫 글자를 본다(두 번째 인수가 const char*)
-    };
-    name.bodyWindow = 0x60;
-    manager.add(name);
+    // 영지를 설정의 영지 키와 견주는 것은 features/region_scope 의 region_name, region_tag 가 맡는다
 }
 
 }

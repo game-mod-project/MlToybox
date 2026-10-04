@@ -151,27 +151,29 @@ TEST(deposits_refuse_a_node_list_that_makes_no_sense) {
 }
 
 TEST(deposits_render_the_nodes_for_the_status_file) {
-    CHECK(deposits::renderNodes({}).empty());
-    const std::string text = deposits::renderNodes({ { 0x20E9D490010ull, deposits::kClay, 500 }, { 0x1EE18477A20ull, deposits::kIron, 3000 } });
-    CHECK(text == R"("nodes":[{"region":"20E9D490010","type":3,"amount":500},{"region":"1EE18477A20","type":2,"amount":3000}])");
+    CHECK(deposits::renderNodes({}, 4).empty());
+    // nodesDay: 모을 때마다 오르는 번호. 영지가 주소로만 적혀서, 읽는 쪽이 "이 맵에서 모은 것인가"를 이 번호로 가린다
+    const std::string text = deposits::renderNodes({ { 0x20E9D490010ull, deposits::kClay, 500 }, { 0x1EE18477A20ull, deposits::kIron, 3000 } }, 7);
+    CHECK(text == R"("nodesDay":7,"nodes":[{"region":"20E9D490010","type":3,"amount":500},{"region":"1EE18477A20","type":2,"amount":3000}])");
     // 상태 파일에 그대로 끼워 넣을 수 있다
     auto j = parseJson(renderStatus(1, 2, {}, text));
     CHECK(j.has_value() && j->get("nodes") && j->get("nodes")->a && j->get("nodes")->a->size() == 2);
+    CHECK(j->get("nodesDay")->asNumber(0) == 7);
     CHECK((*j->get("nodes")->a)[0].get("region")->s == "20E9D490010");
     CHECK((*j->get("nodes")->a)[1].get("amount")->asNumber(0) == 3000);
     CHECK(parseJson(renderStatus(1, 2, {}, "")).has_value());
 }
 
-TEST(deposits_register_one_hook_and_four_address_only_checks) {
+TEST(deposits_register_one_hook_and_three_address_only_checks) {
+    // 영지를 설정의 영지 키와 견주는 항목(region_name, region_tag)은 features/region_scope 가 등록한다
     HookManager m;
     deposits::registerHook(m);
     auto s = m.states();
-    CHECK(s.size() == 5);
+    CHECK(s.size() == 4);
     CHECK(s[0].name == "deposits_day");
     CHECK(s[1].name == "deposits_nodes");
     CHECK(s[2].name == "deposits_amount");
     CHECK(s[3].name == "deposits_owner");
-    CHECK(s[4].name == "deposits_region_name");
 }
 
 TEST(control_reads_the_mineral_targets_of_the_region_feature) {
