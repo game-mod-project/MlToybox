@@ -57,7 +57,7 @@ std::vector<ScopeOption> populationScopeOptions(const PopulationStatus* populati
 }
 
 std::vector<std::string> populationInfo(const PopulationStatus* population, const std::optional<std::string>& regionKey) {
-    if (!population) return { "현재: - (인구 기능이 꺼져 있거나 게임 밖)" };
+    if (!population) return { "현재: - (게임에 들어가면 표시됩니다)" };
     const PopulationRegion* region = nullptr;
     if (regionKey) {
         for (const PopulationRegion& r : population->regions) {
@@ -70,10 +70,13 @@ std::vector<std::string> populationInfo(const PopulationStatus* population, cons
     const int homeless = region ? region->homeless : population->homeless;
     const int freeSlots = region ? region->freeSlots : population->freeSlots;
     const int unassigned = region ? region->unassigned : population->unassigned;
+    // 네이티브가 배율을 맡으면 게임이 직접 들이므로 모드가 따로 들인 가족이 없다. 그때는 뒤의 말을 뺀다
+    std::string session = "이번 세션(전체): 자연 이민 " + std::to_string(population->natural) + "가족";
+    if (population->multiplied > 0) session += " → 배율로 추가 " + std::to_string(population->multiplied) + "가족";
     return {
         "현재(" + scope + "): 가족 " + std::to_string(families) + " · 인구 " + std::to_string(people) + " · 집 없는 가족 " + std::to_string(homeless)
             + " · 빈 자리 " + std::to_string(freeSlots) + " · 미배치 가족 " + std::to_string(unassigned),
-        "이번 세션(전체): 자연 이민 " + std::to_string(population->natural) + "가족 → 배율로 추가 " + std::to_string(population->multiplied) + "가족",
+        session,
     };
 }
 

@@ -136,7 +136,11 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
 - 목록을 다시 만들 때(고용 직후 등) 게임의 새 용병단 알림이 뜰 수 있습니다.
 
 ### 인구 (영지별)
-- **자연 이민 배율(1~10배)**: 영지마다 계산합니다. 그 영지에 자연 이민으로 늘어난 만큼, 그 영지의 집에 추가로 들입니다. 모드가 들인 가족은 배율 계산에서 뺍니다.
+- **자연 이민**: 게임은 영지마다 "월간 인구 변화"를 구해(첫 해 +1, 지지율 55~79 +1, 80~94 +2, 95~100 +3, 5~19 -1, 0~4 -3), 그 달 1일부터 고른 간격으로 하루 한 가족씩 들입니다. 아래 두 값은 내 영지에서만 이 숫자를 바꿉니다. 영지 창의 인구 증가 숫자도 따라 바뀌고, 다른 영주에게는 적용되지 않습니다.
+  - **월 자연 이민 가족 수(0~31)**: 0이면 게임 그대로입니다. 숫자를 넣으면 지지율과 무관하게 매달 그만큼 옵니다.
+  - **이민 속도 배율(1~10배)**: 게임의 숫자에 곱합니다. 게임의 숫자가 0 이하이면 그대로입니다. 월 가족 수를 넣으면 배율은 쓰이지 않습니다.
+  - 상한은 하루 한 가족(월 28~31)입니다. 빈 주거 공간이 없거나 집 없는 가족이 있으면 오지 않습니다(게임의 규칙 그대로).
+  - 네이티브 DLL이 맡습니다([상태] 탭의 `immigration`, `immigration_space`, `immigration_owner`). 이 셋이 설치되지 않으면 월 가족 수는 적용되지 않고, 배율은 예전 방식으로 돌아갑니다: 게임이 가족을 들일 때마다 모드가 `(배율 - 1)`가족을 따로 더 들입니다.
 - **목표 가족 수**: 공통 값은 "영지마다 최소 N가족"이라는 뜻입니다. 영지별로 따로 지정할 수 있습니다.
 - **가족 추가**: 선택한 영지에 들입니다. "공통"이면 빈 자리가 많은 영지부터 채웁니다.
 - 탭의 현재 값(가족, 인구, 집 없는 가족, 빈 자리, 미배치)은 "인구 기능 사용"을 꺼 둔 동안에도 갱신됩니다. 꺼져 있는 동안에는 읽기만 하고, 그동안 늘어난 가족에는 다시 켜도 배율을 걸지 않습니다. "가족 추가"는 기능이 꺼져 있어도 됩니다.
@@ -189,9 +193,10 @@ Manor Lords(Steam, UE5)용 치트 모드입니다. 설정은 게임 안 창(오�
 ## 네이티브 계층
 - **빌드**: `pwsh tools/build-native.ps1 -Test`를 실행하면 `native/build/mltoybox_native.dll`과 `mltoybox_overlay.dll`이 만들어집니다.
 - **배포**: `pwsh tools/deploy.ps1 -Mod MLToybox`가 두 DLL을 `Mods/MLToybox/native/`에 복사합니다. 게임 실행 중에는 DLL이 잠겨 경고만 남깁니다.
-- **기능**: `instant_build`, `instant_finish`, `instant_setup`, `instant_convert`, `placement`, `building_row`, `placement_rows`, `militia_guard`, `militia_guard_2`, `upgrade_row`, `upgrade_can`, `upgrade_pay`, `upgrade_cost`, `upgrade_wealth`, `upgrade_residential`. 모두 패턴이 정확히 1곳에서 찾아지고 레이아웃 검사(`bodyChecks`)를 통과할 때만 설치됩니다.
+- **기능**: `instant_build`, `instant_finish`, `instant_setup`, `instant_convert`, `placement`, `building_row`, `placement_rows`, `militia_guard`, `militia_guard_2`, `upgrade_row`, `upgrade_can`, `upgrade_pay`, `upgrade_cost`, `upgrade_wealth`, `upgrade_residential`, `immigration`, `immigration_space`, `immigration_owner`. 모두 패턴이 정확히 1곳에서 찾아지고 레이아웃 검사(`bodyChecks`)를 통과할 때만 설치됩니다.
   - `upgrade_` 항목: 업그레이드 판정(`upgrade_can`), 비용 지불(`upgrade_pay`), 자재 비용(`upgrade_cost`), 지역 자산 비용(`upgrade_wealth`), 주거 요구(`upgrade_residential`)의 후킹과, 이들이 부를 업그레이드 표의 행 함수(`upgrade_row`, 주소만 찾음).
   - `instant_setup`, `instant_convert`: 게임이 `instaBuild` 플래그를 읽는 두 함수(건물 설정, 청사진 변환)의 후킹. 주인이 다른 영주인 건물에 대한 호출 동안만 플래그 목록을 비워 보입니다. "즉시 완공"이 켜져 있을 때 켜집니다.
+  - `immigration`: 영지의 월간 인구 변화를 돌려주는 게임 함수의 후킹. 주인이 플레이어인 영지의 값만 바꿉니다. 인구 기능이 켜져 있고 월 가족 수나 배율이 설정돼 있을 때 켜집니다. `immigration_space`(빈 주거 공간을 세는 게임 함수)와 `immigration_owner`(영지의 주인 오프셋 확인용)는 주소만 찾습니다.
   - 후킹이 아니라 주소만 찾는 항목: `instant_finish`(`instant_build`가 부를 완공 처리 함수), `building_row`(`placement`가 부를 건물 표의 행 함수), `placement_rows`(`placement`가 고치는 행의 오프셋을 배치 함수의 본문으로 확인).
   - `placement`는 "배치 제한 무시", "자재 불필요", "지역당 개수 제한 해제" 가운데 하나라도 켜져 있으면 켜집니다.
 - **분석 도구**: `dotnet run --project tools/re/MLToybox.Re -- <exec|disasm|sig|count|strings|xrefs> ...`

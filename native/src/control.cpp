@@ -17,6 +17,14 @@ static bool enabled(const Json* features, const char* section) {
     return s && s->get("enabled") && s->get("enabled")->asBool(false);
 }
 
+// 기능이 켜져 있을 때의 정수 설정값. 꺼져 있거나 숫자가 아니거나 lo 보다 작으면 def, hi 보다 크면 hi
+static int number(const Json* features, const char* section, const char* name, int def, int lo, int hi) {
+    if (!enabled(features, section)) return def;
+    const Json* f = features->get(section)->get(name);
+    if (!f || f->type != Json::Type::Number || f->n < lo) return def;
+    return f->n > hi ? hi : static_cast<int>(f->n);
+}
+
 std::optional<NativeControl> parseControl(std::string_view text) {
     auto j = parseJson(text);
     if (!j || j->type != Json::Type::Object) return std::nullopt;
@@ -34,6 +42,8 @@ std::optional<NativeControl> parseControl(std::string_view text) {
     c.noRegionLimit = flag(features, "build", "noRegionLimit");
     c.noMaterials = flag(features, "build", "noMaterials");
     c.upgradeFree = enabled(features, "upgrade");
+    c.immigrationMonthly = number(features, "population", "monthlyFamilies", 0, 0, 31);
+    c.immigrationMultiplier = number(features, "population", "multiplier", 1, 1, 10);
     return c;
 }
 

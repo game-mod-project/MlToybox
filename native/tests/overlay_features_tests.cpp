@@ -18,7 +18,7 @@ TEST(overlay_features_defaults_match_the_panel) {
     const MilitarySettings m = doc.military();
     CHECK(!m.enabled && m.ignoreEquipment && m.ignorePopulation && m.zeroUpkeep && m.unlimitedSquads);
     const PopulationSettings p = doc.population();
-    CHECK(!p.enabled && p.multiplier == 2 && p.targetFamilies == 0 && p.regionTargets.empty());
+    CHECK(!p.enabled && p.multiplier == 2 && p.monthlyFamilies == 0 && p.targetFamilies == 0 && p.regionTargets.empty());
     const ResourcesSettings r = doc.resources();
     CHECK(!r.enabled && r.intervalSec == 2 && r.targets.empty() && r.regionTargets.empty());
     const MercSettings me = doc.mercenaries();
@@ -29,7 +29,7 @@ TEST(overlay_features_read_a_file_written_by_the_panel) {
     const ControlDoc doc = panelFixture();
     CHECK(doc.military().enabled && doc.military().unlimitedSquads);
     const PopulationSettings p = doc.population();
-    CHECK(p.enabled && p.multiplier == 1 && p.targetFamilies == 0 && p.regionTargets.empty());
+    CHECK(p.enabled && p.multiplier == 1 && p.monthlyFamilies == 0 && p.targetFamilies == 0 && p.regionTargets.empty());
     const ResourcesSettings r = doc.resources();
     CHECK(r.enabled && r.intervalSec == 2 && r.targets.size() == 56 && r.targets.at("Ale") == 500);
     CHECK(r.regionTargets.size() == 2 && r.regionTargets.at("sel").at("Ale") == 1000 && r.regionTargets.at("hof").at("Barley") == 600);
@@ -78,6 +78,7 @@ TEST(overlay_features_population_and_resources_round_trip) {
     PopulationSettings p;
     p.enabled = true;
     p.multiplier = 3;
+    p.monthlyFamilies = 6;
     p.targetFamilies = 12;
     p.regionTargets["sel"] = 30;
     p.regionTargets["hof"] = 0;                       // 0 = 그 영지는 끔. 값으로 남는다
@@ -90,7 +91,7 @@ TEST(overlay_features_population_and_resources_round_trip) {
     doc.setResources(r);
     const ControlDoc back = ControlDoc::parse(doc.dump());
     const PopulationSettings p2 = back.population();
-    CHECK(p2.enabled && p2.multiplier == 3 && p2.targetFamilies == 12 && p2.regionTargets.size() == 2);
+    CHECK(p2.enabled && p2.multiplier == 3 && p2.monthlyFamilies == 6 && p2.targetFamilies == 12 && p2.regionTargets.size() == 2);
     CHECK(p2.regionTargets.at("sel") == 30 && p2.regionTargets.at("hof") == 0);
     const ResourcesSettings r2 = back.resources();
     CHECK(r2.enabled && r2.intervalSec == 5 && r2.targets.at("Timber") == 500 && r2.regionTargets.at("hof").at("Timber") == 2000);
