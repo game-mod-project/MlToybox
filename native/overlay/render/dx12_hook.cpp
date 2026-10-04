@@ -5,6 +5,7 @@
 #include "overlay/core/frame_gate.h"
 #include "overlay/ui/app.h"
 #include "overlay/ui/window.h"
+#include "runtime.h"
 #include <MinHook.h>
 #include <atomic>
 #include <d3d12.h>
@@ -45,6 +46,7 @@ unsigned long long g_seenOrder = 0;
 std::atomic<bool> g_recordQueues{true};
 
 IDXGISwapChain* g_swap = nullptr;   // 우리가 그리는 스왑체인
+HWND g_window = nullptr;            // 그 스왑체인의 창
 ID3D12Device* g_device = nullptr;
 ID3D12CommandQueue* g_queue = nullptr;
 ID3D12DescriptorHeap* g_rtvHeap = nullptr;
@@ -162,6 +164,7 @@ void tryInit(IDXGISwapChain* swap) {
     if (!initImGuiDx12(g_device, g_queue, static_cast<int>(g_bufferCount), g_format, err)) { disableOverlay("init failed: " + err); return; }
 
     g_swap = swap;
+    g_window = desc.OutputWindow;
     g_initialized = true;
     g_recordQueues = false;
     notifyOverlayReady();
@@ -169,6 +172,33 @@ void tryInit(IDXGISwapChain* swap) {
     OverlayState current = app().state.load();
     while (current != OverlayState::Disabled && !app().state.compare_exchange_weak(current, OverlayState::Ready)) {
     }
+}
+
+// 게임이 스왑체인을 새로 만들었다(화면 모드나 HDR 전환 등). 예전 것에 맞춰 만든 것을 놓고, 큐 찾기부터 다시 한다.
+// ImGui 컨텍스트와 창 프로시저는 그대로 쓴다. ImGui 잠금을 쥔 채로 부른다
+void forgetSwapChain() {
+    shutdownImGuiDx12();
+    destroyFrameObjects();
+    if (g_device) { g_device->Release(); g_device = nullptr; }
+    g_queue = nullptr;
+    g_swap = nullptr;
+    g_initialized = false;
+    g_firstPresentTick = 0;
+    {
+        std::lock_guard<std::mutex> lock(g_seenMutex);
+        g_seenCount = 0;
+    }
+    g_recordQueues = true;
+}
+
+// 이 스왑체인이 우리가 준비해 둔 것과 다른가: 우리 창에 그리는 다른 스왑체인이거나(한 창에는 스왑체인이 하나뿐이므로 게임이 새로 만든 것이다),
+// 주소는 같은데 백버퍼 수나 형식이 다르다(예전 것이 사라진 자리에 새 것이 생겼다). 다른 창의 스왑체인은 우리 것이 아니다
+enum class SwapChainIs { Ours, Replacement, Unrelated };
+SwapChainIs classify(IDXGISwapChain* swap) {
+    DXGI_SWAP_CHAIN_DESC desc{};
+    if (FAILED(swap->GetDesc(&desc))) return swap == g_swap ? SwapChainIs::Ours : SwapChainIs::Unrelated;
+    if (swap != g_swap) return desc.OutputWindow && desc.OutputWindow == g_window ? SwapChainIs::Replacement : SwapChainIs::Unrelated;
+    return desc.BufferCount == g_bufferCount && desc.BufferDesc.Format == g_format ? SwapChainIs::Ours : SwapChainIs::Replacement;
 }
 
 void renderFrame(IDXGISwapChain* swap) {
@@ -256,7 +286,20 @@ void frame(IDXGISwapChain* swap) {
         tryInit(swap);
         if (!g_initialized) return;
     }
-    if (swap != g_swap) return;
+    const SwapChainIs which = classify(swap);
+    if (which == SwapChainIs::Unrelated) return;
+    if (which == SwapChainIs::Replacement) {
+        // 예전 스왑체인의 마지막 프레임에서 남은 값으로 입력을 삼키지 않는다(그리지 못하는 동안 창은 보이지 않는다)
+        a.wantMouse = false;
+        a.wantKeyboard = false;
+        a.wantText = false;
+        {
+            TrackedLock imguiLock(imguiMutex(), g_holdsImgui);
+            forgetSwapChain();
+        }
+        tryInit(swap);   // 이 스레드가 큐를 실행한 뒤라야 된다. 안 되면 다음 Present 에서 다시 한다
+        if (!g_initialized) return;
+    }
     const HRESULT removed = g_device->GetDeviceRemovedReason();
     if (removed != S_OK) {
         disableOverlay("device removed " + hexCode(static_cast<unsigned long>(removed)));
@@ -431,7 +474,11 @@ bool hook(void* target, void* detour, void** original, const char* name, std::st
         err = std::string(name) + ": " + MH_StatusToString(created);
         return false;
     }
-    const MH_STATUS enabled = MH_EnableHook(target);
+    MH_STATUS enabled;
+    {
+        HookGate gate;   // 네이티브 DLL 의 MinHook 과 같은 때에 스레드를 멈추지 않는다(runtime.h)
+        enabled = MH_EnableHook(target);
+    }
     if (enabled != MH_OK) {
         err = std::string(name) + ": " + MH_StatusToString(enabled);
         return false;
@@ -445,6 +492,7 @@ bool installRenderHooks(std::string& err) {
     void* resize = nullptr;
     void* execute = nullptr;
     if (!findVTables(&present, &resize, &execute, err)) return false;
+    // 이 DLL 의 MinHook 은 네이티브 DLL 의 것과 다른 사본이다. 이미 초기화돼 있는 경우는 같은 프로세스에서 두 번 부르는 테스트뿐이다
     const MH_STATUS init = MH_Initialize();
     if (init != MH_OK && init != MH_ERROR_ALREADY_INITIALIZED) {
         err = std::string("minhook: ") + MH_StatusToString(init);

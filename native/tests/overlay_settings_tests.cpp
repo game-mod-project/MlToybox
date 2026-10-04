@@ -13,6 +13,18 @@ TEST(overlay_settings_defaults_when_missing_or_broken) {
     CHECK(parseSettings("[1]") == d);
 }
 
+// 게임 중에 밖에서 고친 overlay.json 을 다시 읽을 때: 읽을 수 없는 내용(쓰는 도중이거나 문법이 틀렸다)이면
+// 기본값으로 바꾸지 않고 지금 설정을 그대로 둔다. 그러려면 "읽지 못했다"와 "빈 설정"을 가를 수 있어야 한다
+TEST(overlay_settings_tells_unreadable_text_from_empty_settings) {
+    CHECK(!tryParseSettings("").has_value());
+    CHECK(!tryParseSettings("{\"toggleKey\":\"F8\",").has_value());
+    CHECK(!tryParseSettings("[1]").has_value());
+    const auto empty = tryParseSettings("{}");
+    CHECK(empty.has_value() && *empty == OverlaySettings());
+    const auto set = tryParseSettings(R"({"toggleKey":"F8"})");
+    CHECK(set.has_value() && set->toggleKey == "F8");
+}
+
 TEST(overlay_settings_reads_values_and_repairs_bad_ones) {
     auto s = parseSettings(R"({"toggleKey":"F8","scale":1.3,"window":{"x":10,"y":20,"w":900,"h":800},"startOpen":true,"devTab":"영주"})");
     CHECK(s.toggleKey == "F8" && s.scale > 1.29f && s.scale < 1.31f && s.x == 10 && s.y == 20 && s.w == 900 && s.h == 800 && s.startOpen && s.devTab == "영주");

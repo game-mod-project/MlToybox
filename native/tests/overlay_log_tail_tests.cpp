@@ -129,3 +129,15 @@ TEST(overlay_log_filter_by_owner_and_search) {
     f.search = "17:28:08";   // 시각으로도 찾는다
     CHECK(filterLog(lines, f) == (std::vector<size_t>{ 0 }));
 }
+
+// [로그] 탭은 프레임마다 그려진다. 줄이나 조건이 바뀌었을 때만 다시 거른다(프레임마다 1000줄을 다시 거르지 않는다)
+TEST(overlay_log_view_filters_again_only_when_the_lines_or_the_filter_change) {
+    std::vector<LogLine> lines = { { "", "a", true, false }, { "", "b", false, false } };
+    LogView view;
+    CHECK(view.shown(lines, 1, { true, "" }) == std::vector<size_t>{ 0 });
+    lines.push_back({ "", "c", true, false });
+    CHECK(view.shown(lines, 1, { true, "" }) == std::vector<size_t>{ 0 });            // 줄 목록의 판이 같다: 다시 거르지 않는다
+    CHECK(view.shown(lines, 2, { true, "" }) == (std::vector<size_t>{ 0, 2 }));       // 줄이 바뀌었다
+    CHECK(view.shown(lines, 2, { false, "" }).size() == 3);                           // 조건이 바뀌었다
+    CHECK(view.shown(lines, 2, { false, "B" }) == std::vector<size_t>{ 1 });
+}

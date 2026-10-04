@@ -31,15 +31,32 @@ TEST(overlay_session_commands_ride_every_save_until_the_mod_reports_them) {
     CHECK(p->doc.raw()["commands"][0]["id"] == first["id"] && p->doc.raw()["commands"][1]["id"] == second["id"]);
     finishSave(s, *p, 9);
 
-    // 모드가 첫 명령을 실행했다고 알렸다(status.json 의 commands). 그 명령만 뺀다. 빼는 것만으로는 저장하지 않는다
+    // 모드가 첫 명령을 실행했다고 알렸다(status.json 의 commands). 그 명령만 뺀다
     dropFinishedCommands(s, { first["id"].get<std::string>() }, 1790000002);
-    CHECK(s.commands.size() == 1 && s.commands[0]["id"] == second["id"] && !s.dirty);
-    BuildSettings b = s.control.build();
-    b.enabled = true;
-    s.control.setBuild(b);
-    s.dirty = true;
+    CHECK(s.commands.size() == 1 && s.commands[0]["id"] == second["id"]);
     p = beginSave(s);
     CHECK(p.has_value() && p->doc.raw()["commands"].size() == 1 && p->doc.raw()["commands"][0]["id"] == second["id"]);
+}
+
+// 끝난 명령이 파일에 남아 있으면 다음 실행 때 모드가 그것을 오래된 명령으로 다시 보고, 60초 안에 모드가 다시 올라오면 한 번 더 실행한다.
+// 그래서 명령을 뺐으면 한 번 더 저장해 파일에서도 뺀다
+TEST(overlay_session_saves_once_more_to_take_finished_commands_out_of_the_file) {
+    Session s;
+    const Json only = makeAddFamilies(3, 1790000000, std::nullopt);
+    s.commands.push_back(only);
+    s.dirty = true;
+    auto p = beginSave(s);
+    CHECK(p.has_value());
+    finishSave(s, *p, 3);
+    dropFinishedCommands(s, {}, 1790000001);                       // 모드가 아직 알리지 않았다
+    CHECK(!s.dirty && s.commands.size() == 1);
+    dropFinishedCommands(s, { only["id"].get<std::string>() }, 1790000002);
+    CHECK(s.commands.empty() && s.dirty);                          // 파일에서도 빼야 한다
+    p = beginSave(s);
+    CHECK(p.has_value() && p->doc.raw()["commands"].empty());
+    finishSave(s, *p, 4);
+    dropFinishedCommands(s, {}, 1790000003);
+    CHECK(!s.dirty);                                               // 뺄 것이 없으면 다시 저장하지 않는다
 }
 
 TEST(overlay_session_gives_up_on_commands_the_mod_would_ignore) {

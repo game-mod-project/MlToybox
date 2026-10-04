@@ -90,6 +90,16 @@ bool LogTail::poll(const std::filesystem::path& path) {
     return changed;
 }
 
+const std::vector<size_t>& LogView::shown(const std::vector<LogLine>& lines, unsigned long long revision, const LogFilter& filter) {
+    if (!filtered_ || revision != revision_ || !(filter == filter_)) {
+        shown_ = filterLog(lines, filter);
+        filtered_ = true;
+        revision_ = revision;
+        filter_ = filter;
+    }
+    return shown_;
+}
+
 std::vector<size_t> filterLog(const std::vector<LogLine>& lines, const LogFilter& filter) {
     const std::string needle = lowerAscii(trim(filter.search));
     std::vector<size_t> out;

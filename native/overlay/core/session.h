@@ -34,5 +34,7 @@ bool adoptReloaded(Session& s, ControlDoc loaded);
 // 모드가 실행했다고 알린 명령(status.json 의 commands 에 id 가 있다)과, 모드가 버릴 만큼 오래된 명령을 뺀다.
 // 모드는 control.json 을 1초마다 읽으므로, 명령을 한 번만 실으면 그 전에 나간 다음 저장이 명령을 지운다.
 // 모드는 같은 id 를 한 번만 실행하므로 여러 번 실어도 된다.
+// 뺀 것이 있으면 변경 표시를 켠다: 끝난 명령이 파일에 남아 있으면 다음 실행 때 모드가 그것을 오래된 명령으로 다시 보고,
+// 60초 안에 모드가 다시 올라오면 한 번 더 실행한다.
 void dropFinishedCommands(Session& s, const std::vector<std::string>& reportedIds, long long nowEpochSeconds);
 }

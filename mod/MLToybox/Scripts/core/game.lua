@@ -17,17 +17,28 @@ function M.pawn() return firstValid("MyPawnCPP_BP3_C") end
 function M.cheat() return firstValid("MLCheatManager_C") end
 function M.engine() return firstValid("MyRTSMultiEngineCPP_BP_C") end
 
+-- 내 영지 찾기(FindAllOf)는 게임의 모든 객체를 훑는데, 한 번의 게임 스레드 호출 안에서 여러 기능이 각자 부른다.
+-- main.lua 가 그 호출의 시작과 끝을 알려 주면 그 사이에는 한 번만 찾는다(그동안 영지의 주인은 바뀌지 않는다).
+-- 그 밖에서는(맵에 들어갈 때의 enable 등) 부를 때마다 찾는다. 돌려준 목록은 고치지 않는다
+local regionsThisTick = nil   -- nil: 구간 밖. false: 구간 안이고 아직 찾지 않았다
+
+function M.beginTick() regionsThisTick = false end
+function M.endTick() regionsThisTick = nil end
+
 function M.playerRegions()
-  local pawn = M.pawn()
-  if not pawn then return {} end
-  local addr = pawn:GetAddress()
+  if regionsThisTick then return regionsThisTick end
   local out = {}
-  for _, r in ipairs(M.find.all("BP_Region_C")) do
-    if safe.valid(r) then
-      local owner = r.ownerPawn
-      if safe.valid(owner) and owner:GetAddress() == addr then out[#out + 1] = r end
+  local pawn = M.pawn()
+  if pawn then
+    local addr = pawn:GetAddress()
+    for _, r in ipairs(M.find.all("BP_Region_C")) do
+      if safe.valid(r) then
+        local owner = r.ownerPawn
+        if safe.valid(owner) and owner:GetAddress() == addr then out[#out + 1] = r end
+      end
     end
   end
+  if regionsThisTick == false then regionsThisTick = out end
   return out
 end
 

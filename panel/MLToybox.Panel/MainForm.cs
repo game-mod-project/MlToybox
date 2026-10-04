@@ -42,6 +42,7 @@ public sealed class MainForm : Form
     }
 
     private readonly Label _gameDirLabel = new() { AutoSize = true };
+    private readonly Label _noticeLabel = new() { AutoSize = true, ForeColor = Color.Firebrick };
     private readonly Label _stateLabel = new() { AutoSize = true, Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold) };
 
     private readonly CheckBox _resEnabled = new() { Text = "자원 목표값 유지", AutoSize = true };
@@ -179,7 +180,7 @@ public sealed class MainForm : Form
         reload.Click += (_, _) => LoadControlIntoUi();
 
         var top = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(6) };
-        top.Controls.AddRange(new Control[] { _gameDirLabel, changeDir });
+        top.Controls.AddRange(new Control[] { _gameDirLabel, changeDir, _noticeLabel });
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(6), FlowDirection = FlowDirection.RightToLeft };
         bottom.Controls.AddRange(new Control[] { apply, reload, _stateLabel });
 
@@ -285,7 +286,10 @@ public sealed class MainForm : Form
 
     private void LoadControlIntoUi()
     {
-        _control = _bridge?.LoadControl() ?? new ControlDocument();
+        var loaded = _bridge?.LoadControlChecked() ?? (new ControlDocument(), false);
+        _control = loaded.Document;
+        // 읽지 못한 파일은 기본값으로 뜬다. 조용히 뜨면 "적용"이 설정을 기본값으로 덮는 줄 모른다
+        _noticeLabel.Text = loaded.Unreadable ? "control.json 을 읽지 못해 기본값으로 열었습니다. 적용하면 control.json.bak 에 사본을 남기고 덮습니다." : "";
         _lastSentSeq = _control.Seq;
         var f = _control.Features;
         _resEnabled.Checked = f.Resources.Enabled;

@@ -162,6 +162,22 @@ TEST(overlay_bridge_save_keeps_a_copy_of_an_unreadable_file_or_does_not_save) {
     CHECK(readFileShared(b.controlBackupPath()) == "broken again");
 }
 
+// overlay.json 도 손으로 고치다 틀릴 수 있다. 읽을 수 없는 파일로 시작하면 기본값으로 뜨는데,
+// 창을 한 번 옮기면 그 기본값이 파일을 덮는다. 덮기 전에 사본을 남길 수 있어야 한다
+TEST(overlay_bridge_tells_an_unreadable_settings_file_from_a_missing_one) {
+    Bridge b(freshDir("settings"));
+    CHECK(!b.loadSettingsChecked().unreadable);                      // 파일이 없다: 첫 실행
+    CHECK(!b.backupSettings());                                      // 남길 것이 없다
+    writeText(b.settingsPath(), R"({"toggleKey":"F8",)");
+    const LoadedSettings loaded = b.loadSettingsChecked();
+    CHECK(loaded.unreadable && loaded.settings == OverlaySettings());
+    CHECK(b.backupSettings());
+    CHECK(readFileShared(b.settingsBackupPath()) == R"({"toggleKey":"F8",)");
+    writeText(b.settingsPath(), R"({"toggleKey":"F8"})");
+    const LoadedSettings good = b.loadSettingsChecked();
+    CHECK(!good.unreadable && good.settings.toggleKey == "F8");
+}
+
 TEST(overlay_bridge_shared_read_returns_the_bytes_or_nothing) {
     Bridge b(freshDir("shared"));
     CHECK(!readFileShared(b.statusPath()).has_value());

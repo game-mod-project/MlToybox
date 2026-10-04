@@ -15,6 +15,26 @@ T.run({
     local rs = game.playerRegions()
     T.eq(#rs, 1, "one region"); T.eq(rs[1], mine, "mine")
   end,
+  -- FindAllOf 는 게임의 모든 객체를 훑는다. main.lua 가 알려 준 한 번의 게임 스레드 호출 안에서는 내 영지를 한 번만 찾는다
+  player_regions_are_found_once_per_tick = function()
+    local pawn = F.object()
+    local mine = F.object({ ownerPawn = pawn })
+    mine.regionUniqueTag = { ToString = function() return "gold" end }
+    install({ MyPawnCPP_BP3_C = { pawn }, BP_Region_C = { mine } })
+    local scans, all = 0, game.find.all
+    game.find.all = function(c) if c == "BP_Region_C" then scans = scans + 1 end return all(c) end
+    game.playerRegions(); game.playerRegions()
+    T.eq(scans, 2, "outside a tick every call looks again")
+    game.beginTick()
+    T.eq(#game.playerRegions(), 1, "found"); T.eq(#game.regionList(), 1, "listed"); T.eq(game.regionByKey("gold"), mine, "by key")
+    T.eq(scans, 3, "one scan for the whole tick")
+    game.endTick(); game.beginTick()
+    game.playerRegions()
+    T.eq(scans, 4, "the next tick looks again")
+    game.endTick()
+    game.playerRegions()
+    T.eq(scans, 5, "and so does a call after the tick")
+  end,
   player_regions_empty_without_pawn = function()
     install({ BP_Region_C = { F.object({ ownerPawn = F.object() }) } })
     T.eq(#game.playerRegions(), 0, "no pawn -> none")

@@ -15,6 +15,7 @@ bool g_mineOnly = true;      // MLToybox 가 남긴 줄만
 std::string g_search;
 bool g_follow = true;        // 새 줄이 오면 맨 아래로 간다
 size_t g_lastShown = 0;
+LogView g_view;              // 조건에 맞는 줄. 줄이나 조건이 바뀔 때만 다시 거른다
 }
 
 // UE4SS.log 의 끝부분. 모드는 그 파일에 시작·게임 상태·명령 결과·오류를 남긴다(core/log.lua)
@@ -37,7 +38,7 @@ void drawLogTab(TabContext& ctx) {
         if (ImGui::Button("지우기##logsearch")) g_search.clear();
     }
 
-    const std::vector<size_t> shown = filterLog(a.logLines, { g_mineOnly, g_search });
+    const std::vector<size_t>& shown = g_view.shown(a.logLines, a.logRevision, { g_mineOnly, g_search });
     ImGui::SameLine();
     ImGui::TextDisabled("%zu / %zu줄", shown.size(), a.logLines.size());
     if (copy) {

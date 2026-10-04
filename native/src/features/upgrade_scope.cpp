@@ -1,17 +1,13 @@
 #include "features/upgrade_scope.h"
-#include <cstring>
+#include "features/memory.h"
 
 namespace mlt::upgrade_scope {
 
-namespace {
-template <class T> T read(const uint8_t* base, std::ptrdiff_t off) { T v; std::memcpy(&v, base + off, sizeof v); return v; }
-template <class T> void write(uint8_t* base, std::ptrdiff_t off, T v) { std::memcpy(base + off, &v, sizeof v); }
-}
+using mem::read;
+using mem::write;
 
 bool ownedByMainPlayer(const uint8_t* building) {
-    if (!building) return false;
-    const auto owner = reinterpret_cast<const uint8_t*>(read<std::uintptr_t>(building, kBuildingOwnerOffset));
-    return owner && owner[kPawnIsMainPlayerOffset] != 0;
+    return mem::flagBehindPointer(building, kBuildingOwnerOffset, kPawnIsMainPlayerOffset);
 }
 
 RowEdit relaxRow(uint8_t* row) {

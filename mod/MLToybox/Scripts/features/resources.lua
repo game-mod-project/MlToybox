@@ -21,16 +21,7 @@ function M.observe(state)
   M.tick(state, nil)
 end
 
--- 영지 식별자: regionUniqueTag(세이브 간 고정, 예 "hof"), 표시 이름: regionName(플레이어가 바꿀 수 있음)
-local function regionKey(r)
-  local ok, tag = pcall(function() return r.regionUniqueTag:ToString() end)
-  return ok and tag or nil
-end
-
-local function regionName(r)
-  local ok, name = pcall(function() return r.regionName:ToString() end)
-  return ok and name or nil
-end
+local regionKey, regionName = game.regionKey, game.regionName
 
 -- 영지별 목표(regionTargets[영지][자원])가 있으면 그것을, 없으면 공통 목표를 쓴다
 local function targetFor(targets, override, id)

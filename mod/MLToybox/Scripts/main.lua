@@ -43,6 +43,7 @@ local commands = commandsLib.new({
   customizeRetinue = retinueEditor.open,
 }, function(command, result)
   if result.ok then log.info("command %s: ok", tostring(command.type))
+  elseif result.stale then log.info("command %s: ignored (older than %d seconds)", tostring(command.type), commandsLib.MAX_AGE_SEC)
   else log.error("command %s: %s", tostring(command.type), tostring(result.error)) end
 end)
 local appliedSeq = nil
@@ -54,7 +55,10 @@ end
 registry:apply(config.defaults)
 
 RegisterLoadMapPreHook(function()
-  safe.call("core", function() registry:setInGame(false) end)
+  safe.call("core", function()
+    registry:setInGame(false)
+    lord.forget()   -- 모드가 바꿔 둔 국고의 기억은 이 맵의 것이다
+  end)
 end)
 
 RegisterInitGameStatePostHook(function(context)
@@ -71,6 +75,7 @@ LoopAsync(config.pollIntervalMs, function()
   local ok, err = pcall(function()
     local control = bridge:poll()
     ExecuteInGameThread(function()
+      game.beginTick()   -- 이 호출 안에서는 내 영지를 한 번만 찾는다(core/game.lua)
       safe.call("core", function()
         local now = os.time()
         if control then
@@ -98,6 +103,7 @@ LoopAsync(config.pollIntervalMs, function()
         local wrote, werr = bridge:writeStatus(status)
         if not wrote then log.error("status write: %s", tostring(werr)) end
       end)
+      game.endTick()
     end)
   end)
   if not ok then log.error("loop: %s", tostring(err)) end

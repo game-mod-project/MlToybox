@@ -24,7 +24,8 @@ function M.new(handlers, onResult)
         local issued = tonumber(command.issuedAt)
         local handler = self.handlers[command.type]
         if not issued or ctx.now - issued > M.MAX_AGE_SEC then
-          result = { ok = false, error = "stale command (ignored)" }
+          -- 실패가 아니라 무시한 것이다(지난 실행 때의 명령이 파일에 남아 있었다). stale 로 가려 준다
+          result = { ok = false, error = "stale command (ignored)", stale = true }
         elseif not handler then
           result = { ok = false, error = "unknown command: " .. tostring(command.type) }
         else

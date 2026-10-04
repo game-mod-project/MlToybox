@@ -2,6 +2,11 @@ local safe = require("core.safe")
 
 local M = { DEFAULT_INTERVAL = 2 }
 
+-- 실패는 기능의 호출 종류마다 따로 센다(safe 에 주는 이름 = "기능:호출"). 기능 이름 하나로 세면
+-- 매초 성공하는 poll 이 계속 실패하는 tick 의 연속 횟수를 지워, 고장 난 기능이 임계치에 닿지 못한다
+local METHODS = { "enable", "configure", "poll", "tick", "observe" }
+local function countKey(name, method) return name .. ":" .. method end
+
 function M.new()
   local r = {
     features = {}, order = {}, active = {}, settings = {},
@@ -15,17 +20,20 @@ function M.new()
     self.features[name] = feature
     self.order[#self.order + 1] = name
     self.active[name] = false
-    safe.reset(name)
-    safe.onTrip(name, function(err)
-      self.tripped[name] = true
-      self:_deactivate(name, "auto-disabled: " .. tostring(err))
-    end)
+    for _, method in ipairs(METHODS) do
+      local key = countKey(name, method)
+      safe.reset(key)
+      safe.onTrip(key, function(err)
+        self.tripped[name] = true
+        self:_deactivate(name, "auto-disabled: " .. tostring(err))
+      end)
+    end
   end
 
   function r:_invoke(name, method)
     local fn = self.features[name][method]
     if fn == nil then return true end
-    local ok, err = safe.call(name, fn, self.state, self.settings[name])
+    local ok, err = safe.call(countKey(name, method), fn, self.state, self.settings[name])
     if not ok and not self.tripped[name] then self.errors[name] = tostring(err) end
     return ok
   end
@@ -132,7 +140,6 @@ function M.new()
       resourceIds = (type(st.resourceIds) == "table" and #st.resourceIds > 0) and st.resourceIds or nil,
       resources = (type(st.resources) == "table" and next(st.resources)) and st.resources or nil,
       population = st.population,
-      lord = st.lord,
       mercenaries = st.mercenaries,
       regions = (type(st.regions) == "table" and #st.regions > 0) and st.regions or nil,
     }
