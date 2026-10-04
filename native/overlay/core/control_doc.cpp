@@ -241,6 +241,7 @@ PopulationSettings ControlDoc::population() const {
     PopulationSettings v;
     v.enabled = boolOr(f, "enabled", false);
     v.multiplier = intOr(f, "multiplier", 2);
+    v.monthlyFamilies = intOr(f, "monthlyFamilies", 0);
     v.targetFamilies = intOr(f, "targetFamilies", 0);
     v.regionTargets = readIntMap(objectAt(f, "regionTargets"));
     return v;
@@ -250,6 +251,7 @@ void ControlDoc::setPopulation(const PopulationSettings& v) {
     Json& f = feature("population");
     f["enabled"] = v.enabled;
     f["multiplier"] = v.multiplier;
+    f["monthlyFamilies"] = v.monthlyFamilies;
     f["targetFamilies"] = v.targetFamilies;
     f["regionTargets"] = writeIntMap(v.regionTargets);
 }

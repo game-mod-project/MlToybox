@@ -94,7 +94,7 @@ TEST(overlay_view_retinue_label_names_the_unit_count_and_origin) {
 
 TEST(overlay_view_population_scope_and_info) {
     CHECK(populationScopeOptions(nullptr).size() == 1 && populationScopeOptions(nullptr)[0].label == "공통 (모든 내 영지)");
-    CHECK(populationInfo(nullptr, std::nullopt) == std::vector<std::string>{ "현재: - (인구 기능이 꺼져 있거나 게임 밖)" });
+    CHECK(populationInfo(nullptr, std::nullopt) == std::vector<std::string>{ "현재: - (게임에 들어가면 표시됩니다)" });
     PopulationStatus p;
     p.families = 14;
     p.population = 42;
@@ -109,6 +109,8 @@ TEST(overlay_view_population_scope_and_info) {
     CHECK(lines.size() == 2);
     CHECK(lines[0] == "현재(모든 내 영지 합계): 가족 14 · 인구 42 · 집 없는 가족 0 · 빈 자리 3 · 미배치 가족 2");
     CHECK(lines[1] == "이번 세션(전체): 자연 이민 1가족 → 배율로 추가 2가족");
+    p.multiplied = 0;   // 네이티브가 배율을 맡으면 게임이 직접 들인다: 모드가 따로 들인 가족이 없으면 뒤의 말을 뺀다
+    CHECK(populationInfo(&p, std::nullopt)[1] == "이번 세션(전체): 자연 이민 1가족");
     lines = populationInfo(&p, "hof");
     CHECK(lines[0] == "현재(Klainau): 가족 10 · 인구 30 · 집 없는 가족 0 · 빈 자리 3 · 미배치 가족 2");
     CHECK(populationInfo(&p, "gone")[0].find("모든 내 영지 합계") != std::string::npos);   // 사라진 영지는 합계로

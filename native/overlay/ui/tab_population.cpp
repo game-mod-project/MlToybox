@@ -63,7 +63,11 @@ void drawPopulationTab(TabContext& ctx) {
     g_scope = scopes[static_cast<size_t>(scope)].key;   // 골라 둔 영지가 사라졌으면 공통으로 돌아간다
 
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("자연 이민 배율(배):");
+    ImGui::TextUnformatted("월 자연 이민 가족 수(0 = 게임 그대로):");
+    ImGui::SameLine();
+    changed |= numberField("##monthly", p.monthlyFamilies, 0, 31, scaled(50.0f));
+    ImGui::SameLine();
+    ImGui::TextUnformatted("이민 속도 배율(배):");
     ImGui::SameLine();
     changed |= numberField("##multiplier", p.multiplier, 1, 10, scaled(50.0f));
 
@@ -84,7 +88,9 @@ void drawPopulationTab(TabContext& ctx) {
 
     ImGui::Spacing();
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("배율은 영지마다 그 영지의 자연 이민만큼 그 영지에 추가합니다. 가족 추가는 선택한 영지에, 공통이면 빈 자리가 많은 영지부터 들입니다.");
+    ImGui::TextDisabled("월 가족 수와 배율은 내 영지의 자연 이민을 바꿉니다(영지 창의 인구 증가 숫자도 따라 바뀝니다). 월 가족 수는 지지율과 무관하게 매달 그만큼, 배율은 게임의 값에 곱합니다. 월 가족 수를 넣으면 배율은 쓰이지 않습니다.");
+    ImGui::TextDisabled("자연 이민은 그 달에 고르게 나눠 하루 한 가족까지 오고, 빈 주거 공간이 없거나 집 없는 가족이 있으면 오지 않습니다(게임의 규칙).");
+    ImGui::TextDisabled("가족 추가는 선택한 영지에, 공통이면 빈 자리가 많은 영지부터 들입니다.");
     ImGui::TextDisabled("빈 집(가족 0 → 1 → 2 순)에 들어오며 미배치 가족으로 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.");
     ImGui::Spacing();
     for (const std::string& line : populationInfo(live, g_scope)) ImGui::TextUnformatted(line.c_str());
