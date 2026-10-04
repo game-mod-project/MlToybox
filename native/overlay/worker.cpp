@@ -117,6 +117,7 @@ static void readLog(App& a, const Bridge& bridge, LogTail& tail) {
     if (!tail.poll(bridge.ue4ssLogPath())) return;
     std::lock_guard<std::mutex> lock(a.mutex);
     a.logLines = tail.lines();
+    ++a.logRevision;
 }
 
 // 개발·검증용(overlay.json 의 inputLog): 창 스레드가 적어 둔 글쇠 메시지를 bridge/overlay_input.log 에 덧붙인다

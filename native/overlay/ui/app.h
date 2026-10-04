@@ -31,6 +31,7 @@ struct App : Session {
     std::shared_ptr<const ResourceCatalog> catalog;   // 자원 이름 표(bridge/catalog.json). 아직 읽지 못했으면 비어 있다
     std::shared_ptr<const BuildingCatalog> buildings;   // 저장 용량 표의 건물 목록(같은 파일의 buildings). 없으면 비어 있다
     std::vector<LogLine> logLines;             // UE4SS.log 의 끝부분(작업 스레드가 1초마다 이어 읽는다)
+    unsigned long long logRevision = 0;        // logLines 를 바꿀 때마다 올린다([로그] 탭이 그때만 다시 거른다)
     std::vector<std::string> inputLines;       // 개발·검증용(inputLog): 창 스레드가 적어 둔 글쇠 메시지. 작업 스레드가 파일에 쓴다
 
     // --- 잠금 없이 읽고 쓴다 ---

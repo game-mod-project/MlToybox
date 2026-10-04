@@ -42,7 +42,22 @@ private:
 struct LogFilter {
     bool mineOnly = false;
     std::string search;   // 시각과 글에서 찾는다. 앞뒤 공백은 빼고, 영문 대소문자는 가리지 않는다
+
+    bool operator==(const LogFilter&) const = default;
 };
 // 조건에 맞는 줄의 번호(오래된 줄부터)
 std::vector<size_t> filterLog(const std::vector<LogLine>& lines, const LogFilter& filter);
+
+// [로그] 탭이 보여 줄 줄. 화면은 프레임마다 그려지므로, 줄 목록이나 조건이 바뀌었을 때만 다시 거른다
+class LogView {
+public:
+    // revision: 줄 목록이 바뀔 때마다 달라지는 수(ui/app.h 의 App::logRevision). 같은 수면 줄 목록이 그대로라고 본다
+    const std::vector<size_t>& shown(const std::vector<LogLine>& lines, unsigned long long revision, const LogFilter& filter);
+
+private:
+    bool filtered_ = false;
+    unsigned long long revision_ = 0;
+    LogFilter filter_;
+    std::vector<size_t> shown_;
+};
 }
