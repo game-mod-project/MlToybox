@@ -84,14 +84,45 @@ function M.enable(state)
   state.population = nil
 end
 
+-- 영지 하나의 지금 값
+local function entryOf(r, key)
+  return {
+    key = key, name = regionName(r) or key,
+    families = r:getTotalNumFamilies(), population = r:getNumTotalPopulation(),
+    homeless = r:getNumHomelessFamilies(), freeSlots = freeSlotsOf(housesOf(r)),
+    unassigned = r:getNumUnassignedFamilies(),
+  }
+end
+
+-- 영지별 값과 합계를 state.population 에 적는다(키가 없는 영지는 합계에만 든다)
+local function publish(state, entries)
+  local totals = { families = 0, population = 0, homeless = 0, freeSlots = 0, unassigned = 0 }
+  local perRegion = {}
+  for _, entry in ipairs(entries) do
+    if entry.key then perRegion[#perRegion + 1] = entry end
+    for k in pairs(totals) do totals[k] = totals[k] + entry[k] end
+  end
+  totals.natural = state.populationNatural or 0        -- 이번 세션 누계
+  totals.multiplied = state.populationMultiplied or 0
+  totals.regions = perRegion
+  state.population = totals
+end
+
+-- 꺼져 있는 동안 registry 가 부른다. [인구] 탭이 지금 값을 보이도록 읽기만 한다(가족을 들이지 않는다).
+-- 배율의 기준(populationLast)은 두지 않는다: 다시 켜면 enable 이 기준을 비우므로, 꺼져 있는 동안 늘어난 가족에는 배율이 걸리지 않는다
+function M.observe(state)
+  local entries = {}
+  for _, r in ipairs(game.playerRegions()) do entries[#entries + 1] = entryOf(r, regionKey(r)) end
+  publish(state, entries)
+end
+
 function M.tick(state, settings)
   local multiplier = math.min(M.MAX_MULTIPLIER, math.max(1, math.floor(tonumber(settings.multiplier) or 1)))
   local common = tonumber(settings.targetFamilies)
   local overrides = settings.regionTargets or {}
   state.populationLast = state.populationLast or {}
 
-  local totals = { families = 0, population = 0, homeless = 0, freeSlots = 0, unassigned = 0 }
-  local perRegion = {}
+  local entries = {}
   for _, r in ipairs(game.playerRegions()) do
     local key = regionKey(r)
     local families = r:getTotalNumFamilies()
@@ -110,24 +141,14 @@ function M.tick(state, settings)
       if current < target then M.addFamilies(target - current, key) end
     end
 
-    local entry = {
-      key = key, name = regionName(r) or key,
-      families = r:getTotalNumFamilies(), population = r:getNumTotalPopulation(),
-      homeless = r:getNumHomelessFamilies(), freeSlots = freeSlotsOf(housesOf(r)),
-      unassigned = r:getNumUnassignedFamilies(),
-    }
+    local entry = entryOf(r, key)
     if key then
       state.populationLast[key] = entry.families
       modAdded[key] = 0
-      perRegion[#perRegion + 1] = entry
     end
-    for k in pairs(totals) do totals[k] = totals[k] + entry[k] end
+    entries[#entries + 1] = entry
   end
-
-  totals.natural = state.populationNatural or 0        -- 이번 세션 누계
-  totals.multiplied = state.populationMultiplied or 0
-  totals.regions = perRegion
-  state.population = totals
+  publish(state, entries)
 end
 
 -- 일회성 명령 addFamilies { count, region? } (core.commands 처리기). region 이 없으면 빈 자리가 많은 영지부터
