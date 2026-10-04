@@ -39,11 +39,7 @@ bool isLordWide(std::string_view id) {
 }
 
 std::vector<ScopeOption> resourceScopeOptions(const StatusDoc* status) {
-    std::vector<ScopeOption> options = { { std::nullopt, "공통 (모든 내 영지, 현재=합계)" } };
-    if (status && status->regions) {
-        for (const RegionResources& r : *status->regions) options.push_back({ r.key, regionLabel(r.name, r.key) });
-    }
-    return options;
+    return commonAndRegionOptions(status && status->regions ? &*status->regions : nullptr, "공통 (모든 내 영지, 현재=합계)");
 }
 
 const std::map<std::string, double>* resourceCurrent(const StatusDoc* status, const std::optional<std::string>& key) {

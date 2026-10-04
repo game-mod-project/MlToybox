@@ -149,3 +149,27 @@ TEST(create_failure_reported_and_never_enabled) {
     m.sync(on, be);
     CHECK(!m.states()[0].installed && m.states()[0].error == "MH_ERROR" && be.toggles.empty());
 }
+
+namespace {
+std::string fragmentA() { return "\"a\":1"; }
+std::string fragmentNone() { return ""; }
+std::string fragmentB() { return "\"b\":[2]"; }
+}
+
+// 기능이 상태 파일에 값을 싣는 자리: 설치된 항목의 조각만, 빈 것은 빼고 쉼표로 잇는다
+TEST(extras_join_the_status_fragments_of_installed_entries) {
+    std::array<uint8_t, 8> text{ 0xAA, 0xBB, 0x90, 0xCC, 0xDD, 0x90, 0xEE, 0xFF };
+    HookManager m; FakeBackend be;
+    HookSpec a{ "a", "AA BB", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    a.status = &fragmentA;
+    HookSpec none{ "none", "CC DD", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    none.status = &fragmentNone;
+    HookSpec missing{ "missing", "12 34", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    missing.status = &fragmentB;                    // 설치되지 않는 항목: 불리지 않는다
+    HookSpec b{ "b", "EE FF", reinterpret_cast<void*>(&detour), &g_orig, &wantsBuild };
+    b.status = &fragmentB;
+    m.add(a); m.add(none); m.add(missing); m.add(b);
+    CHECK(m.extras().empty());                      // 설치하기 전
+    m.installAll(text, 0, be);
+    CHECK(m.extras() == "\"a\":1,\"b\":[2]");
+}

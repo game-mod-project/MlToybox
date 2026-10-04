@@ -112,13 +112,16 @@ struct MoodSettings {
 };
 
 // 영지: 가축 상인 대기와 자원 매장지의 최소 매장량. 패널에는 화면이 없고 설정만 보존한다(Panel.Core 의 RegionControl).
-// 광물(소금·철·점토)의 목표는 네이티브 DLL(src/control.cpp)이 같은 설정에서 읽는다
+// 광물(소금·철·점토)의 목표와 richDeposits 는 네이티브 DLL(src/control.cpp)이 같은 설정에서 읽는다
 struct RegionSettings {
     bool enabled = false;
     int intervalSec = 5;
     bool noLivestockWait = false;                                     // 가축을 주문한 뒤의 대기("상인 방문까지")를 없앤다
+    bool richDeposits = false;                                        // 내 영지의 소금·철·점토·돌 매장지를 풍부하게(무한 지하 매장지)
     std::map<std::string, int> targets;                               // 종류 이름 → 매장지 하나의 최소 양. 키가 없으면 채우지 않는다
     std::map<std::string, std::map<std::string, int>> regionTargets;  // 영지 키 → 종류별 값(0 = 그 영지는 채우지 않는다). 없는 종류는 공통을 따른다
+
+    bool operator==(const RegionSettings&) const = default;
 };
 
 struct MercSettings {

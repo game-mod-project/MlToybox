@@ -1,4 +1,5 @@
 #pragma once
+#include "features/region_scope.h"
 #include "hooks.h"
 #include <cstddef>
 #include <cstdint>
@@ -16,14 +17,11 @@ namespace mlt::mood {
 constexpr const char* kApprovalPattern = "40 55 53 57 41 55 48 8D AC 24 48 FF FF FF 48 81 EC B8 01 00 00";
 // void ARegion::updatePublicOrder() (구현 0x144BD7FA0)
 constexpr const char* kOrderPattern = "48 8B C4 48 89 58 20 55 56 57 41 56 41 57 48 8D 68 A1";
-// void ARegion::addProblem(EProblem, void*, void*) (구현 0x144BC2ED0). 후킹하지 않고 주소만 찾는다
-constexpr const char* kAddProblemPattern =
-    "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 54 41 56 41 57 48 83 EC 20 4C 8D A1 68 0D 00 00";
+// void ARegion::addProblem(EProblem, void*, void*) (구현 0x144BC2ED0). 후킹하지 않고 주소만 찾는다.
+// 다른 기능이 영지의 주인 오프셋을 확인할 때 찾는 함수와 같다
+constexpr const char* kAddProblemPattern = region_scope::kOwnerCheckPattern;
 // void ARegion::removeProblem(EProblem, void*, void*) (구현 0x144BF1C40). 주소만 찾는다
 constexpr const char* kRemoveProblemPattern = "48 83 EC 28 4D 8B D9 45 33 D2";
-// bool FName == const char* (구현 0x14124BB30). 영지의 태그를 설정의 영지 키와 견줄 때 부른다. 주소만 찾는다
-constexpr const char* kNameEqualsPattern =
-    "48 89 5C 24 18 48 89 74 24 20 57 48 83 EC 20 48 8B F2 48 8B D9 48 85 D2 0F 84 ?? ?? ?? ?? 48 C7 C7 FF FF FF FF 48 FF C7 80 3C 3A 00";
 
 // 한 값(자격 또는 공공질서)의 자리. 요인 목록은 TArray<FApprovalMemory>(원소 0x18, 효과는 +0x14)다
 struct StatLayout {
@@ -37,9 +35,8 @@ constexpr StatLayout kOrder{ 0x1084, 0x1098, 100.0f, false };    // ARegion::pub
 constexpr std::ptrdiff_t kFactorSize = 0x18, kFactorEffectOffset = 0x14;
 constexpr std::ptrdiff_t kRegionPoliciesOffset = 0xCF8;          // 정책 효과 목록(리플렉션에 없음). 원소 0xC, 효과는 +4
 constexpr std::ptrdiff_t kPolicySize = 0xC, kPolicyEffectOffset = 4;
-constexpr std::ptrdiff_t kRegionOwnerOffset = 0x350;             // APawnCPP* ARegion::ownerPawn
-constexpr std::ptrdiff_t kPawnIsMainPlayerOffset = 0x34C;        // bool APawnCPP::isMainPlayer
-constexpr std::ptrdiff_t kRegionTagOffset = 0x2B0;               // FName ARegion::regionUniqueTag
+constexpr std::ptrdiff_t kRegionOwnerOffset = region_scope::kRegionOwnerOffset;             // 이 기능의 본문 검사로도 확인한다
+constexpr std::ptrdiff_t kPawnIsMainPlayerOffset = region_scope::kPawnIsMainPlayerOffset;
 constexpr int kMaxGood = 10;
 constexpr int kLowApproval = 25;          // 게임이 "자격 낮음" 문제를 넣는 경계(이 값 미만)
 constexpr uint8_t kProblemLowApproval = 38;   // EProblem::LowApproval
@@ -61,9 +58,6 @@ int decide(int game, float base, std::span<const float> effects, bool readable, 
 
 // 영지의 요인 효과를 out 에 모은다(자격은 정책 효과까지). 목록의 개수나 포인터가 말이 안 되면 false
 bool readEffects(const uint8_t* region, const StatLayout& layout, std::vector<float>& out);
-
-// 영지의 주인이 플레이어인가
-bool ownedByMainPlayer(const uint8_t* region);
 
 // 그 영지에 쓸 설정. isRegion(key) 가 참인 영지 설정이 있으면 그것, 없으면(또는 영지를 가릴 수 없으면) 공통 설정
 const MoodSet& pick(const MoodControl& control, const std::function<bool(const std::string&)>& isRegion);

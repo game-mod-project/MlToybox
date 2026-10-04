@@ -40,6 +40,7 @@ struct MineralTargets {
 };
 struct RegionControl {
     bool enabled = false;
+    bool rich = false;                                              // 내 영지의 소금·철·점토·돌 매장지를 풍부하게(features.region.richDeposits)
     MineralTargets common;                                          // 내 영지 전체
     std::vector<std::pair<std::string, MineralTargets>> regions;    // 영지 키(regionUniqueTag) → 그 영지의 목표
     bool operator==(const RegionControl&) const = default;

@@ -1,6 +1,5 @@
 #include "runtime.h"
 #include "control.h"
-#include "features/deposits.h"
 #include "hooks.h"
 #include "probe.h"
 #include "status.h"
@@ -121,7 +120,7 @@ void runWorker(void* selfModule) {
             if (auto c = parseControl(*s)) control = *c;   // 깨진 파일이면 직전 값 유지
         }
         hooks.sync(control, backend);
-        writeFileAtomic(bridge / L"native_status.json", renderStatus(nowEpochSeconds(), control.seq, hooks.states(), deposits::snapshotJson()));
+        writeFileAtomic(bridge / L"native_status.json", renderStatus(nowEpochSeconds(), control.seq, hooks.states(), hooks.extras()));
         Sleep(1000);
     }
 }

@@ -49,11 +49,7 @@ std::string retinueLabel(const RetinueSquad& squad) {
 }
 
 std::vector<ScopeOption> populationScopeOptions(const PopulationStatus* population) {
-    std::vector<ScopeOption> options = { { std::nullopt, "공통 (모든 내 영지)" } };
-    if (population) {
-        for (const PopulationRegion& r : population->regions) options.push_back({ r.key, regionLabel(r.name, r.key) });
-    }
-    return options;
+    return commonAndRegionOptions(population ? &population->regions : nullptr);
 }
 
 std::vector<std::string> populationInfo(const PopulationStatus* population, const std::optional<std::string>& regionKey) {
@@ -81,11 +77,7 @@ std::vector<std::string> populationInfo(const PopulationStatus* population, cons
 }
 
 std::vector<ScopeOption> moodScopeOptions(const MoodStatus* mood) {
-    std::vector<ScopeOption> options = { { std::nullopt, "공통 (모든 내 영지)" } };
-    if (mood) {
-        for (const MoodRegion& r : mood->regions) options.push_back({ r.key, regionLabel(r.name, r.key) });
-    }
-    return options;
+    return commonAndRegionOptions(mood ? &mood->regions : nullptr);
 }
 
 std::vector<std::string> moodLines(const MoodStatus* mood) {
@@ -98,20 +90,30 @@ std::vector<std::string> moodLines(const MoodStatus* mood) {
     return lines;
 }
 
-std::string moodNativeNote(const NativeStatus* native) {
-    if (!native) return "";
-    const auto installed = [native](const char* name) {
+std::optional<bool> nativeInstalled(const NativeStatus* native, std::initializer_list<const char*> names) {
+    if (!native) return std::nullopt;
+    if (!native->loaded) return false;
+    if (native->stale || native->features.empty()) return std::nullopt;   // 상태 파일을 아직 못 읽었거나 오래됐다
+    for (const char* name : names) {
         const auto it = native->features.find(name);
-        return native->loaded && it != native->features.end() && it->second.installed;
-    };
+        if (it == native->features.end() || !it->second.installed) return false;
+    }
+    return true;
+}
+
+std::string moodNativeNote(const NativeStatus* native) {
     // 계산 함수 둘을 맡지 못하면 배율을 걸 수 없다. 고정값은 Lua 가 써 넣어 유지한다
-    if (!installed("mood_approval") || !installed("mood_order")) {
-        return "네이티브 DLL 이 게임의 계산을 맡지 못했습니다(게임이 업데이트됐을 수 있습니다). 배율은 적용되지 않고 고정값만 모드가 써 넣어 유지합니다. "
-               "게임이 하루에 한 번 다시 계산할 때 잠깐 게임의 값이 보일 수 있습니다.";
+    const std::optional<bool> hooks = nativeInstalled(native, { "mood_approval", "mood_order" });
+    if (!hooks) return "";
+    if (!*hooks) {
+        return "네이티브 DLL 이 게임의 계산을 맡지 못했습니다(게임이 업데이트됐을 수 있습니다). 배율은 적용되지 않고 고정값만 모드가 2초마다 다시 써 넣습니다. "
+               "게임이 하루에 한 번 다시 계산할 때 잠깐 게임의 값이 보이고, 그 값이 낮으면 \"자격 매우 낮음\" 알림과 \"자격 낮음\" 문제가 날마다 생길 수 있습니다.";
     }
     std::string note;
-    if (!installed("mood_region_name")) note += "영지를 가리는 게임 함수를 찾지 못해 영지별 설정이 온전히 적용되지 않습니다(게임이 다시 계산할 때는 공통 설정이 쓰입니다). ";
-    if (!installed("mood_problem_add") || !installed("mood_problem_remove")) note += "\"자격 낮음\" 문제 표시는 게임이 계산한 값을 따릅니다.";
+    if (nativeInstalled(native, { "region_name", "region_tag" }) == false) {
+        note += "영지를 가리는 게임 코드를 찾지 못해 영지별 설정이 온전히 적용되지 않습니다(게임이 다시 계산할 때는 공통 설정이 쓰입니다). ";
+    }
+    if (nativeInstalled(native, { "mood_problem_add", "mood_problem_remove" }) == false) note += "\"자격 낮음\" 문제 표시는 게임이 계산한 값을 따릅니다.";
     return note;
 }
 

@@ -50,10 +50,6 @@ bool readEffects(const uint8_t* region, const StatLayout& layout, std::vector<fl
     return !layout.policies || appendEffects(region, kRegionPoliciesOffset, kPolicySize, kPolicyEffectOffset, out);
 }
 
-bool ownedByMainPlayer(const uint8_t* region) {
-    return mem::flagBehindPointer(region, kRegionOwnerOffset, kPawnIsMainPlayerOffset);
-}
-
 const MoodSet& pick(const MoodControl& control, const std::function<bool(const std::string&)>& isRegion) {
     if (isRegion) {
         for (const auto& [key, set] : control.regions) if (isRegion(key)) return set;
@@ -86,10 +82,8 @@ ProblemAction problemAction(int game, int value) {
 
 namespace {
 using ProblemFn = void(__fastcall*)(void* region, uint8_t type, void* a, void* b);
-using NameEqualsFn = bool(__fastcall*)(uint64_t name, const char* text);
 UpdateFn g_updateApproval = nullptr, g_updateOrder = nullptr;
 ProblemFn g_addProblem = nullptr, g_removeProblem = nullptr;
-NameEqualsFn g_nameEquals = nullptr;
 
 // 작업 스레드가 설정을 바꾸고 게임 스레드의 detour 가 읽는다. 하루에 영지마다 한 번 읽으므로 잠금으로 충분하다
 std::mutex g_mutex;
@@ -101,15 +95,14 @@ MoodSet settingsFor(const uint8_t* region) {
         std::lock_guard lock(g_mutex);
         control = g_control;
     }
-    // 이름을 견주는 게임 함수를 못 찾았으면 영지를 가릴 수 없다. 공통 설정만 쓴다
-    if (!g_nameEquals) return pick(*control, nullptr);
-    const uint64_t tag = mem::read<uint64_t>(region, kRegionTagOffset);
-    return pick(*control, [tag](const std::string& key) { return g_nameEquals(tag, key.c_str()); });
+    // 영지를 가릴 수 없으면(이름 비교 함수나 태그의 자리를 확인하지 못했다) 공통 설정만 쓴다
+    if (!region_scope::canTellRegions()) return pick(*control, nullptr);
+    return pick(*control, [region](const std::string& key) { return region_scope::tagIs(region, key); });
 }
 
 void __fastcall ApprovalDetour(void* region) {
     auto* r = static_cast<uint8_t*>(region);
-    if (!ownedByMainPlayer(r)) { g_updateApproval(region); return; }
+    if (!region_scope::ownedByMainPlayer(r)) { g_updateApproval(region); return; }
     const MoodStat stat = settingsFor(r).approval;
     if (stat.neutral()) { g_updateApproval(region); return; }
     const Outcome out = runUpdate(r, kApproval, stat, g_updateApproval);
@@ -124,7 +117,7 @@ void __fastcall ApprovalDetour(void* region) {
 
 void __fastcall OrderDetour(void* region) {
     auto* r = static_cast<uint8_t*>(region);
-    if (!ownedByMainPlayer(r)) { g_updateOrder(region); return; }
+    if (!region_scope::ownedByMainPlayer(r)) { g_updateOrder(region); return; }
     const MoodStat stat = settingsFor(r).order;
     if (stat.neutral()) { g_updateOrder(region); return; }
     runUpdate(r, kOrder, stat, g_updateOrder);
@@ -184,13 +177,7 @@ void registerHook(HookManager& manager) {
     };
     remove.bodyWindow = 0x100;
     manager.add(remove);
-
-    HookSpec name{ "mood_region_name", kNameEqualsPattern, nullptr, reinterpret_cast<void**>(&g_nameEquals), &wanted };
-    name.bodyChecks = {
-        "80 3A 5F",                              // cmp byte [rdx],5Fh             글자열의 첫 글자를 본다(두 번째 인수가 const char*)
-    };
-    name.bodyWindow = 0x60;
-    manager.add(name);
+    // 영지를 설정의 영지 키와 견주는 것은 features/region_scope 의 region_name, region_tag 가 맡는다
 }
 
 }

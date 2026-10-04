@@ -10,14 +10,11 @@ namespace {
 template <class T> void put(uint8_t* base, std::ptrdiff_t off, T v) { std::memcpy(base + off, &v, sizeof v); }
 template <class T> T get(const uint8_t* base, std::ptrdiff_t off) { T v; std::memcpy(&v, base + off, sizeof v); return v; }
 
-struct FakePawn { alignas(8) uint8_t bytes[0x350]{}; };
-
 // 영지: 자격·공공질서 값과, 요인 목록 둘(원소 0x18, 효과는 +0x14), 정책 효과 목록(원소 0xC, 효과는 +4)
 struct FakeRegion {
     alignas(8) uint8_t bytes[0x1100]{};
     std::vector<uint8_t> approvalFactors, orderFactors, policies;
 
-    void setOwner(FakePawn* p) { put(bytes, mood::kRegionOwnerOffset, reinterpret_cast<std::uintptr_t>(p)); }
     void setArray(std::ptrdiff_t off, std::vector<uint8_t>& store, std::ptrdiff_t elem, std::ptrdiff_t valueOff, std::initializer_list<float> values) {
         store.assign(values.size() * elem, 0);
         size_t i = 0;
@@ -170,18 +167,6 @@ TEST(mood_low_approval_problem_follows_the_changed_value) {
     CHECK(mood::problemAction(24, 25) == mood::ProblemAction::Remove);
 }
 
-TEST(mood_only_touches_regions_of_the_main_player) {
-    FakePawn me, lord;
-    me.bytes[mood::kPawnIsMainPlayerOffset] = 1;
-    FakeRegion r;
-    r.setOwner(&me);
-    CHECK(mood::ownedByMainPlayer(r.bytes));
-    r.setOwner(&lord);
-    CHECK(!mood::ownedByMainPlayer(r.bytes));
-    r.setOwner(nullptr);
-    CHECK(!mood::ownedByMainPlayer(r.bytes));
-}
-
 TEST(mood_region_settings_replace_the_common_ones_for_that_region) {
     MoodControl c;
     c.common.approval = MoodStat{ 0, 2, 50 };
@@ -195,16 +180,16 @@ TEST(mood_region_settings_replace_the_common_ones_for_that_region) {
     CHECK(mood::pick(c, nullptr).approval.good == 2);             // 영지를 가릴 수 없으면 공통
 }
 
-TEST(mood_registers_two_hooks_and_three_address_only_functions) {
+TEST(mood_registers_two_hooks_and_two_address_only_functions) {
+    // 영지를 설정의 영지 키와 견주는 항목(region_name, region_tag)은 features/region_scope 가 등록한다
     HookManager m;
     mood::registerHook(m);
     auto s = m.states();
-    CHECK(s.size() == 5);
+    CHECK(s.size() == 4);
     CHECK(s[0].name == "mood_approval");
     CHECK(s[1].name == "mood_order");
     CHECK(s[2].name == "mood_problem_add");
     CHECK(s[3].name == "mood_problem_remove");
-    CHECK(s[4].name == "mood_region_name");
 }
 
 TEST(control_reads_the_mood_settings) {
@@ -232,6 +217,15 @@ TEST(control_mood_is_neutral_when_off_missing_or_malformed) {
     CHECK(c.has_value());
     CHECK(c->mood.common.approval.fixed == 100 && c->mood.common.approval.good == 10 && c->mood.common.approval.bad == 0);
     CHECK(c->mood.common.order.fixed == 0 && c->mood.common.order.good == 1 && c->mood.common.order.bad == 100);
+}
+
+TEST(control_mood_skips_region_entries_that_are_not_objects) {
+    // Lua 와 오버레이는 객체가 아닌 영지 항목을 없는 것으로 본다(그 영지는 공통 설정을 따른다). 네이티브가 그것을
+    // "따로 지정한 게임 그대로"로 읽으면 그 영지에만 공통 설정이 듣지 않는다
+    auto c = parseControl(R"({"version":1,"seq":9,"features":{"mood":{"enabled":true,"approval":{"good":3},
+        "regions":{"eich":7,"imm":"x","hof":{}}}}})");
+    CHECK(c.has_value());
+    CHECK(c->mood.regions.size() == 1 && c->mood.regions[0].first == "hof");
 }
 
 TEST(control_mood_settings_compare_equal_only_when_the_same) {

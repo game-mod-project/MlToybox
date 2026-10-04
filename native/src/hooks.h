@@ -20,6 +20,8 @@ struct HookSpec {
     // (detour 가 의존하는 필드 오프셋을 쓰는 명령). 게임 업데이트 뒤 같은 프롤로그의 다른 함수에 설치되는 것을 막는다.
     std::vector<std::string> bodyChecks = {};
     size_t bodyWindow = 0x200;
+    // 상태 파일에 덧붙일 JSON 조각("이름":값 꼴)을 돌려준다. 설치된 항목만 불린다. 덧붙일 것이 없으면 빈 글
+    std::string (*status)() = nullptr;
 };
 
 class HookBackend {
@@ -35,6 +37,8 @@ public:
     void installAll(std::span<const uint8_t> text, uintptr_t textAddress, HookBackend& backend);
     void sync(const NativeControl& control, HookBackend& backend);
     std::vector<FeatureState> states() const;
+    // 설치된 항목들의 상태 조각을 쉼표로 이은 것(renderStatus 의 extra)
+    std::string extras() const;
 private:
     struct Entry { HookSpec spec; void* target = nullptr; FeatureState state; };
     std::vector<Entry> entries_;
