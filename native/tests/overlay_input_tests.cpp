@@ -110,17 +110,41 @@ TEST(overlay_input_swallows_only_what_the_overlay_wants) {
 
     f.send(WM_KEYDOWN, 'A', 0x00000001);                          // 입력 칸에 커서가 없다: 게임이 받는다
     f.send(WM_CHAR, 'a', 0x00000001);
-    CHECK(g_reached[WM_KEYDOWN] == 1 && g_reached[WM_CHAR] == 1);
+    f.send(WM_KEYUP, 'A', 0xC0000001);
+    CHECK(g_reached[WM_KEYDOWN] == 1 && g_reached[WM_CHAR] == 1 && g_reached[WM_KEYUP] == 1);
     f.a.wantKeyboard = true;                                      // 입력 칸에 커서가 있다
     f.send(WM_KEYDOWN, 'A', 0x00000001);
     f.send(WM_CHAR, 'a', 0x00000001);
     f.send(WM_KEYUP, 'A', 0xC0000001);
-    CHECK(g_reached[WM_KEYDOWN] == 1 && g_reached[WM_CHAR] == 1 && g_reached[WM_KEYUP] == 0);
+    CHECK(g_reached[WM_KEYDOWN] == 1 && g_reached[WM_CHAR] == 1 && g_reached[WM_KEYUP] == 1);
 
     f.a.visible = false;                                          // 닫혀 있으면 직전 프레임의 값이 남아 있어도 넘긴다
     f.send(WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(10, 10));
     f.send(WM_KEYDOWN, 'A', 0x00000001);
     CHECK(g_reached[WM_LBUTTONDOWN] == 2 && g_reached[WM_KEYDOWN] == 2);
+}
+
+// 게임에서 누르고 있던 키(카메라 이동의 W, Shift 등)를 오버레이가 키보드를 잡은 뒤에 떼면, 그 뗌은 게임이 받아야 한다.
+// 삼키면 게임에서 그 키가 눌린 채로 남는다. 오버레이가 삼킨 누름의 뗌은 넘기지 않는다
+TEST(overlay_input_passes_the_release_of_a_key_the_game_saw_go_down) {
+    Fixture f;
+    f.send(WM_KEYDOWN, 'W', 0x00000001);                          // 게임이 받는다
+    CHECK(g_reached[WM_KEYDOWN] == 1);
+    f.a.wantKeyboard = true;                                      // 누른 채로 입력 칸을 눌렀다
+    f.send(WM_KEYDOWN, 'W', 0x40000001);                          // 누르고 있는 동안의 반복은 오버레이의 것
+    f.send(WM_KEYDOWN, 'D', 0x00000001);                          // 입력 칸에 친 글쇠
+    f.send(WM_KEYUP, 'D', 0xC0000001);
+    CHECK(g_reached[WM_KEYDOWN] == 1 && g_reached[WM_KEYUP] == 0);
+    f.send(WM_KEYUP, 'W', 0xC0000001);                            // 게임이 본 누름의 뗌
+    CHECK(g_reached[WM_KEYUP] == 1);
+    f.send(WM_KEYUP, 'W', 0xC0000001);                            // 한 번만 넘긴다
+    CHECK(g_reached[WM_KEYUP] == 1);
+
+    f.a.visible = false;                                          // 창이 닫혀 있을 때 누른 키도 같다
+    f.send(WM_SYSKEYDOWN, VK_MENU, 0x20000001);
+    f.a.visible = true;
+    f.send(WM_SYSKEYUP, VK_MENU, 0xC0000001);
+    CHECK(g_reached[WM_SYSKEYDOWN] == 1 && g_reached[WM_SYSKEYUP] == 1);
 }
 
 // 버튼을 누른 채 창을 닫으면 백엔드가 잡은 마우스를 놓아야 한다(안 그러면 다시 열 때 창이 마우스에 붙어 끌린다)

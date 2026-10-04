@@ -2,6 +2,7 @@
 #include "guard.h"
 #include "overlay/ui/app.h"
 #include <atomic>
+#include <bitset>
 #include <cstdio>
 #include <exception>
 #include <imgui.h>
@@ -24,6 +25,20 @@ std::atomic<BOOL(WINAPI*)(POINT*)> g_cursorSource{nullptr};   // 테스트가 �
 
 // --- 아래는 창 스레드만 쓴다
 bool g_wasVisible = false;
+// 게임이 눌린 것으로 알고 있는 키: 누름을 게임에 넘겼고 뗌은 아직 넘기지 않았다
+std::bitset<256> g_gameKeysDown;
+
+bool isKeyDown(UINT msg) { return msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN; }
+bool isKeyUp(UINT msg) { return msg == WM_KEYUP || msg == WM_SYSKEYUP; }
+
+// 메시지를 게임(원래 창 프로시저)에 넘긴다. 게임이 본 키의 누름과 뗌을 적어 둔다
+LRESULT passToGame(WNDPROC original, HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (wParam < g_gameKeysDown.size()) {
+        if (isKeyDown(msg)) g_gameKeysDown.set(wParam);
+        else if (isKeyUp(msg)) g_gameKeysDown.reset(wParam);
+    }
+    return CallWindowProcW(original, hwnd, msg, wParam, lParam);
+}
 
 struct InputArgs {
     HWND hwnd;
@@ -126,10 +141,10 @@ LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
     App& a = app();
     const WNDPROC original = g_original.load();
     // 오버레이가 그릴 수 없는 상태면 토글 키를 포함해 아무것도 가로채지 않는다
-    if (a.state.load() != OverlayState::Ready) return CallWindowProcW(original, hwnd, msg, wParam, lParam);
+    if (a.state.load() != OverlayState::Ready) return passToGame(original, hwnd, msg, wParam, lParam);
 
-    const bool keyDown = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
-    const bool keyUp = msg == WM_KEYUP || msg == WM_SYSKEYUP;
+    const bool keyDown = isKeyDown(msg);
+    const bool keyUp = isKeyUp(msg);
     const bool toggleKey = static_cast<int>(wParam) == a.toggleVk.load();
     if (toggleKey && keyDown) {
         if (!(lParam & (1LL << 30))) a.visible = !a.visible.load();   // 누르고 있는 동안의 반복 입력은 무시
@@ -157,9 +172,14 @@ LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
         const bool mouse = msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST;
         const bool key = msg >= WM_KEYFIRST && msg <= WM_KEYLAST;
-        if ((mouse && a.wantMouse.load()) || (key && a.wantKeyboard.load())) return 0;   // 창이 먹은 입력은 게임에 넘기지 않는다
+        if ((mouse && a.wantMouse.load()) || (key && a.wantKeyboard.load())) {
+            // 창이 먹은 입력은 게임에 넘기지 않는다. 다만 게임이 눌린 것으로 알고 있는 키의 뗌은 넘긴다:
+            // 삼키면 게임에서 그 키가 눌린 채로 남는다(W 를 누른 채 입력 칸을 누르면 카메라가 계속 움직인다)
+            const bool releaseForGame = keyUp && wParam < g_gameKeysDown.size() && g_gameKeysDown.test(wParam);
+            if (!releaseForGame) return 0;
+        }
     }
-    return CallWindowProcW(original, hwnd, msg, wParam, lParam);
+    return passToGame(original, hwnd, msg, wParam, lParam);
 }
 }
 
@@ -177,6 +197,7 @@ bool installWndProc(HWND hwnd) {
     // 읽은 뒤 바꾸기 전에 다른 프로그램이 프로시저를 바꿨다면, 우리가 실제로 갈아 끼운 것은 그쪽 것이다. 그것을 이어 부른다
     if (replaced != current) g_original = reinterpret_cast<WNDPROC>(replaced);
     g_hooked = hwnd;
+    g_gameKeysDown.reset();   // 새 창이다. 앞 창에서 본 키는 잊는다
     return true;
 }
 
