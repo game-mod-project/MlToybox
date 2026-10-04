@@ -15,7 +15,7 @@ void drawBuildTab(TabContext& ctx) {
     changed |= ImGui::Checkbox("지역당 개수 제한 해제", &b.noRegionLimit);
     ImGui::Indent();
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("영주 저택 모듈·세금 징수소·장작/식량 수레. 끈 뒤에는 게임을 다시 켜야 원래대로");
+    ImGui::TextDisabled("영주 저택 모듈·세금 징수소·장작/식량 수레");
     ImGui::PopTextWrapPos();
     ImGui::Unindent();
     if (changed) {
