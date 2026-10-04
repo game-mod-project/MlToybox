@@ -1,18 +1,12 @@
 #include "features/immigration.h"
+#include "features/memory.h"
 #include <algorithm>
 #include <atomic>
-#include <cstring>
 
 namespace mlt::immigration {
 
-namespace {
-template <class T> T read(const uint8_t* base, std::ptrdiff_t off) { T v; std::memcpy(&v, base + off, sizeof v); return v; }
-}
-
 bool ownedByMainPlayer(const uint8_t* region) {
-    if (!region) return false;
-    const auto owner = reinterpret_cast<const uint8_t*>(read<std::uintptr_t>(region, kRegionOwnerOffset));
-    return owner && owner[kPawnIsMainPlayerOffset] != 0;
+    return mem::flagBehindPointer(region, kRegionOwnerOffset, kPawnIsMainPlayerOffset);
 }
 
 int32_t adjust(int32_t vanilla, int32_t monthly, int32_t multiplier, bool hasLivingSpace) {

@@ -1,19 +1,13 @@
 #include "features/house_capacity.h"
+#include "features/memory.h"
 #include "features/upgrade_scope.h"
 #include <algorithm>
 #include <atomic>
-#include <cstring>
 
 namespace mlt::house_capacity {
 
-namespace {
-template <class T> T read(const uint8_t* base, std::ptrdiff_t off) { T v; std::memcpy(&v, base + off, sizeof v); return v; }
-}
-
 bool ownedByMainPlayer(const uint8_t* building) {
-    if (!building) return false;
-    const auto owner = reinterpret_cast<const uint8_t*>(read<std::uintptr_t>(building, kBuildingOwnerOffset));
-    return owner && owner[kPawnIsMainPlayerOffset] != 0;
+    return mem::flagBehindPointer(building, kBuildingOwnerOffset, kPawnIsMainPlayerOffset);
 }
 
 int32_t scale(int32_t vanilla, int32_t multiplier) {

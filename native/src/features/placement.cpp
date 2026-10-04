@@ -1,13 +1,11 @@
 #include "features/placement.h"
+#include "features/memory.h"
 #include <atomic>
-#include <cstring>
 
 namespace mlt::placement {
 
-namespace {
-template <class T> T read(const uint8_t* base, std::ptrdiff_t off) { T v; std::memcpy(&v, base + off, sizeof v); return v; }
-template <class T> void write(uint8_t* base, std::ptrdiff_t off, T v) { std::memcpy(base + off, &v, sizeof v); }
-}
+using mem::read;
+using mem::write;
 
 bool allowPlacement(uint8_t* pawn) {
     if (!pawn) return false;
