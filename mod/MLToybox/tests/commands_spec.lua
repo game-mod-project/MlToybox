@@ -30,6 +30,12 @@ T.run({
     c:run({ cmd("old", { issuedAt = 900 }) }, { now = 1000 })
     T.eq(#calls, 0, "not executed")
     T.eq(c:status().old.ok, false, "reported"); T.truthy(c:status().old.error:find("stale", 1, true), "reason")
+    T.eq(c:status().old.stale, true, "marked: an ignored command is not a failure (main.lua logs it as information)")
+  end,
+  only_stale_commands_are_marked_stale = function()
+    local c = runner()
+    c:run({ cmd("ok"), cmd("u", { type = "nope" }), cmd("e", { type = "boom" }) }, { now = 1000 })
+    T.eq(c:status().ok.stale, nil, "ran"); T.eq(c:status().u.stale, nil, "unknown type is a failure"); T.eq(c:status().e.stale, nil, "handler error is a failure")
   end,
   missing_issued_at_is_stale = function()
     local c, calls = runner()

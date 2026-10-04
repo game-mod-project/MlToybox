@@ -43,6 +43,7 @@ local commands = commandsLib.new({
   customizeRetinue = retinueEditor.open,
 }, function(command, result)
   if result.ok then log.info("command %s: ok", tostring(command.type))
+  elseif result.stale then log.info("command %s: ignored (older than %d seconds)", tostring(command.type), commandsLib.MAX_AGE_SEC)
   else log.error("command %s: %s", tostring(command.type), tostring(result.error)) end
 end)
 local appliedSeq = nil
