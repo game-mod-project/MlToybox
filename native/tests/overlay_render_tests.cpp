@@ -89,10 +89,29 @@ TEST(overlay_render_draws_and_never_blocks_the_games_resize) {
     for (int i = 0; i < 3; ++i) CHECK(SUCCEEDED(swap->Present(0, 0)));
     CHECK(a.frames.load() > before);                                                        // 바꾼 뒤에도 그린다
 
+    // 게임이 스왑체인을 새로 만든 경우(화면 모드 전환 등): 예전 것을 놓고 같은 창에 새 스왑체인을 만든다.
+    // 오버레이는 새 스왑체인에 다시 그리고, 예전 것의 마지막 프레임에서 남은 값으로 입력을 삼키지 않는다
+    waitForGpu(device, queue);
+    const void* oldSwap = swap;
+    swap->Release();
+    swap = nullptr;
+    sd.BufferCount = 3;
+    CHECK(SUCCEEDED(factory->CreateSwapChainForHwnd(queue, hwnd, &sd, nullptr, nullptr, &swap)));
+    if (swap == oldSwap) std::printf("NOTE overlay_render: the new swap chain got the old address\n");
+    a.wantMouse = true;
+    before = a.frames.load();
+    for (int i = 0; i < 4; ++i) {
+        queue->ExecuteCommandLists(1, lists);                                               // 게임은 프레임마다 큐를 실행한다
+        CHECK(SUCCEEDED(swap->Present(0, 0)));
+    }
+    CHECK(a.state.load() == OverlayState::Ready);
+    CHECK(a.frames.load() > before);
+    CHECK(!a.wantMouse.load());
+
     disableOverlay("test: gave up");                                                        // 프레임 예외 등으로 물러난 상태
     CHECK(SUCCEEDED(swap->Present(0, 0)));
     waitForGpu(device, queue);
-    const HRESULT resized = swap->ResizeBuffers(2, 640, 480, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+    const HRESULT resized = swap->ResizeBuffers(3, 640, 480, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
     CHECK(SUCCEEDED(resized));                                                              // 꺼진 뒤에도 게임의 크기 변경을 막지 않는다
 
     a.state = OverlayState::Starting;
