@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,6 +26,8 @@ inline constexpr float kScaleMax = 1.5f;
 
 // 파일이 없거나 깨졌으면 기본값. 모르는 토글 키는 Insert, 범위를 벗어난 값은 가까운 끝값
 OverlaySettings parseSettings(std::string_view text);
+// 해석하지 못하면(깨졌거나 객체가 아니다) 값 없음. 읽을 수 없는 파일과 빈 설정을 가릴 때 쓴다
+std::optional<OverlaySettings> tryParseSettings(std::string_view text);
 std::string dumpSettings(const OverlaySettings& s);
 
 // 고를 수 있는 토글 키 이름(화면 표시 순서)

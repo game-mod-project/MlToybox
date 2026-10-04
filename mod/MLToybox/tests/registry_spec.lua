@@ -128,6 +128,31 @@ T.run({
     T.eq(count(good, "tick"), 5, "good kept ticking")
     safe.setThreshold(5)
   end,
+  -- 실패는 호출 종류마다 따로 센다. 기능 이름 하나로 세면 매초 성공하는 poll 이 계속 실패하는 tick 의 횟수를 지워 영영 꺼지지 않는다
+  a_failing_tick_trips_even_while_poll_keeps_succeeding = function()
+    safe.setThreshold(3)
+    local r = registry.new()
+    local ticks = 0
+    local mixed = { name = "mixed", intervalSec = 1, poll = function() end, tick = function() ticks = ticks + 1; error("tick failed") end }
+    r:add(mixed); r:setInGame(true); r:apply({ mixed = { enabled = true } })
+    for t = 1, 6 do r:tick(t) end
+    T.eq(ticks, 3, "stopped at the threshold"); T.eq(r.tripped.mixed, true, "tripped"); T.eq(r.active.mixed, false, "off")
+    safe.setThreshold(5)
+  end,
+  -- 같은 이름으로 밖에서 부른 호출(main.lua 의 safe.call("lord", lord.read))이 그 기능의 실패 횟수를 건드리지 않는다
+  outside_calls_under_the_feature_name_do_not_touch_its_count = function()
+    safe.setThreshold(3)
+    local r = registry.new(); local bad, good = fake("lord", { fail = "tick" }), fake("other"); r:add(bad); r:add(good)
+    r:setInGame(true); r:apply({ lord = { enabled = true, intervalSec = 1 } })
+    for t = 1, 4 do
+      r:tick(t)
+      safe.call("lord", function() end)          -- 성공해도 tick 의 연속 실패는 그대로다
+    end
+    T.eq(r.tripped.lord, true, "the tick still tripped")
+    for _ = 1, 5 do safe.call("other", function() error("read failed") end) end
+    T.eq(r.tripped.other, nil, "an outside failure does not trip the feature")
+    safe.setThreshold(5)
+  end,
   apply_clears_trip = function()
     safe.setThreshold(1)
     local r = registry.new(); local bad = fake("bad", { fail = "tick" }); r:add(bad)
@@ -210,11 +235,11 @@ T.run({
     r.state.mercenaries = { hiredMine = 2 }
     T.eq(r:status(1, nil, nil).mercenaries.hiredMine, 2, "present")
   end,
-  status_includes_lord_values_when_present = function()
+  -- 영주 값은 main.lua 가 lord.read() 로 싣는다(기능이 꺼져 있어도 보고한다). 공유 상태에서 가져오지 않는다
+  status_leaves_lord_values_to_main = function()
     local r = registry.new(); r:add(fake("a")); r:setInGame(true)
-    T.eq(r:status(1, nil, nil).lord, nil, "absent")
     r.state.lord = { treasury = 5, kingsFavour = 2 }
-    T.eq(r:status(1, nil, nil).lord.kingsFavour, 2, "present")
+    T.eq(r:status(1, nil, nil).lord, nil, "not taken from the shared state")
   end,
   status_includes_per_region_resources_when_present = function()
     local r = registry.new(); r:add(fake("a")); r:setInGame(true)

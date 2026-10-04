@@ -1,5 +1,6 @@
 #pragma once
 #include "control_doc.h"
+#include "settings.h"
 #include "status_doc.h"
 #include <filesystem>
 #include <optional>
@@ -20,6 +21,11 @@ std::optional<std::string> readFileFrom(const std::filesystem::path& path, unsig
 struct LoadedControl {
     ControlDoc doc;
     bool unreadable = false;   // 파일은 있는데 해석하지 못했다(문서는 기본값)
+};
+
+struct LoadedSettings {
+    OverlaySettings settings;
+    bool unreadable = false;   // 파일은 있는데 해석하지 못했다(설정은 기본값)
 };
 
 class Bridge {
@@ -50,6 +56,12 @@ public:
     // 파일이 읽을 수 없는 상태면 control.json.bak 으로 사본을 남긴 뒤에 덮는다. 사본을 못 남기면 저장하지 않는다
     std::optional<long long> saveControl(ControlDoc& doc) const;
     std::optional<StatusDoc> readStatus() const;
+
+    std::filesystem::path settingsBackupPath() const { return dir_ / L"overlay.json.bak"; }
+    // overlay.json. 파일이 없으면 기본값. 있는데 해석하지 못했으면 기본값이고 unreadable 이 참이다
+    LoadedSettings loadSettingsChecked() const;
+    // overlay.json 을 overlay.json.bak 으로 복사한다(있던 사본은 덮는다). 파일이 없거나 복사하지 못하면 false
+    bool backupSettings() const;
 
     static BridgeState evaluate(const StatusDoc* status, long long lastSentSeq, long long nowEpochSeconds);
 

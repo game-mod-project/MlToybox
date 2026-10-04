@@ -1,12 +1,10 @@
 #include "features/militia_guard.h"
-#include <cstring>
+#include "features/memory.h"
 
 namespace mlt::militia_guard {
 
-namespace {
-template <class T> T read(const uint8_t* base, std::ptrdiff_t off) { T v; std::memcpy(&v, base + off, sizeof v); return v; }
-const uint8_t* readPtr(const uint8_t* base, std::ptrdiff_t off) { return reinterpret_cast<const uint8_t*>(read<std::uintptr_t>(base, off)); }
-}
+using mem::read;
+using mem::readPtr;
 
 bool isSafe(const uint8_t* pawn, const uint8_t* region) {
     if (!pawn) return false;

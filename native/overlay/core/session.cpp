@@ -44,7 +44,10 @@ void dropFinishedCommands(Session& s, const std::vector<std::string>& reportedId
         const auto issued = optNumber(&command, "issuedAt");
         return !issued || nowEpochSeconds - static_cast<long long>(*issued) > kCommandMaxAgeSec;
     };
+    const size_t before = s.commands.size();
     s.commands.erase(std::remove_if(s.commands.begin(), s.commands.end(), finished), s.commands.end());
+    // 뺀 명령은 마지막으로 저장한 파일에 아직 들어 있다. 한 번 더 저장해 파일에서도 뺀다
+    if (s.commands.size() != before) s.dirty = true;
 }
 
 }

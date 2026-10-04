@@ -14,15 +14,7 @@ M.SCOPE = { "immigration", "immigration_space", "immigration_owner" }
 -- 모드가 들인 가족 수(영지별). 다음 틱의 자연 이민 계산에서 빼서 배율이 다시 걸리지 않게 한다
 local modAdded = {}
 
-local function regionKey(r)
-  local ok, tag = pcall(function() return r.regionUniqueTag:ToString() end)
-  return ok and tag or nil
-end
-
-local function regionName(r)
-  local ok, name = pcall(function() return r.regionName:ToString() end)
-  return ok and name or nil
-end
+local regionKey, regionName = game.regionKey, game.regionName
 
 local function housesOf(region)
   local houses = {}
@@ -39,19 +31,35 @@ local function freeSlotsOf(houses)
   return free
 end
 
+local function freeIn(count) return math.max(0, M.MAX_FAMILIES_PER_HOUSE - count) end
+
+-- 영지 하나의 집과, 집마다의 가족 수와, 빈 자리의 합. 가족 목록은 리플렉션으로 읽으므로 한 번만 읽어 두고,
+-- 가족을 들일 때 그 집의 수만 고친다(가족마다 모든 집을 다시 읽으면 집과 가족이 많을 때 게임이 멈칫한다)
+local function entryFor(region)
+  local e = { region = region, houses = housesOf(region), counts = {}, free = 0 }
+  for i, b in ipairs(e.houses) do
+    e.counts[i] = #b.occupantFamilyIDs
+    e.free = e.free + freeIn(e.counts[i])
+  end
+  return e
+end
+
 -- 영지 하나에 한 가족: 빈 집(가족 0)을 먼저, 그다음 가족 1인 집. 성공하면 true
-local function addOne(region, houses)
+local function addOne(e)
   for pass = 0, M.MAX_FAMILIES_PER_HOUSE - 1 do
-    for _, b in ipairs(houses) do
-      if #b.occupantFamilyIDs == pass then
-        local before = {}
-        for i = 1, #b.occupantFamilyIDs do before[b.occupantFamilyIDs[i]] = true end
+    for i, b in ipairs(e.houses) do
+      if e.counts[i] == pass then
+        local before, ids = {}, b.occupantFamilyIDs
+        for k = 1, #ids do before[ids[k]] = true end
         b:spawnManorServantsInside(1)
-        local ids = b.occupantFamilyIDs
-        if #ids > pass then
-          for i = 1, #ids do
-            if not before[ids[i]] then region:unassignFamily(ids[i]) end
+        ids = b.occupantFamilyIDs
+        local count = #ids
+        if count > pass then
+          for k = 1, count do
+            if not before[ids[k]] then e.region:unassignFamily(ids[k]) end
           end
+          e.free = e.free - freeIn(pass) + freeIn(count)
+          e.counts[i] = count
           return true
         end
       end
@@ -64,16 +72,15 @@ end
 function M.addFamilies(n, key)
   local entries = {}
   for _, r in ipairs(game.playerRegions()) do
-    if key == nil or regionKey(r) == key then entries[#entries + 1] = { region = r, houses = housesOf(r) } end
+    if key == nil or regionKey(r) == key then entries[#entries + 1] = entryFor(r) end
   end
   local added = 0
   while added < n do
     local best, bestFree = nil, 0
     for _, e in ipairs(entries) do
-      local free = freeSlotsOf(e.houses)
-      if free > bestFree then best, bestFree = e, free end
+      if e.free > bestFree then best, bestFree = e, e.free end
     end
-    if not best or not addOne(best.region, best.houses) then break end
+    if not best or not addOne(best) then break end
     added = added + 1
     local k = regionKey(best.region)
     if k then modAdded[k] = (modAdded[k] or 0) + 1 end

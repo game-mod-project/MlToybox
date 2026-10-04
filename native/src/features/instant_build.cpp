@@ -1,11 +1,10 @@
 #include "features/instant_build.h"
+#include "features/memory.h"
 #include <cstring>
 
 namespace mlt::instant_build {
 
-namespace {
-template <class T> T read(const uint8_t* base, std::ptrdiff_t off) { T v; std::memcpy(&v, base + off, sizeof v); return v; }
-}
+using mem::read;
 
 int completeParts(uint8_t* master) {
     if (!master) return 0;
@@ -32,8 +31,7 @@ int completeParts(uint8_t* master) {
 
 namespace {
 bool ownedByMainPlayer(const uint8_t* master) {
-    const auto owner = reinterpret_cast<const uint8_t*>(read<std::uintptr_t>(master, kOwnerPawnOffset));
-    return owner && read<uint8_t>(owner, kPawnIsMainPlayerOffset) != 0;
+    return mem::flagBehindPointer(master, kOwnerPawnOffset, kPawnIsMainPlayerOffset);
 }
 }
 
@@ -45,8 +43,8 @@ int fillParts(uint8_t* master, bool ownerOffsetsVerified) {
 
 bool ownedByAnotherLord(const uint8_t* master) {
     if (!master) return false;
-    const auto owner = reinterpret_cast<const uint8_t*>(read<std::uintptr_t>(master, kOwnerPawnOffset));
-    return owner && read<uint8_t>(owner, kPawnIsMainPlayerOffset) == 0;
+    const uint8_t* owner = mem::readPtr(master, kOwnerPawnOffset);
+    return owner && owner[kPawnIsMainPlayerOffset] == 0;
 }
 
 int32_t hideFlags(uint8_t* engine) {

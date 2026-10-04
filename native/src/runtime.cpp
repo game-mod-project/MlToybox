@@ -44,6 +44,20 @@ bool pinModuleContaining(const void* address) {
                               static_cast<LPCWSTR>(address), &pinned) != 0;
 }
 
+HookGate::HookGate() {
+    // 프로세스마다 다른 이름: 게임을 둘 띄워도 서로 기다리지 않는다
+    const std::wstring name = L"Local\\MLToybox.HookGate." + std::to_wstring(GetCurrentProcessId());
+    mutex_ = CreateMutexW(nullptr, FALSE, name.c_str());
+    if (!mutex_) return;
+    const DWORD waited = WaitForSingleObject(static_cast<HANDLE>(mutex_), INFINITE);
+    held_ = waited == WAIT_OBJECT_0 || waited == WAIT_ABANDONED;
+}
+
+HookGate::~HookGate() {
+    if (held_) ReleaseMutex(static_cast<HANDLE>(mutex_));
+    if (mutex_) CloseHandle(static_cast<HANDLE>(mutex_));
+}
+
 TextSection mainModuleText() {
     auto base = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
     auto dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
@@ -72,6 +86,7 @@ struct MinHookBackend : HookBackend {
         return true;
     }
     bool setEnabled(void* target, bool on, std::string& err) override {
+        HookGate gate;   // 오버레이 DLL 의 MinHook 과 같은 때에 스레드를 멈추지 않는다
         MH_STATUS s = on ? MH_EnableHook(target) : MH_DisableHook(target);
         if (s != MH_OK) { err = MH_StatusToString(s); return false; }
         return true;
