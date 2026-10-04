@@ -22,7 +22,8 @@ add_library(mlt_core STATIC
     src/probe.cpp
     src/features/placement.cpp
     src/features/militia_guard.cpp
-    src/features/upgrade_scope.cpp)
+    src/features/upgrade_scope.cpp
+    src/features/immigration.cpp)
 target_include_directories(mlt_core PUBLIC src third_party/minhook/include)
 target_link_libraries(mlt_core PUBLIC minhook)
 
@@ -94,7 +95,7 @@ target_link_libraries(mltoybox_overlay PRIVATE overlay_impl)
 
 enable_testing()
 add_executable(native_tests tests/main.cpp tests/smoke_tests.cpp tests/scanner_tests.cpp
-    tests/json_tests.cpp tests/control_tests.cpp tests/status_tests.cpp tests/hooks_tests.cpp tests/instant_build_tests.cpp tests/probe_tests.cpp tests/placement_tests.cpp tests/pin_tests.cpp tests/militia_guard_tests.cpp tests/upgrade_scope_tests.cpp
+    tests/json_tests.cpp tests/control_tests.cpp tests/status_tests.cpp tests/hooks_tests.cpp tests/instant_build_tests.cpp tests/probe_tests.cpp tests/placement_tests.cpp tests/pin_tests.cpp tests/militia_guard_tests.cpp tests/upgrade_scope_tests.cpp tests/immigration_tests.cpp
     tests/overlay_text_tests.cpp
     tests/overlay_control_doc_tests.cpp
     tests/overlay_status_doc_tests.cpp

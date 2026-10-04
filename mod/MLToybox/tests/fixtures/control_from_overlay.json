@@ -29,6 +29,7 @@
     "population": {
       "enabled": true,
       "multiplier": 3,
+      "monthlyFamilies": 0,
       "targetFamilies": 12,
       "regionTargets": {
         "nus": 30

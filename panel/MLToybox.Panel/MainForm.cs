@@ -71,6 +71,7 @@ public sealed class MainForm : Form
 
     private readonly CheckBox _popEnabled = new() { Text = "인구 기능 사용", AutoSize = true };
     private readonly NumericUpDown _popMultiplier = new() { Minimum = 1, Maximum = 10, Value = 2, Width = 50 };
+    private readonly NumericUpDown _popMonthly = new() { Minimum = 0, Maximum = 31, Value = 0, Width = 50 };
     private readonly NumericUpDown _popTarget = new() { Minimum = 0, Maximum = 1000, Value = 0, Width = 70 };
     private readonly NumericUpDown _popAddCount = new() { Minimum = 1, Maximum = 20, Value = 3, Width = 50 };
     private readonly Label _popInfo = new() { AutoSize = true, Text = "현재: -" };
@@ -158,10 +159,11 @@ public sealed class MainForm : Form
         tabs.TabPages.Add(Page("인구",
             _popEnabled,
             Row(new Label { Text = "영지:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popRegion),
-            Row(new Label { Text = "자연 이민 배율(배):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popMultiplier),
+            Row(new Label { Text = "월 자연 이민 가족 수(0 = 게임 그대로):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popMonthly,
+                new Label { Text = "이민 속도 배율(배):", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popMultiplier),
             Row(_popTargetLabel, _popTarget, _popOverride),
             Row(new Label { Text = "지금 바로 들일 가족 수:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, _popAddCount, addFamilies),
-            new Label { Text = "배율은 영지마다 그 영지의 자연 이민만큼 그 영지에 추가합니다. 가족 추가는 선택한 영지에, 공통이면 빈 자리가 많은 영지부터 들입니다." + Environment.NewLine + "빈 집(가족 0 → 1 → 2 순)에 들어오며 미배치 가족으로 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.", AutoSize = true },
+            new Label { Text = "월 가족 수와 배율은 내 영지의 자연 이민을 바꿉니다(영지 창의 인구 증가 숫자도 따라 바뀝니다). 월 가족 수는 지지율과 무관하게 매달 그만큼, 배율은 게임의 값에 곱합니다." + Environment.NewLine + "월 가족 수를 넣으면 배율은 쓰이지 않습니다. 자연 이민은 하루 한 가족까지 오고, 빈 주거 공간이 없거나 집 없는 가족이 있으면 오지 않습니다(게임의 규칙)." + Environment.NewLine + "가족 추가는 선택한 영지에, 공통이면 빈 자리가 많은 영지부터 들입니다." + Environment.NewLine + "빈 집(가족 0 → 1 → 2 순)에 들어오며 미배치 가족으로 들어옵니다. 빈 자리가 없으면 들어오지 않습니다.", AutoSize = true },
             _popInfo));
         var statusPage = new TabPage("상태");
         statusPage.Controls.Add(_statusText);
@@ -305,6 +307,7 @@ public sealed class MainForm : Form
         _mercTab.LoadFrom(f.Mercenaries);
         _popEnabled.Checked = f.Population.Enabled;
         _popMultiplier.Value = Math.Clamp(f.Population.Multiplier, 1, 10);
+        _popMonthly.Value = Math.Clamp(f.Population.MonthlyFamilies, 0, 31);
         _popScope = null;
         _popRegionsKey = "";
         if (_popRegion.Items.Count > 0) { _popUpdating = true; _popRegion.SelectedIndex = 0; _popUpdating = false; }
@@ -385,6 +388,7 @@ public sealed class MainForm : Form
         f.Mercenaries = _mercTab.Read();
         f.Population.Enabled = _popEnabled.Checked;
         f.Population.Multiplier = (int)_popMultiplier.Value;
+        f.Population.MonthlyFamilies = (int)_popMonthly.Value;
         StorePopTarget();
         try
         {
@@ -477,7 +481,8 @@ public sealed class MainForm : Form
             : (r.Families, r.Population, r.Homeless, r.FreeSlots, r.Unassigned);
         var scope = r is null ? "모든 내 영지 합계" : r.Name;
         _popInfo.Text = $"현재({scope}): 가족 {families} · 인구 {people} · 집 없는 가족 {homeless} · 빈 자리 {free} · 미배치 가족 {unassigned}"
-            + $"{Environment.NewLine}이번 세션(전체): 자연 이민 {p.Natural}가족 → 배율로 추가 {p.Multiplied}가족";
+            + $"{Environment.NewLine}이번 세션(전체): 자연 이민 {p.Natural}가족"
+            + (p.Multiplied > 0 ? $" → 배율로 추가 {p.Multiplied}가족" : "");   // 네이티브가 배율을 맡으면 모드가 따로 들인 가족이 없다
     }
 
     private string? SpawnRegionKey() => (_spawnRegion.SelectedItem as ScopeOption)?.Key;
