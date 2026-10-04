@@ -176,7 +176,7 @@ struct MoodFrames {
 }
 
 TEST(overlay_mood_tab_sits_after_population_and_its_first_checkbox_turns_the_feature_on) {
-    CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "자격·질서", "상태", "로그" }));
+    CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "자격·질서", "영지", "상태", "로그" }));
     MoodFrames f;
     f.frame(nullptr);
     CHECK(!f.a.control.mood().enabled && !f.a.dirty);

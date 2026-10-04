@@ -21,6 +21,7 @@ end
 
 function M.status(statusPath, now, loaded, loadErr)
   local out = { loaded = loaded, error = loadErr, stale = true }
+  local nodes = nil
   local text = fileio.read(statusPath)
   if text then
     local ok, d = pcall(json.decode, text)
@@ -28,9 +29,12 @@ function M.status(statusPath, now, loaded, loadErr)
       out.heartbeat = d.heartbeat
       out.stale = (now - d.heartbeat) > M.STALE_SEC
       if type(d.features) == "table" and next(d.features) then out.features = d.features end
+      if not out.stale and type(d.nodes) == "table" then nodes = d.nodes end
     end
   end
   M.last = out
+  -- 내 영지의 광물 매장지(영지 주소, 종류 번호, 남은 양). 네이티브가 날짜가 넘어갈 때 적는다. status.json 에는 영지 기능이 정리해서 싣는다
+  M.nodes = nodes
   return out
 end
 

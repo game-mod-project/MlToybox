@@ -21,6 +21,17 @@ public sealed class FeaturesControl
     public PopulationControl Population { get; set; } = new();
     public StorageControl Storage { get; set; } = new();
     public MoodControl Mood { get; set; } = new();
+    public RegionControl Region { get; set; } = new();
+}
+
+// 영지: 가축 상인 대기와 자원 매장지의 최소 매장량. 게임 안 창의 "영지" 탭에서 고친다. 패널에는 화면이 없고, 저장할 때 설정을 그대로 남긴다
+public sealed class RegionControl
+{
+    public bool Enabled { get; set; }
+    public int IntervalSec { get; set; } = 5;
+    public bool NoLivestockWait { get; set; }                                   // 가축을 주문한 뒤의 대기("상인 방문까지")를 없앤다
+    public Dictionary<string, int> Targets { get; set; } = new();               // 종류 이름 → 매장지 하나의 최소 양
+    public Dictionary<string, Dictionary<string, int>> RegionTargets { get; set; } = new();   // 영지 키 → 종류별 값(0 = 그 영지는 채우지 않는다)
 }
 
 // 자격·공공질서. 게임 안 창의 "자격·질서" 탭에서 고친다. 패널에는 화면이 없고, 저장할 때 설정을 그대로 남긴다

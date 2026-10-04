@@ -108,6 +108,25 @@ struct MoodStatus {
     std::vector<MoodRegion> regions;
 };
 
+// 매장지 하나. kind 는 종류 이름(Salt, Iron, Clay, Stone, Fish, Eel, Berries, Mushrooms)
+struct DepositInfo {
+    std::string kind;
+    int amount = 0;
+    std::optional<int> capacity;   // 덩어리형만. 다시 차지 않는 것(돌)은 0
+};
+
+// 내 영지 하나의 가축 상인 대기일과 매장지
+struct RegionState {
+    std::string key;
+    std::string name;
+    int livestockWait = 0;   // "상인 방문까지" 남은 날. 0 이면 지금 주문할 수 있다
+    std::vector<DepositInfo> deposits;
+};
+
+struct RegionStatus {
+    std::vector<RegionState> regions;
+};
+
 struct MercSlot {
     std::string name;
     int cost = 0;
@@ -146,6 +165,7 @@ struct StatusDoc {
     std::optional<PopulationStatus> population;
     std::optional<MercenaryStatus> mercenaries;
     std::optional<MoodStatus> mood;
+    std::optional<RegionStatus> region;
     Json raw;
 };
 

@@ -102,6 +102,37 @@ public class BridgeClientTests
         Assert.Empty(fresh.Features.Mood.Regions);
     }
 
+    // 영지(가축 상인 대기, 매장량)도 게임 안 창에서만 고친다. 패널이 저장해도 그대로 남아야 한다
+    [Fact]
+    public void SaveControl_KeepsTheRegionSettingsSetInTheOverlay()
+    {
+        var c = NewClient(out var dir);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(c.ControlPath, "{\"version\":1,\"seq\":3,\"features\":{\"region\":{\"enabled\":true,\"intervalSec\":5,\"noLivestockWait\":true,"
+            + "\"targets\":{\"Iron\":1000,\"Fish\":400},\"regionTargets\":{\"imm\":{\"Iron\":3000},\"eich\":{\"Clay\":0}}}},\"commands\":[]}");
+        var doc = c.LoadControl();
+        Assert.True(doc.Features.Region.Enabled);
+        Assert.True(doc.Features.Region.NoLivestockWait);
+        doc.Features.Build.Enabled = true;
+        c.SaveControl(doc);
+        using var json = JsonDocument.Parse(File.ReadAllText(c.ControlPath));
+        var region = json.RootElement.GetProperty("features").GetProperty("region");
+        Assert.True(region.GetProperty("enabled").GetBoolean());
+        Assert.True(region.GetProperty("noLivestockWait").GetBoolean());
+        Assert.Equal(5, region.GetProperty("intervalSec").GetInt32());
+        Assert.Equal(1000, region.GetProperty("targets").GetProperty("Iron").GetInt32());
+        Assert.Equal(400, region.GetProperty("targets").GetProperty("Fish").GetInt32());
+        Assert.Equal(3000, region.GetProperty("regionTargets").GetProperty("imm").GetProperty("Iron").GetInt32());
+        Assert.Equal(0, region.GetProperty("regionTargets").GetProperty("eich").GetProperty("Clay").GetInt32());
+        // 설정이 없던 파일에는 꺼진 기본값이 쓰인다
+        var fresh = new ControlDocument();
+        Assert.False(fresh.Features.Region.Enabled);
+        Assert.False(fresh.Features.Region.NoLivestockWait);
+        Assert.Equal(5, fresh.Features.Region.IntervalSec);
+        Assert.Empty(fresh.Features.Region.Targets);
+        Assert.Empty(fresh.Features.Region.RegionTargets);
+    }
+
     [Fact]
     public void LoadControl_CorruptFile_ReturnsDefault()
     {

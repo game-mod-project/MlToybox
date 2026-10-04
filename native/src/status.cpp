@@ -3,7 +3,7 @@
 
 namespace mlt {
 
-std::string renderStatus(long long heartbeat, long long appliedSeq, const std::vector<FeatureState>& features) {
+std::string renderStatus(long long heartbeat, long long appliedSeq, const std::vector<FeatureState>& features, std::string_view extra) {
     std::string out = "{\"version\":1,\"heartbeat\":" + std::to_string(heartbeat) + ",\"appliedSeq\":" + std::to_string(appliedSeq);
     if (!features.empty()) {
         out += ",\"features\":{";
@@ -15,6 +15,10 @@ std::string renderStatus(long long heartbeat, long long appliedSeq, const std::v
             out += "}";
         }
         out += "}";
+    }
+    if (!extra.empty()) {
+        out += ",";
+        out += extra;
     }
     out += "}";
     return out;

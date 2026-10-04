@@ -30,6 +30,21 @@ struct MoodControl {
     bool operator==(const MoodControl&) const = default;
 };
 
+// 광물 매장지(소금·철·점토) 하나의 최소 매장량(features.region 의 targets). 0 = 채우지 않는다.
+// 영지 설정에서 -1 은 "그 종류는 공통 목표를 따른다"는 뜻이다
+struct MineralTargets {
+    int salt = 0;
+    int iron = 0;
+    int clay = 0;
+    bool operator==(const MineralTargets&) const = default;
+};
+struct RegionControl {
+    bool enabled = false;
+    MineralTargets common;                                          // 내 영지 전체
+    std::vector<std::pair<std::string, MineralTargets>> regions;    // 영지 키(regionUniqueTag) → 그 영지의 목표
+    bool operator==(const RegionControl&) const = default;
+};
+
 struct NativeControl {
     long long seq = -1;
     bool instantBuild = false;
@@ -41,6 +56,7 @@ struct NativeControl {
     int immigrationMultiplier = 1; // 이민 속도 배율(features.population.multiplier). 1 = 게임 그대로
     int houseCapacity = 1;         // 집의 수용 가족 수 배율(features.population.houseCapacity). 1 = 게임 그대로
     MoodControl mood;              // 자격·공공질서(features.mood). 꺼져 있으면 비어 있다
+    RegionControl region;          // 영지 기능 가운데 광물 매장량(features.region). 꺼져 있으면 비어 있다
 };
 std::optional<NativeControl> parseControl(std::string_view text);
 }

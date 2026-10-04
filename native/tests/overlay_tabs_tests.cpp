@@ -60,7 +60,7 @@ struct TabFrames {
 
 // 업그레이드(건물 업그레이드의 조건·비용·해금)는 건물 기능이라 건설 탭에 있다. 따로 탭을 두지 않는다
 TEST(overlay_tabs_upgrade_lives_in_the_build_tab) {
-    CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "자격·질서", "상태", "로그" }));
+    CHECK(tabNames() == (std::vector<std::string>{ "자원", "영주", "건설", "군사", "용병", "인구", "자격·질서", "영지", "상태", "로그" }));
 
     TabFrames f;
     f.frame(drawBuildTab);
