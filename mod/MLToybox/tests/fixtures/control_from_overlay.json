@@ -30,6 +30,7 @@
       "enabled": true,
       "multiplier": 3,
       "monthlyFamilies": 0,
+      "houseCapacity": 1,
       "targetFamilies": 12,
       "regionTargets": {
         "nus": 30

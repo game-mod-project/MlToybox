@@ -43,6 +43,7 @@ public sealed class PopulationControl
     public bool Enabled { get; set; }
     public int Multiplier { get; set; } = 2;   // 이민 속도 배율(게임의 월간 인구 변화에 곱한다)
     public int MonthlyFamilies { get; set; }   // 월 자연 이민 가족 수(0 = 게임 그대로. 넣으면 배율 대신 이 값이 쓰인다)
+    public int HouseCapacity { get; set; } = 1;   // 집의 수용 가족 수 배율(1 = 게임 그대로)
     public int TargetFamilies { get; set; }   // 영지마다 최소 가족 수(0 = 끔)
     public Dictionary<string, int> RegionTargets { get; set; } = new();   // 영지별 값(0 = 그 영지 끔)
 }
