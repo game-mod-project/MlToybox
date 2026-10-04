@@ -1,7 +1,17 @@
 local T = require("t")
 local F = require("fakes")
 local game = require("core.game")
+local native = require("core.native")
 local population = require("features.population")
+
+-- 네이티브가 "내 영지의 월간 인구 변화를 바꾸는 일"을 맡았는가: true 맡음, false 못 맡음(DLL 없음), nil 아직 모름
+local function nativeCan(v)
+  if v == nil then native.last = nil
+  elseif v then
+    native.last = { loaded = true, stale = false, features = {
+      immigration = { installed = true }, immigration_space = { installed = true }, immigration_owner = { installed = true } } }
+  else native.last = { loaded = false, stale = true } end
+end
 
 local nextId = 100
 
@@ -78,7 +88,9 @@ T.run({
     population.addFamilies(4)                                                                      -- sel 빈 자리 3, hof 1
     T.eq(sel.spawned + hof.spawned, 7, "total"); T.eq(hof.spawned, 1, "hof gets one once sel is no roomier")
   end,
+  -- 네이티브가 못 맡을 때의 배율(예전 방식): 게임이 들인 만큼 모드가 따로 더 들인다
   multiplier_applies_per_region_to_that_region = function()
+    nativeCan(false)
     local hof, sel = table.unpack(world(region("hof", { 0, 0, 0 }), region("sel", { 0, 0, 0 })))
     local st = {}
     population.enable(st, {})
@@ -91,6 +103,7 @@ T.run({
     T.eq(st.population.natural, 1, "natural counted"); T.eq(st.population.multiplied, 2, "multiplied counted")
   end,
   command_added_families_are_not_multiplied_as_natural_growth = function()
+    nativeCan(false)
     -- 실측: 명령으로 1가족 추가 → 다음 틱이 자연 이민으로 보고 배율 3 으로 2가족을 더 들였다
     local hof = world(region("hof", { 0, 0, 0, 0 }))[1]
     local st = {}
@@ -104,7 +117,31 @@ T.run({
     population.tick(st, { enabled = true, multiplier = 3 })
     T.eq(hof.spawned, 3, "real natural growth still multiplied")
   end,
+  -- 네이티브가 맡으면 게임이 직접 더 들인다(월간 인구 변화에 곱한다). 모드는 따로 들이지 않고 자연 이민만 센다
+  multiplier_is_left_to_the_native_hook_when_it_is_installed = function()
+    nativeCan(true)
+    local hof = world(region("hof", { 0, 0, 0, 0 }))[1]
+    local st = {}
+    population.enable(st, {})
+    population.tick(st, { enabled = true, multiplier = 3 })   -- 기준선
+    hof.natural = 3                                           -- 게임이 배율만큼 들였다
+    population.tick(st, { enabled = true, multiplier = 3 })
+    T.eq(hof.spawned, 0, "the mod adds nothing on top"); T.eq(st.population.natural, 3, "arrivals counted"); T.eq(st.population.multiplied, 0, "nothing multiplied by the mod")
+  end,
+  -- 네이티브 상태를 아직 모르면 이번 틱에는 더 들이지 않는다(맡았는데 또 들이면 배율이 두 번 걸린다)
+  multiplier_waits_while_the_native_state_is_unknown = function()
+    nativeCan(nil)
+    local hof = world(region("hof", { 0, 0, 0, 0 }))[1]
+    local st = {}
+    population.enable(st, {})
+    population.tick(st, { enabled = true, multiplier = 3 })
+    hof.natural = 1
+    population.tick(st, { enabled = true, multiplier = 3 })
+    T.eq(hof.spawned, 0, "nothing added while unknown")
+  end,
+  -- 목표 가족 수는 네이티브와 무관하게 모드가 채운다
   common_target_is_minimum_per_region = function()
+    nativeCan(true)
     local hof, sel = table.unpack(world(region("hof", { 0, 0 }, 10), region("sel", { 0, 0 }, 11)))
     local st = {}
     population.enable(st, {})
@@ -147,6 +184,7 @@ T.run({
   end,
   -- 켰다 끈 뒤: 값은 계속 따라가고 세션 누계는 그대로 보인다. 꺼져 있는 동안 늘어난 가족에는 다시 켜도 배율을 걸지 않는다
   observe_follows_the_game_after_the_feature_is_turned_off = function()
+    nativeCan(false)
     local hof = world(region("hof", { 0, 0, 0, 0 }))[1]
     local st = {}
     population.enable(st, {})

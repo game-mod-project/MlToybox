@@ -1,10 +1,15 @@
 local game = require("core.game")
+local native = require("core.native")
 local safe = require("core.safe")
 
 -- 인구: ASMBuildingMaster.spawnManorServantsInside(1) 로 주거지에 가족을 들인다(집당 최대 2가족).
--- 모든 계산은 영지별이다: 배율은 그 영지의 자연 이민만큼 그 영지에, 목표 가족 수는 영지마다 최소값.
+-- 모든 계산은 영지별이다: 목표 가족 수는 영지마다 최소값.
+-- 자연 이민의 수와 속도(settings.monthlyFamilies, settings.multiplier)는 네이티브 DLL 이 게임의 월간 인구 변화를 내 영지에서만 바꿔서 한다
+-- (findings "자연 이민 — 게임의 방식"). 네이티브가 못 맡으면 배율만 예전 방식으로 한다: 그 영지의 자연 이민만큼 그 영지에 따로 더 들인다.
 -- spawnManorServantsInside 는 새 가족을 그 집의 일꾼으로 배치하므로(일터 = 자기 집), 자연 이민처럼 미배치로 바꾼다.
 local M = { name = "population", intervalSec = 5, MAX_FAMILIES_PER_HOUSE = 2, MAX_COMMAND = 20, MAX_MULTIPLIER = 10 }
+-- 네이티브가 월간 인구 변화를 맡을 때 설치돼 있어야 하는 항목(core/native.lua 의 installed)
+M.SCOPE = { "immigration", "immigration_space", "immigration_owner" }
 
 -- 모드가 들인 가족 수(영지별). 다음 틱의 자연 이민 계산에서 빼서 배율이 다시 걸리지 않게 한다
 local modAdded = {}
@@ -121,6 +126,8 @@ function M.tick(state, settings)
   local common = tonumber(settings.targetFamilies)
   local overrides = settings.regionTargets or {}
   state.populationLast = state.populationLast or {}
+  -- 네이티브가 맡았으면 게임이 직접 더 들인다. 못 맡을 때만 여기서 들이고, 아직 모르면 이번에는 넘어간다(둘 다 하면 배율이 두 번 걸린다)
+  local addHere = multiplier > 1 and native.installed(M.SCOPE) == false
 
   local entries = {}
   for _, r in ipairs(game.playerRegions()) do
@@ -130,7 +137,7 @@ function M.tick(state, settings)
     local grown = last and (families - last - (modAdded[key] or 0)) or 0
     if grown > 0 then
       state.populationNatural = (state.populationNatural or 0) + grown
-      if multiplier > 1 then
+      if addHere then
         state.populationMultiplied = (state.populationMultiplied or 0) + M.addFamilies(grown * (multiplier - 1), key)
       end
     end
