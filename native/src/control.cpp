@@ -38,7 +38,6 @@ std::optional<NativeControl> parseControl(std::string_view text) {
     c.seq = static_cast<long long>(seq->n);
     c.instantBuild = flag(features, "build", "instantBuild");
     c.ignorePlacement = flag(features, "build", "ignorePlacement");
-    c.ignorePopulation = flag(features, "military", "ignorePopulation");
     c.noRegionLimit = flag(features, "build", "noRegionLimit");
     c.noMaterials = flag(features, "build", "noMaterials");
     c.upgradeFree = enabled(features, "upgrade");
