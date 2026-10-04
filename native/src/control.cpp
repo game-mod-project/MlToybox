@@ -44,6 +44,7 @@ std::optional<NativeControl> parseControl(std::string_view text) {
     c.upgradeFree = enabled(features, "upgrade");
     c.immigrationMonthly = number(features, "population", "monthlyFamilies", 0, 0, 31);
     c.immigrationMultiplier = number(features, "population", "multiplier", 1, 1, 10);
+    c.houseCapacity = number(features, "population", "houseCapacity", 1, 1, 10);
     return c;
 }
 

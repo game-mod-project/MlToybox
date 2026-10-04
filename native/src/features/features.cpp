@@ -4,6 +4,7 @@
 #include "features/militia_guard.h"
 #include "features/upgrade_scope.h"
 #include "features/immigration.h"
+#include "features/house_capacity.h"
 
 namespace mlt {
 void registerFeatures(HookManager& manager) {
@@ -12,5 +13,6 @@ void registerFeatures(HookManager& manager) {
     militia_guard::registerHook(manager);
     upgrade_scope::registerHook(manager);
     immigration::registerHook(manager);
+    house_capacity::registerHook(manager);
 }
 }
