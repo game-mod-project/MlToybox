@@ -5,6 +5,7 @@
 ## GitHub 릴리스
 | 판 | 올린 날 | `main` 커밋 | 처음 들어간 항목 |
 |---|---|---|---|
+| [v1.0.10](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.10) | 2026-10-05 | 8ac0f54 | 2026-10-05 「영지: 소금·철·점토·돌 매장지를 풍부하게 (무한 지하 매장지, 내 영지만)」, 「자격·질서와 영지 기능의 코드 리뷰에서 나온 15건」 |
 | [v1.0.9](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.9) | 2026-10-05 | fab9574 | 2026-10-05 「영지: 가축 상인 대기 없음과 매장량 최소 유지 (내 영지만)」, 「자격·공공질서: 고정값과 요인 배율 (내 영지만)」 |
 | [v1.0.8](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.8) | 2026-10-04 | 6342366 | 2026-10-04 「코드 리뷰에서 나온 15건」 |
 | [v1.0.7](https://github.com/game-mod-project/MlToybox/releases/tag/v1.0.7) | 2026-10-04 | b997cc5 | 2026-10-04 「인구: 집의 수용 가족 수 배율」 |
