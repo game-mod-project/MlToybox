@@ -18,6 +18,11 @@ T.run({
     local fn, err = loadfile(SCRIPTS_DIR .. "/../../MLToyboxLab/Scripts/main.lua")
     T.truthy(fn, "lab main.lua: " .. tostring(err))
   end,
+  -- 덤프 모드는 게임이 업데이트된 뒤의 복구 절차에서만 올린다. 문법 오류가 그때 가서 드러나지 않게 한다
+  dump_main_compiles = function()
+    local fn, err = loadfile(SCRIPTS_DIR .. "/../../MLToyboxDump/Scripts/main.lua")
+    T.truthy(fn, "dump main.lua: " .. tostring(err))
+  end,
   main_compiles = function()
     local fn, err = loadfile(scriptsPath("main.lua"))
     T.truthy(fn, "main.lua: " .. tostring(err))

@@ -235,6 +235,21 @@ TEST(overlay_fixture_for_the_lua_spec_matches_core_output) {
     storage.limits["69"].generic = 3000;
     storage.limits["69"].pantry = 6000;
     doc.setStorage(storage);
+    MoodSettings mood;
+    mood.enabled = true;
+    mood.common.approval.fixed = 80;
+    mood.common.order.good = 3;
+    mood.common.order.bad = 50;
+    mood.regions["nus"].order.fixed = 33;                      // 따로 지정한 영지: 자격은 게임 그대로, 공공질서만 고정
+    doc.setMood(mood);
+    RegionSettings region;
+    region.enabled = true;
+    region.noLivestockWait = true;
+    region.richDeposits = true;
+    region.targets["Fish"] = 900;
+    region.regionTargets["nus"]["Fish"] = 0;                   // 0 = 그 영지는 채우지 않는다
+    region.regionTargets["gold"]["Mushrooms"] = 700;
+    doc.setRegion(region);
     Json command = makeSetLord("influence", 20000, 1790000000);
     command["id"] = "0123456789abcdef0123456789abcdef";
     Json spawn = makeSpawnSquads("spearMilitia", 2, 1790000000, "nus");
