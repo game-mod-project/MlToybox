@@ -94,6 +94,50 @@
           "generic": 5000
         }
       }
+    },
+    "mood": {
+      "enabled": true,
+      "approval": {
+        "fixed": 80,
+        "good": 1,
+        "bad": 100
+      },
+      "order": {
+        "fixed": 0,
+        "good": 3,
+        "bad": 50
+      },
+      "regions": {
+        "nus": {
+          "approval": {
+            "fixed": 0,
+            "good": 1,
+            "bad": 100
+          },
+          "order": {
+            "fixed": 33,
+            "good": 1,
+            "bad": 100
+          }
+        }
+      }
+    },
+    "region": {
+      "enabled": true,
+      "intervalSec": 5,
+      "noLivestockWait": true,
+      "richDeposits": true,
+      "targets": {
+        "Fish": 900
+      },
+      "regionTargets": {
+        "gold": {
+          "Mushrooms": 700
+        },
+        "nus": {
+          "Fish": 0
+        }
+      }
     }
   },
   "commands": [
