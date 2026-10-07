@@ -62,7 +62,6 @@ end
 
 M.fname = function(s) return FName(s) end
 
--- 분대 생성 위치: 내 첫 지역의 영주 저택, 없으면 첫 완공 건물
 -- 영지 식별자: regionUniqueTag(세이브 간 고정, 예 "gold"), 표시 이름: regionName(플레이어가 바꿀 수 있음)
 function M.regionKey(r)
   local ok, tag = pcall(function() return r.regionUniqueTag:ToString() end)
