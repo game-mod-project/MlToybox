@@ -2,7 +2,17 @@
 
 - 작성일: 2026-09-28
 - 대상 게임: Manor Lords (Steam appid 1363080, buildid 24905706, UE5, 싱글플레이)
-- 상태: 설계 승인 대기
+- 상태: 구현됨(첫 릴리스 v1.0.0, 2026-10-02). 이 문서는 작성 시점의 설계이고 그 뒤로 맞춰 고치지 않았다. 지금의 구조와 동작은 [`README.md`](../../../README.md)가, 바뀐 과정은 [`docs/CHANGELOG.md`](../../CHANGELOG.md)가 기준이다.
+
+> **지금과 다른 곳** (2026-10-07에 코드와 맞춰 봄. 본문은 고치지 않았다)
+> - §1.3: 범위 밖이던 인게임 UI와 단축키(게임 안 오버레이 창, Insert), 원격 git 레포(GitHub)가 생겼다. 설정은 오버레이에서 하고 패널(§5.1)은 비상용이다.
+> - §4: `core/finder.lua`, `core/ticker.lua`, `enabled.txt`는 없다. 지금은 `core/registry.lua`(기능 등록과 주기), `core/game.lua`(게임 객체 조회), `core/datatable.lua`, `core/commands.lua`, `core/native.lua` 등이고, 기능 모듈은 열 개다(`config.lua`의 `featureModules`). 모드 등록은 `mods.txt`, 테스트 프로젝트는 `panel/MLToybox.Tests`다.
+> - §4.1: `init`은 없다. 기능 모듈은 `enable`, `configure`, `poll`, `tick`, `observe`, `disable`과 `intervalSec`을 둔다(이름 말고는 모두 선택. `core/registry.lua`).
+> - §4.2: 맵 전환은 `RegisterLoadMapPreHook`과 `RegisterInitGameStatePostHook`으로 안다. `control.json`이 바뀌었는지는 mtime이 아니라 `seq`로 가린다(`core/bridge.lua`).
+> - §5.2: `control.json`과 `status.json`의 항목이 늘었다(영주, 용병, 인구, 저장 용량, 자격·질서, 영지, 일회성 명령 `commands`).
+> - §8: Lua 스펙은 독립 인터프리터가 아니라 `dotnet test` 안에서 NLua로 돈다.
+> - §10: 원격 레포가 있다(`CLAUDE.md`).
+> - §11: 주민 수를 넘는 징집은 네이티브가 아니라 Lua의 병력 생성으로 했다(`features/spawn_squads.lua`, Plan 3 부록 A.2). `src/bridge.*`, `src/signatures.h`, `features/recruits.cpp`는 없다. 지금은 `src/control.*`, `runtime.*`, `status.*`, `probe.*`이고 패턴과 오프셋은 `src/features/<기능>.h`에 있다.
 
 ## 1. 목적과 범위
 

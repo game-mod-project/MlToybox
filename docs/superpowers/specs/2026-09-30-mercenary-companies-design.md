@@ -3,7 +3,14 @@
 - 작성일: 2026-09-30
 - 대상: MLToybox Lua 모드(`mod/MLToybox`)와 패널(`panel/`). 네이티브 DLL은 바꾸지 않는다.
 - 근거: `analysis/findings.md` "용병 고용 — 목록 보충과 커스텀 용병단 (2026-09-30, 스파이크)"
-- 상태: 설계 승인, 구현 계획 작성 전
+- 상태: 구현됨(2026-09-30, 깃발은 2026-10-01). 이 문서는 작성 시점의 설계이고 그 뒤로 맞춰 고치지 않았다. 지금의 동작은 [`README.md`](../../../README.md)의 "용병" 절이 기준이다.
+
+> **지금과 다른 곳** (2026-10-07에 코드와 맞춰 봄. 본문은 고치지 않았다)
+> - §1.3: 범위 밖이던 깃발 지정이 생겼다. 커스텀 용병단의 `banner`에 순정 용병단의 이름을 넣으면 그 깃발·색·문장을 쓴다(없으면 전처럼 칸의 것을 물려받는다). 패널 기능도 게임 안 창(오버레이)으로 옮겨졌다.
+> - §3: `companies`의 항목에 `banner`(선택)가 있다.
+> - §4.1: `plan.validate(companies, ctx)`이고 `ctx`는 `{ vanillaNames, regionKeys, unitExists }`다. `plan.build`의 입력에 `canCopyRows`가, 결과에 `slots`가 늘었다.
+> - §4.2: `list.read`는 칸마다 `units`, `region`, `banner`도 돌려준다. 재구성을 기다리는 동안 고용비만 맞추는 `list.applyCustomCosts`가 있다.
+> - §4.4: `state.merc`는 `{ baselineDone, refunded, nextRebuild, note }`이고, 끌 때 상태 보고를 지우는 `disable`이 있다.
 
 ## 1. 목적
 
